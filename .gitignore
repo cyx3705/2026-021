@@ -1,0 +1,31 @@
+# OneHistoryStudio baseline begin
+*.bak
+*.cache
+*.eod
+*.eox
+*.elk
+*.flk
+*.lck
+*.log
+*.obj
+*.pdb
+*.slk
+*.tmp
+*.xlk
+# OneHistoryStudio baseline end
+
+# OneHistoryStudio managed begin
+*.bak
+*.cache
+*.eod
+*.eox
+*.elk
+*.flk
+*.lck
+*.log
+*.obj
+*.pdb
+*.slk
+*.tmp
+*.xlk
+# OneHistoryStudio managed end
