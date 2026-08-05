@@ -1,31 +1,59 @@
 # OneHistoryStudio baseline begin
 *.bak
+*.buildwithskipanalyzers
 *.cache
+*.dwl
+*.dwl2
+*.elk
 *.eod
 *.eox
-*.elk
 *.flk
+*.idb
+*.ilk
 *.lck
 *.log
+*.lref
 *.obj
 *.pdb
 *.slk
+*.suo
+*.tlog
 *.tmp
+*.up2date
+*.user
+*.vsidx
 *.xlk
 # OneHistoryStudio baseline end
 
-# OneHistoryStudio managed begin
+# IDE and editor state
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build, dependency, test, and scratch output
+**/bin/
+**/obj/
+**/node_modules/
+TestResults/
+artifacts/
+work/
+
+# Local and generated files
 *.bak
 *.cache
+*.log
+*.pdb
+*.tmp
+
+# EPLAN machine-local database state
 *.eod
 *.eox
 *.elk
 *.flk
 *.lck
-*.log
-*.obj
-*.pdb
 *.slk
-*.tmp
 *.xlk
-# OneHistoryStudio managed end

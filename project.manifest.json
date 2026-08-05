@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "template": {
+    "isTemplate": true,
+    "source": "0000-000-Template",
+    "strictValidationArgument": "-Instantiation"
+  },
+  "project": {
+    "id": "0000-001",
+    "name": "AIReady",
+    "title": "OneHistory AI-Ready 项目模板",
+    "kind": [
+      "template",
+      "multidisciplinary"
+    ],
+    "status": "template"
+  },
+  "paths": {
+    "activeRoots": [
+      "b-Office/current",
+      "b-Office/package",
+      "b-Code"
+    ],
+    "sourceRoots": [
+      "b-Code"
+    ],
+    "generatedRoots": [],
+    "archiveRoots": [
+      "b-Office/history"
+    ],
+    "allowedRootDirectoryPrefixes": [
+      "a-",
+      "b-",
+      "z-"
+    ]
+  },
+  "documents": {
+    "center": "b-Office/文档中心.md",
+    "package": "b-Office/package/复用说明.md",
+    "structure": "b-Office/文档中心.md",
+    "overview": "b-Office/current/项目概览.md",
+    "technicalContract": "b-Office/current/技术合同.md",
+    "decisions": "b-Office/current/有效决策.md",
+    "verification": "b-Office/current/验证合同.md",
+    "historyBoundary": "b-Office/history/历史资料说明.md"
+  },
+  "commands": {
+    "setup": null,
+    "build": null,
+    "test": null,
+    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1",
+    "run": null,
+    "package": null
+  },
+  "externalDependencies": [],
+  "contextExclusions": [
+    "b-Office/history/**",
+    "b-Publish/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/node_modules/**",
+    "**/.vs/**",
+    "artifacts/**"
+  ]
+}
