@@ -36,9 +36,10 @@ public static class MercuryDockManagerView
         private readonly TextBox _minItems = new() { Width = 56 };
         private readonly TextBox _maxItems = new() { Width = 56 };
         private readonly TextBox _halfLife = new() { Width = 56 };
-        private readonly ComboBox _commandInput = new() { Width = 220, IsEditable = true };
-        private readonly ComboBox _argumentInput = new() { Width = 200, IsEditable = true };
+        private readonly SuggestBox _commandInput = new();
+        private readonly SuggestBox _argumentInput = new();
         private readonly TextBlock _status = new();
+        private CommandOptionTree _commandTree = CommandOptionTree.Build(MercuryDockAliasCommands.FallbackCommandCatalog());
         private bool _commandsLoaded;
 
         public ManagerPage()
@@ -72,12 +73,16 @@ public static class MercuryDockManagerView
             policyBar.Children.Add(Gap("半衰期(天)"));
             policyBar.Children.Add(_halfLife);
 
-            ConfigureCombo(_commandInput, "要执行的总线指令；默认 mercury.dock.open，可改输任意指令");
-            ConfigureCombo(_argumentInput, "指令参数；打开项目时为项目名或编号");
-            // 常驻默认指令：可删除改输其他指令，下拉候选来自服务侧全量清单。
+            // 指令框：无下拉箭头，输入即弹候选，Shift+W/S 移动、Tab 确认并逐级下钻（域→类→方法）。
+            _commandInput.Hint = "要执行的总线指令：输入即弹出候选，Shift+W/S 上下移动，Tab 确认并逐级下钻（域→类→方法）";
+            _commandInput.Source = text => _commandTree.ChildrenOf(text);
+            _commandInput.Committed += _ => _argumentInput.Focus();
+            // 常驻默认指令：可删除改输其他指令，候选来自服务侧全量清单。
             _commandInput.Text = MercuryDockAliasCommands.OpenCommandName;
-            _commandInput.SelectionChanged += (_, _) => ReloadArgumentCandidates();
-            _commandInput.LostFocus += (_, _) => ReloadArgumentCandidates();
+
+            _argumentInput.Hint = "指令参数：打开项目时为项目名或编号，输入即过滤；其他指令自由输入";
+            _argumentInput.Source = ArgumentOptions;
+            _argumentInput.Committed += _ => AddEntry();
 
             var add = new Button
             {
@@ -88,11 +93,16 @@ public static class MercuryDockManagerView
             DockTheme.StyleButton(add, accent: true);
             add.Click += (_, _) => AddEntry();
 
-            var addBar = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            // 指令框独占一行，参数框与按钮同行，窄面板下不再换行截断。
+            _commandInput.Margin = new Thickness(0, 8, 0, 0);
+            var argRow = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            DockPanel.SetDock(add, Dock.Right);
+            argRow.Children.Add(add);
+            argRow.Children.Add(_argumentInput);
+
+            var addBar = new StackPanel();
             addBar.Children.Add(_commandInput);
-            addBar.Children.Add(_argumentInput);
-            _argumentInput.Margin = new Thickness(8, 0, 0, 0);
-            addBar.Children.Add(add);
+            addBar.Children.Add(argRow);
 
             _status.TextWrapping = TextWrapping.Wrap;
             _status.FontFamily = DockTheme.FontFamily;
@@ -121,8 +131,8 @@ public static class MercuryDockManagerView
 
             root.Children.Add(new TextBlock
             {
-                Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；"
-                    + "策略改完自动保存。加入框默认 mercury.dock.open（打开项目目录），可改输任意总线指令，加入后常驻桌面坞。",
+                Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；策略改完自动保存。"
+                    + "指令框输入即弹候选：Shift+W/S 上下移动，Tab 确认并逐级下钻（域→类→方法）；默认 mercury.dock.open 打开项目目录，可改输任意总线指令，加入后常驻桌面坞。",
                 TextWrapping = TextWrapping.Wrap,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
@@ -174,7 +184,6 @@ public static class MercuryDockManagerView
             {
                 LoadPolicy();
                 Reload();
-                ReloadArgumentCandidates();
                 _ = LoadCommandCatalogAsync();
                 _ = MercuryDockState.RefreshAsync();
             };
@@ -314,25 +323,10 @@ public static class MercuryDockManagerView
             };
         }
 
-        private static void ConfigureCombo(ComboBox input, string tip)
-        {
-            input.Height = 28;
-            input.Padding = DockTheme.ControlPadding;
-            input.FontFamily = DockTheme.FontFamily;
-            input.FontSize = DockTheme.BodyFontSize;
-            input.Foreground = DockTheme.Label;
-            input.Background = DockTheme.PanelBackground;
-            input.BorderBrush = DockTheme.PanelBorder;
-            input.BorderThickness = new Thickness(1);
-            input.VerticalContentAlignment = VerticalAlignment.Center;
-            input.ToolTip = tip;
-        }
-
         private void OnChanged() => Dispatcher.BeginInvoke(() =>
         {
             LoadPolicy();
             Reload();
-            ReloadArgumentCandidates();
         });
 
         /// <summary>列表只显示已入坞的条目：项目（固定+策略选中）加手动指令项。</summary>
@@ -377,7 +371,7 @@ public static class MercuryDockManagerView
                 return;
             _commandsLoaded = true;
 
-            IReadOnlyList<string> names = [];
+            IReadOnlyList<CommandCatalogItem> items = [];
             var bus = MercuryDockUiModule.Bus;
             if (bus != null)
             {
@@ -385,7 +379,7 @@ public static class MercuryDockManagerView
                 {
                     var result = await bus.ExecuteAsync("command.list", "UI").ConfigureAwait(false);
                     if (result.Success)
-                        names = MercuryDockAliasCommands.ParseCommandNames(result.Data);
+                        items = MercuryDockAliasCommands.ParseCommandCatalog(result.Data);
                 }
                 catch (Exception)
                 {
@@ -395,23 +389,28 @@ public static class MercuryDockManagerView
 
             await Dispatcher.BeginInvoke(() =>
             {
-                var items = names.Count > 0 ? names : MercuryDockAliasCommands.FallbackCommandNames();
-                _commandInput.ItemsSource = items
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                if (items.Count == 0)
+                    items = MercuryDockAliasCommands.FallbackCommandCatalog();
+                // 服务侧清单可能来自旧版模块：保证常驻默认指令永远在候选树里。
+                if (items.All(item => !item.Name.Equals(
+                        MercuryDockAliasCommands.OpenCommandName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    items = items.Concat(MercuryDockAliasCommands.FallbackCommandCatalog()
+                        .Where(item => item.Name.Equals(
+                            MercuryDockAliasCommands.OpenCommandName, StringComparison.OrdinalIgnoreCase)))
+                        .ToList();
+                }
+                _commandTree = CommandOptionTree.Build(items);
             });
         }
 
         /// <summary>参数候选：打开项目指令时为工作树未入坞项目（排除项标注排前），其他指令自由输入。</summary>
-        private void ReloadArgumentCandidates()
+        private IReadOnlyList<SuggestOption> ArgumentOptions(string text)
         {
             if (!IsOpenProjectCommand(_commandInput.Text))
-            {
-                _argumentInput.ItemsSource = null;
-                return;
-            }
+                return [];
 
-            var selected = (_argumentInput.SelectedItem as AddCandidate)?.Name;
+            var filter = text.Trim();
             var docked = MercuryDockState.Projects
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -419,22 +418,19 @@ public static class MercuryDockManagerView
                 .Where(item => item.Excluded)
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _argumentInput.ItemsSource = MercuryDockState.ListWorktreeProjects()
+            return MercuryDockState.ListWorktreeProjects()
                 .Where(name => !docked.Contains(name))
-                .Select(name => new AddCandidate(name, excluded.Contains(name)))
+                .Where(name => filter.Length == 0
+                    || name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .Select(name => (Name: name, Excluded: excluded.Contains(name)))
                 .OrderByDescending(candidate => candidate.Excluded)
                 .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(candidate => new SuggestOption(
+                    candidate.Name,
+                    candidate.Name,
+                    candidate.Excluded ? "已排除，加入即找回" : null,
+                    false))
                 .ToList();
-            if (selected == null)
-                return;
-            foreach (var item in _argumentInput.Items)
-            {
-                if (item is AddCandidate candidate && candidate.Name == selected)
-                {
-                    _argumentInput.SelectedItem = item;
-                    break;
-                }
-            }
         }
 
         /// <summary>加入：打开项目指令且参数命中工作树项目走 AddToDock，其余作为自定义指令常驻入坞。</summary>
@@ -513,11 +509,6 @@ public static class MercuryDockManagerView
             public string Key => IsCommand ? "cmd:" + Command : "proj:" + Name;
         }
 
-        /// <summary>"加入扩展坞"参数下拉项；Excluded 仅用于标注与排序。</summary>
-        private sealed record AddCandidate(string Name, bool Excluded)
-        {
-            public override string ToString() => Excluded ? $"{Name}（已排除）" : Name;
-        }
     }
 
     private sealed class PinOpacityConverter : IValueConverter

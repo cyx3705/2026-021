@@ -22,7 +22,7 @@ Equal(1, moduleInfos.Count, "独立程序集必须只有一个模块入口");
 Equal("MercuryDock", moduleInfos[0].ModuleName, "模块域必须使用稳定模块名");
 Equal("dock", moduleInfos[0].GetType().GetProperty("CommandPrefix")?.GetValue(moduleInfos[0]),
     "旧命令前缀必须保持兼容");
-Equal("3.1.0", moduleInfos[0].Version, "模块版本");
+Equal("3.2.0", moduleInfos[0].Version, "模块版本");
 Equal(typeof(MercuryDockCommands), moduleInfos[0].MainClassType, "命令入口类型");
 
 Equal(
@@ -30,7 +30,7 @@ Equal(
     moduleInfos[0].MainClassType!
         .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
         .Count(method => !method.IsSpecialName),
-    "dock 指令数(3.1.0 别名指令走 RegisterCommands，不占反射方法数)");
+    "dock 指令数(别名指令走 RegisterCommands，不占反射方法数)");
 
 var uiTypes = assembly.GetTypes()
     .Where(type => type.IsPublic && !type.IsAbstract && typeof(IUiModule).IsAssignableFrom(type))
@@ -144,11 +144,42 @@ Equal(
     MercuryDockAliasCommands.BuildOpenCommandText("a b"),
     "含空白参数必须加引号");
 
-using var catalog = JsonDocument.Parse("""[{"commandName":"mercury.dock.open"},{"commandName":"dock.list"},{"other":1}]""");
-Equal(2, MercuryDockAliasCommands.ParseCommandNames(catalog.RootElement).Count, "解析 command.list 的 JsonElement");
+using var catalog = JsonDocument.Parse("""
+[{"commandName":"mercury.dock.open","domain":"MercuryDock","commandClass":"app","summary":"打开项目"},
+ {"commandName":"dock.list","domain":"MercuryDock","commandClass":"projects"},
+ {"other":1}]
+""");
+var catalogItems = MercuryDockAliasCommands.ParseCommandCatalog(catalog.RootElement);
+Equal(2, catalogItems.Count, "解析 command.list 的 JsonElement");
+Equal("MercuryDock", catalogItems[0].Domain, "指令目录域字段");
+Equal("projects", catalogItems[1].CommandClass, "指令目录类字段");
 True(
-    MercuryDockAliasCommands.FallbackCommandNames().Contains(MercuryDockAliasCommands.OpenCommandName),
+    MercuryDockAliasCommands.FallbackCommandCatalog().Any(item => item.Name == MercuryDockAliasCommands.OpenCommandName),
     "保底清单必须含常驻默认指令");
+
+// 3.2.0 级联候选树：域→类→方法逐级下钻，分支确认后进入下一级。
+var tree = CommandOptionTree.Build(
+[
+    new CommandCatalogItem("mercury.dock.open", "MercuryDock", "app", "打开项目目录"),
+    new CommandCatalogItem("mercury.dock.close", "MercuryDock", "app", ""),
+    new CommandCatalogItem("dock.pin", "MercuryDock", "projects", ""),
+    new CommandCatalogItem("help", "", "", "帮助"),
+]);
+var roots = tree.ChildrenOf("");
+Equal(3, roots.Count, "根级候选数");
+True(roots.Single(option => option.Display.StartsWith("mercury")).IsBranch, "mercury 是分支");
+True(!roots.Single(option => option.Display == "help").IsBranch, "help 是叶子");
+Equal("help", roots.Single(option => option.Display == "help").Text, "叶子确认文本即指令全文");
+var secondLevel = tree.ChildrenOf("mercury.");
+Equal(1, secondLevel.Count, "mercury 下只有 dock");
+Equal("mercury.dock.", secondLevel[0].Text, "分支确认后进入下一级");
+var methods = tree.ChildrenOf("mercury.dock.");
+Equal(2, methods.Count, "方法级两条");
+Equal("mercury.dock.open", methods.Single(option => option.Display == "open").Text, "叶子全文");
+Equal("打开项目目录", methods.Single(option => option.Display == "open").Detail, "叶子带摘要");
+Equal(1, tree.ChildrenOf("mercury.d").Count, "过滤段按前缀收缩候选");
+Equal(1, tree.ChildrenOf("mercury.dock.o").Count, "方法级过滤只剩 open");
+Equal(0, tree.ChildrenOf("nope.").Count, "未知路径无候选");
 
 // 3.1.0 指令项状态：加入去重、移除不区分大小写；全程在隔离状态目录。
 True(MercuryDockState.AddCommand("demo.alpha  1"), "加入指令项必须成功");
@@ -212,7 +243,7 @@ catch (Exception)
 }
 
 Console.WriteLine(
-    "MercuryDock.Smoke: PASS (1 module, 16 commands + mercury.dock.open alias, 1 UI module, shell-hosted manager, Explorer entry, bottom-right layout, weight+glow, command entries, worktree-root fallback)");
+    "MercuryDock.Smoke: PASS (1 module, 16 commands + mercury.dock.open alias, 1 UI module, shell-hosted manager, Explorer entry, bottom-right layout, weight+glow, command entries, cascading command tree, worktree-root fallback)");
 
 static void True(bool condition, string message)
 {
