@@ -258,12 +258,12 @@
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildRowStyle">
             <summary>
-            对齐命令集页行距：Shell.Item.Base 的 Padding(8,4)，正文字号跟随 ListView Body。
-            自绘选中模板保留淡黄底深字，避免系统白底。
+            表格正文字号 Small、行距 Padding(4,1)，比命令集默认 Body/(8,4) 更紧；
+            自绘选中模板保留淡黄底深字。
             </summary>
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildHeaderStyle">
-            <summary>对齐命令集页 Shell.GridHeader：Small 字号、26 高、左对齐。</summary>
+            <summary>紧凑表头：Small 字号、高 20。</summary>
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildPinTemplate">
             <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
