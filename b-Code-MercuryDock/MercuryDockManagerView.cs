@@ -46,9 +46,10 @@ public static class MercuryDockManagerView
         {
             // 页面只有深色模式：整页铺深色底，避免透出宿主浅色停靠框背景。
             Background = DockTheme.PanelBackground;
+            // 页面边距与命令集页(McpToolsView Margin=10)对齐。
             var root = new DockPanel
             {
-                Margin = new Thickness(12),
+                Margin = new Thickness(10),
                 Background = DockTheme.PanelBackground,
             };
             root.SetValue(TextElement.FontFamilyProperty, DockTheme.FontFamily);
@@ -103,20 +104,21 @@ public static class MercuryDockManagerView
             policyGroup.Children.Add(Gap("半衰期(天)"));
             policyGroup.Children.Add(_halfLife);
 
-            var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
+            var toolbar = new DockPanel();
             DockPanel.SetDock(add, Dock.Right);
             DockPanel.SetDock(policyGroup, Dock.Left);
             toolbar.Children.Add(add);
             toolbar.Children.Add(policyGroup);
             toolbar.Children.Add(_entryInput);
 
+            // 状态行贴在顶栏下；空文本时高度为 0，不额外拉开与表格的间距。
             _status.TextWrapping = TextWrapping.Wrap;
             _status.FontFamily = DockTheme.FontFamily;
             _status.FontSize = DockTheme.SmallFontSize;
             _status.Foreground = DockTheme.Muted;
-            _status.Margin = new Thickness(0, 0, 0, 6);
+            _status.Margin = new Thickness(0, 2, 0, 0);
 
-            var header = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+            var header = new StackPanel();
             header.Children.Add(toolbar);
             header.Children.Add(_status);
             DockPanel.SetDock(header, Dock.Top);
@@ -130,11 +132,13 @@ public static class MercuryDockManagerView
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Muted,
-                Margin = new Thickness(0, 0, 0, 6),
+                Margin = new Thickness(2, 8, 0, 0),
             });
             DockPanel.SetDock(root.Children[^1], Dock.Bottom);
 
             _list.View = BuildColumns();
+            // 与命令集页 ToolList 一致：顶栏下 8px，正文字号 Body，行距由 Shell.Item.Base 同款 Padding(8,4) 决定。
+            _list.Margin = new Thickness(0, 8, 0, 0);
             _list.Background = DockTheme.PanelBackground;
             _list.BorderBrush = DockTheme.PanelBorder;
             _list.BorderThickness = new Thickness(1);
@@ -188,7 +192,11 @@ public static class MercuryDockManagerView
 
         private static GridView BuildColumns()
         {
-            var view = new GridView();
+            var view = new GridView
+            {
+                // 对齐命令集页 Shell.GridHeader：小字号表头、26 高、透明底发丝分隔。
+                ColumnHeaderContainerStyle = BuildHeaderStyle(),
+            };
             view.Columns.Add(new GridViewColumn
             {
                 Header = "固定",
@@ -204,20 +212,82 @@ public static class MercuryDockManagerView
         }
 
         /// <summary>
-        /// 紧凑行样式 + 自绘选中模板。3.2.2 裸 Style 盖掉了宿主 Shell.Item.Base，
-        /// 回退系统白底选中；此处显式淡黄底深字，聚焦/失焦一致。
+        /// 对齐命令集页行距：Shell.Item.Base 的 Padding(8,4)，正文字号跟随 ListView Body。
+        /// 自绘选中模板保留淡黄底深字，避免系统白底。
         /// </summary>
         private static Style BuildRowStyle()
         {
             var style = new Style(typeof(ListViewItem));
-            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 1, 4, 1)));
-            style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 22.0));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 4, 8, 4)));
             style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
             style.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.Label));
             style.Setters.Add(new Setter(Control.TemplateProperty, BuildRowTemplate()));
             return style;
+        }
+
+        /// <summary>对齐命令集页 Shell.GridHeader：Small 字号、26 高、左对齐。</summary>
+        private static Style BuildHeaderStyle()
+        {
+            var style = new Style(typeof(GridViewColumnHeader));
+            style.Setters.Add(new Setter(Control.FontFamilyProperty, DockTheme.FontFamily));
+            style.Setters.Add(new Setter(Control.FontSizeProperty, DockTheme.SmallFontSize));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.Muted));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 0, 8, 0)));
+            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 26.0));
+            style.Setters.Add(new Setter(Control.TemplateProperty, BuildHeaderTemplate()));
+            return style;
+        }
+
+        private static ControlTemplate BuildHeaderTemplate()
+        {
+            var template = new ControlTemplate(typeof(GridViewColumnHeader));
+            var grid = new FrameworkElementFactory(typeof(Grid));
+            var border = new FrameworkElementFactory(typeof(Border), "Bd");
+            border.SetValue(Border.BackgroundProperty, DockTheme.SurfaceAlt);
+            border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+            var content = new FrameworkElementFactory(typeof(ContentPresenter));
+            content.SetBinding(
+                FrameworkElement.MarginProperty,
+                new Binding(nameof(Control.Padding))
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                });
+            content.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.AppendChild(content);
+            grid.AppendChild(border);
+
+            var thumb = new FrameworkElementFactory(typeof(System.Windows.Controls.Primitives.Thumb), "PART_HeaderGripper");
+            thumb.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right);
+            thumb.SetValue(FrameworkElement.WidthProperty, 8.0);
+            thumb.SetValue(FrameworkElement.CursorProperty, Cursors.SizeWE);
+            thumb.SetValue(Control.TemplateProperty, BuildHeaderGripperTemplate());
+            grid.AppendChild(thumb);
+            template.VisualTree = grid;
+
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty, DockTheme.Hover, "Bd"));
+            template.Triggers.Add(hover);
+            return template;
+        }
+
+        private static ControlTemplate BuildHeaderGripperTemplate()
+        {
+            var template = new ControlTemplate(typeof(System.Windows.Controls.Primitives.Thumb));
+            var hit = new FrameworkElementFactory(typeof(Border));
+            hit.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            var line = new FrameworkElementFactory(typeof(Border));
+            line.SetValue(FrameworkElement.WidthProperty, 1.0);
+            line.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            line.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 6, 0, 6));
+            line.SetValue(Border.BackgroundProperty, DockTheme.PanelBorder);
+            hit.AppendChild(line);
+            template.VisualTree = hit;
+            return template;
         }
 
         private static ControlTemplate BuildRowTemplate()
