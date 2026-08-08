@@ -141,15 +141,13 @@ public static class MercuryDockManagerView
             _list.Foreground = DockTheme.Label;
             _list.FontFamily = DockTheme.FontFamily;
             _list.FontSize = DockTheme.BodyFontSize;
-            // 行距略收紧：默认 ListViewItem 偏疏，中央页签下更需紧凑。
-            var rowStyle = new Style(typeof(ListViewItem));
-            rowStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 1, 4, 1)));
-            rowStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 22.0));
-            rowStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
-            _list.ItemContainerStyle = rowStyle;
-            // 选中恒为淡黄底深字，聚焦与失焦一致，不再用白色或暗金。
+            // 行距略收紧，并自带选中模板：淡黄底深字，覆盖宿主/系统白底选中。
+            _list.ItemContainerStyle = BuildRowStyle();
+            // 兜底：未走自定义模板时的系统选中色（含失焦白底）。
             _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Selection;
             _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.SelectionText;
+            _list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = DockTheme.Selection;
+            _list.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = DockTheme.SelectionText;
             _list.Resources[SystemColors.ControlBrushKey] = DockTheme.Selection;
             _list.Resources[SystemColors.ControlTextBrushKey] = DockTheme.SelectionText;
             // 右键按下先选中行，菜单里的排除/移除才有确定的作用对象。
@@ -203,6 +201,65 @@ public static class MercuryDockManagerView
             view.Columns.Add(Column("点击", nameof(DockRow.Clicks), 50, "F1"));
             view.Columns.Add(Column("最近打开", nameof(DockRow.LastOpened), 120, "yyyy-MM-dd HH:mm"));
             return view;
+        }
+
+        /// <summary>
+        /// 紧凑行样式 + 自绘选中模板。3.2.2 裸 Style 盖掉了宿主 Shell.Item.Base，
+        /// 回退系统白底选中；此处显式淡黄底深字，聚焦/失焦一致。
+        /// </summary>
+        private static Style BuildRowStyle()
+        {
+            var style = new Style(typeof(ListViewItem));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 1, 4, 1)));
+            style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 22.0));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.Label));
+            style.Setters.Add(new Setter(Control.TemplateProperty, BuildRowTemplate()));
+            return style;
+        }
+
+        private static ControlTemplate BuildRowTemplate()
+        {
+            var template = new ControlTemplate(typeof(ListViewItem));
+            var border = new FrameworkElementFactory(typeof(Border), "Bd");
+            border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+            border.SetBinding(
+                Border.PaddingProperty,
+                new Binding(nameof(Control.Padding))
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                });
+            border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+
+            var row = new FrameworkElementFactory(typeof(GridViewRowPresenter), "Row");
+            row.SetBinding(
+                GridViewRowPresenter.ContentProperty,
+                new Binding(nameof(ContentControl.Content))
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent),
+                });
+            row.SetBinding(
+                GridViewRowPresenter.ColumnsProperty,
+                new Binding("View.Columns")
+                {
+                    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(ListView), 1),
+                });
+            border.AppendChild(row);
+            template.VisualTree = border;
+
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(Border.BackgroundProperty, DockTheme.Hover, "Bd"));
+            template.Triggers.Add(hover);
+
+            // 选中触发器放在悬停之后，保证选中色优先于悬停色。
+            var selected = new Trigger { Property = ListViewItem.IsSelectedProperty, Value = true };
+            selected.Setters.Add(new Setter(Border.BackgroundProperty, DockTheme.Selection, "Bd"));
+            selected.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.SelectionText));
+            template.Triggers.Add(selected);
+            return template;
         }
 
         /// <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>

@@ -51,6 +51,8 @@ internal sealed class SuggestBox : UserControl
         _list.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
         _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Selection;
         _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.SelectionText;
+        _list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = DockTheme.Selection;
+        _list.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = DockTheme.SelectionText;
         _list.Resources[SystemColors.ControlBrushKey] = DockTheme.Selection;
         _list.Resources[SystemColors.ControlTextBrushKey] = DockTheme.SelectionText;
         var itemStyle = new Style(typeof(ListBoxItem));
