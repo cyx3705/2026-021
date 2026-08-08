@@ -4,27 +4,37 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Modules;
 
 namespace MercuryDock;
 
 /// <summary>
-/// 活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在无窗服务宿主中建窗。
+/// 活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在有 WPF Application 的宿主中建窗。
 /// </summary>
 /// <remarks>
-/// 宿主判据：模块宿主只在 <c>ShellUi</c> 非空时给 <see cref="IShellUiAware"/> 实例注入注册器，
-/// 而注入发生在实例化阶段、早于 <see cref="CreateUi"/>。桌面 Shell 恒注入，无窗服务宿主恒不注入，
-/// 因此 setter 是否被调用可确定性地区分两侧，不依赖启动顺序。本模块不使用注册器本身。
+/// 当前 HistoryVulcan 组合下只有桌面 Shell 进程会实例化 UI 模块（服务进程 EnableUiModules=false），
+/// 因此管理页与桌面坞都运行在 Shell 进程；模块指令（dock.* 与别名 mercury.dock.open）注册在服务进程，
+/// Shell 侧经 <see cref="CommandBus"/> 的远程执行器透明转发，模块代码无需关心进程边界。
 /// </remarks>
-public sealed class MercuryDockUiModule : IUiModule, IShellUiAware
+public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleContextAware
 {
     private static DockWindow? _window;
     private IShellUiRegistrar? _shellUi;
     private IDisposable? _managerWindow;
 
+    /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
+    internal static CommandBus? Bus { get; private set; }
+
     IShellUiRegistrar IShellUiAware.ShellUi
     {
         set => _shellUi = value;
+    }
+
+    public void Attach(IModuleContext context)
+    {
+        Bus = context.Bus;
+        context.RegisterCommands(MercuryDockAliasCommands.Register);
     }
 
     public void CreateUi()
@@ -38,7 +48,6 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware
 
         _ = MercuryDockState.RefreshAsync();
 
-        // 桌面 Shell 侧承载扩展坞管理页面，服务宿主侧承载活动坞本体。
         if (_shellUi != null)
             _managerWindow ??= _shellUi.RegisterToolWindow(MercuryDockManagerView.CreateDescriptor(), "MercuryDock");
 
@@ -247,7 +256,12 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware
             var maximum = projects.Count == 0 ? 0 : projects.Max(item => item.Weight);
             foreach (var project in projects)
                 _items.Children.Add(ProjectButton(project, maximum));
-            if (projects.Count == 0)
+
+            // 手动加入的指令项常驻项目之后：不参与权重与策略排序，点击即经总线执行。
+            foreach (var entry in MercuryDockState.CommandEntries)
+                _items.Children.Add(CommandButton(entry));
+
+            if (projects.Count == 0 && MercuryDockState.CommandEntries.Count == 0)
             {
                 _items.Children.Add(new TextBlock
                 {
@@ -332,11 +346,106 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware
             stack.Children.Add(host);
             stack.Children.Add(label);
             var button = NakedButton(stack, project.Name);
+            button.Click += (_, _) => OpenProject(project);
+            var menu = StyledMenu();
+            var pin = new MenuItem { Header = project.Pinned ? "取消置顶" : "置顶" };
+            pin.Click += (_, _) => MercuryDockState.Pin(project.Name, !project.Pinned);
+            var refresh = new MenuItem { Header = "刷新" };
+            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
+            menu.Items.Add(pin);
+            menu.Items.Add(refresh);
+            button.ContextMenu = menu;
+            return button;
+        }
+
+        /// <summary>手动指令项按钮：指令字形无光圈，点击经总线执行，右键可移除。</summary>
+        private static Button CommandButton(DockCommandEntry entry)
+        {
+            var glyph = new Border
+            {
+                Width = 52,
+                Height = 52,
+                CornerRadius = new CornerRadius(8),
+                Background = DockTheme.SurfaceAlt,
+                BorderBrush = DockTheme.AccentSoft,
+                BorderThickness = new Thickness(1),
+                Child = new TextBlock
+                {
+                    Text = "❯",
+                    FontFamily = DockTheme.FontFamily,
+                    FontSize = 22,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = DockTheme.Accent,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+            };
+            var stack = new StackPanel { Width = 68 };
+            stack.Children.Add(glyph);
+            stack.Children.Add(new TextBlock
+            {
+                Text = entry.Label,
+                FontFamily = DockTheme.FontFamily,
+                FontSize = DockTheme.SmallFontSize,
+                Foreground = DockTheme.Label,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+            var button = NakedButton(stack, entry.Command);
             button.Click += (_, _) =>
+            {
+                // 自定义指令只有经总线才有意义；总线缺失（旧宿主/烟测）时静默不动作。
+                if (Bus != null)
+                    _ = Bus.ExecuteAsync(entry.Command, "UI");
+            };
+            var menu = StyledMenu();
+            var remove = new MenuItem { Header = "移除该指令" };
+            remove.Click += (_, _) => MercuryDockState.RemoveCommand(entry.Command);
+            var refresh = new MenuItem { Header = "刷新" };
+            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
+            menu.Items.Add(remove);
+            menu.Items.Add(refresh);
+            button.ContextMenu = menu;
+            return button;
+        }
+
+        /// <summary>项目条目优先经总线执行别名指令，让打开动作与其他指令项同一条链路。</summary>
+        private static void OpenProject(DockProject project)
+        {
+            if (Bus != null)
+            {
+                _ = OpenProjectViaBusAsync(project);
+                return;
+            }
+
+            OpenProjectLocally(project);
+        }
+
+        private static async Task OpenProjectViaBusAsync(DockProject project)
+        {
+            // 服务未就绪或指令失败时回退本地打开，保证桌面坞永远能开目录。
+            var result = await Bus!
+                .ExecuteAsync(MercuryDockAliasCommands.BuildOpenCommandText(project.Name), "UI")
+                .ConfigureAwait(false);
+            if (!result.Success)
+                OpenProjectLocally(project);
+        }
+
+        private static void OpenProjectLocally(DockProject project)
+        {
+            try
             {
                 MercuryDockState.RecordOpen(project.Name);
                 Process.Start(new ProcessStartInfo(project.Path) { UseShellExecute = true });
-            };
+            }
+            catch (Exception)
+            {
+                // 目录被删等极端情况下点击不得打穿桌面坞。
+            }
+        }
+
+        private static ContextMenu StyledMenu()
+        {
             var menu = new ContextMenu
             {
                 Background = DockTheme.PanelBackground,
@@ -349,14 +458,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware
             menu.Resources[SystemColors.MenuTextBrushKey] = DockTheme.Label;
             menu.Resources[SystemColors.HighlightBrushKey] = DockTheme.Hover;
             menu.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.Label;
-            var pin = new MenuItem { Header = project.Pinned ? "取消置顶" : "置顶" };
-            pin.Click += (_, _) => MercuryDockState.Pin(project.Name, !project.Pinned);
-            var refresh = new MenuItem { Header = "刷新" };
-            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
-            menu.Items.Add(pin);
-            menu.Items.Add(refresh);
-            button.ContextMenu = menu;
-            return button;
+            return menu;
         }
 
         /// <summary>无边框透明按钮，悬停时叠一层浅色半透明，深底上不会闪出白块。</summary>

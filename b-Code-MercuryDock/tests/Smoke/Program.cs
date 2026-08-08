@@ -1,12 +1,17 @@
 using System.IO;
 using System.Reflection;
+using System.Text.Json;
 using MercuryDock;
+using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Modules;
 using BaseVariable;
 
 var assembly = typeof(MercuryDockCommands).Assembly;
 var previousExplorerRegistrationSetting = Environment.GetEnvironmentVariable("MERCURYDOCK_DISABLE_EXPLORER_REGISTRATION");
 Environment.SetEnvironmentVariable("MERCURYDOCK_DISABLE_EXPLORER_REGISTRATION", "1");
+// 状态目录隔离：整个 Smoke 不碰真实 %APPDATA% 的 state.json。
+var stateOverride = Path.Combine(Path.GetTempPath(), "mercurydock-state-" + Guid.NewGuid().ToString("N"));
+Environment.SetEnvironmentVariable("MERCURYDOCK_STATE_DIRECTORY", stateOverride);
 
 var moduleInfos = assembly.GetTypes()
     .Where(type => type.IsPublic && !type.IsAbstract && typeof(ModuleInfoBase).IsAssignableFrom(type))
@@ -17,7 +22,7 @@ Equal(1, moduleInfos.Count, "独立程序集必须只有一个模块入口");
 Equal("MercuryDock", moduleInfos[0].ModuleName, "模块域必须使用稳定模块名");
 Equal("dock", moduleInfos[0].GetType().GetProperty("CommandPrefix")?.GetValue(moduleInfos[0]),
     "旧命令前缀必须保持兼容");
-Equal("3.0.0", moduleInfos[0].Version, "模块版本");
+Equal("3.1.0", moduleInfos[0].Version, "模块版本");
 Equal(typeof(MercuryDockCommands), moduleInfos[0].MainClassType, "命令入口类型");
 
 Equal(
@@ -25,7 +30,7 @@ Equal(
     moduleInfos[0].MainClassType!
         .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
         .Count(method => !method.IsSpecialName),
-    "dock 指令数(3.0.0 新增手动加入扩展坞 add)");
+    "dock 指令数(3.1.0 别名指令走 RegisterCommands，不占反射方法数)");
 
 var uiTypes = assembly.GetTypes()
     .Where(type => type.IsPublic && !type.IsAbstract && typeof(IUiModule).IsAssignableFrom(type))
@@ -121,6 +126,40 @@ True(policy.MinItems >= DockPolicy.LowestItems, "最少显示数下限");
 True(policy.MaxItems <= DockPolicy.HighestItems, "最多显示数上限");
 True(policy.HalfLifeDays >= DockPolicy.ShortestHalfLifeDays, "半衰期下限");
 Equal("dock.manager", MercuryDockManagerView.CreateDescriptor().Id, "管理页面窗口 ID");
+
+// 3.1.0 指令总线：别名指令经 RegisterCommands 注册，dock.* 反射指令不受影响。
+True(
+    typeof(IModuleContextAware).IsAssignableFrom(typeof(MercuryDockUiModule)),
+    "必须实现 IModuleContextAware 才能接入宿主指令总线");
+var registry = new CommandRegistry();
+MercuryDockAliasCommands.Register(registry);
+True(registry.TryGet(MercuryDockAliasCommands.OpenCommandName, out var alias), "必须注册 mercury.dock.open 别名指令");
+Equal("app", alias!.CommandClass, "别名指令归类");
+Equal(
+    "mercury.dock.open 2026-021-HistoryMercury",
+    MercuryDockAliasCommands.BuildOpenCommandText("2026-021-HistoryMercury"),
+    "普通项目名不加引号");
+Equal(
+    "mercury.dock.open \"a b\"",
+    MercuryDockAliasCommands.BuildOpenCommandText("a b"),
+    "含空白参数必须加引号");
+
+using var catalog = JsonDocument.Parse("""[{"commandName":"mercury.dock.open"},{"commandName":"dock.list"},{"other":1}]""");
+Equal(2, MercuryDockAliasCommands.ParseCommandNames(catalog.RootElement).Count, "解析 command.list 的 JsonElement");
+True(
+    MercuryDockAliasCommands.FallbackCommandNames().Contains(MercuryDockAliasCommands.OpenCommandName),
+    "保底清单必须含常驻默认指令");
+
+// 3.1.0 指令项状态：加入去重、移除不区分大小写；全程在隔离状态目录。
+True(MercuryDockState.AddCommand("demo.alpha  1"), "加入指令项必须成功");
+True(MercuryDockState.AddCommand("demo.alpha 1"), "重复加入视为成功");
+Equal(1, MercuryDockState.CommandEntries.Count, "折叠空白后按指令文本去重");
+Equal("demo.alpha 1", MercuryDockState.CommandEntries[0].Command, "指令文本折叠连续空白");
+True(!MercuryDockState.AddCommand("   "), "空白指令不得入坞");
+True(MercuryDockState.RemoveCommand("DEMO.ALPHA 1"), "移除指令不区分大小写");
+Equal(0, MercuryDockState.CommandEntries.Count, "移除后指令项清空");
+True(!MercuryDockState.RemoveCommand("demo.alpha 1"), "移除不存在项返回 false");
+
 // 3.0.0 工作树根回退：即使配置值失效，也要能从默认根 HistoryVesta 列出项目。
 True(MercuryDockState.ListWorktreeProjects().Count > 0, "工作树扫描必须经默认根列出项目");
 Equal("OHS 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer 入口名称");
@@ -162,8 +201,18 @@ finally
     Directory.Delete(shortcuts, recursive: true);
 }
 
+try
+{
+    if (Directory.Exists(stateOverride))
+        Directory.Delete(stateOverride, recursive: true);
+}
+catch (Exception)
+{
+    // 文件监视器可能短暂持有目录句柄，隔离目录留在临时目录无害。
+}
+
 Console.WriteLine(
-    "MercuryDock.Smoke: PASS (1 module, 16 commands, 1 UI module, shell-hosted manager, Explorer entry, bottom-right layout, weight+glow, worktree-root fallback)");
+    "MercuryDock.Smoke: PASS (1 module, 16 commands + mercury.dock.open alias, 1 UI module, shell-hosted manager, Explorer entry, bottom-right layout, weight+glow, command entries, worktree-root fallback)");
 
 static void True(bool condition, string message)
 {

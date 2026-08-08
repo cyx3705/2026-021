@@ -16,6 +16,9 @@ public sealed record DockProject(
     DateTimeOffset? LastOpened = null,
     bool Excluded = false);
 
+/// <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
+public sealed record DockCommandEntry(string Command, string Label, DateTimeOffset Added);
+
 internal static partial class MercuryDockState
 {
     private static readonly object Gate = new();
@@ -23,7 +26,14 @@ internal static partial class MercuryDockState
     private static readonly string AppRoot = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "OneHistoryStudio");
-    private static readonly string DockRoot = Path.Combine(AppRoot, "MercuryDock");
+
+    /// <summary>
+    /// 状态目录可用 MERCURYDOCK_STATE_DIRECTORY 整体改向（烟测隔离用），此时旧版迁移自动跳过。
+    /// </summary>
+    private static readonly string DockRoot =
+        Environment.GetEnvironmentVariable("MERCURYDOCK_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
+            ? overrideRoot
+            : Path.Combine(AppRoot, "MercuryDock");
     private static readonly string LegacyDockRoot = Path.Combine(AppRoot, "ActiveDock");
     private static readonly string StatePath = Path.Combine(DockRoot, "state.json");
     private static readonly string SettingsPath = Path.Combine(AppRoot, "settings.json");
@@ -273,32 +283,11 @@ internal static partial class MercuryDockState
     }
 
     /// <summary>
-    /// 手动把项目加入扩展坞：解除排除并固定。只接受工作树根下真实存在且编号合规的目录名。
+    /// 手动把项目加入扩展坞：解除排除并固定。接受工作树根下真实存在的项目名或编号。
     /// </summary>
     public static bool AddToDock(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            return false;
-
-        string? actual = null;
-        try
-        {
-            var root = ReadWorktreeRoot();
-            if (Directory.Exists(root))
-            {
-                actual = Directory.EnumerateDirectories(root)
-                    .Select(Path.GetFileName)
-                    .FirstOrDefault(dir => dir != null
-                        && dir.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)
-                        && ProjectNumber().IsMatch(dir));
-            }
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-
-        if (actual == null)
+        if (!TryResolveWorktreeProject(name, out var actual, out _))
             return false;
 
         lock (Gate)
@@ -311,6 +300,41 @@ internal static partial class MercuryDockState
         Changed?.Invoke();
         _ = RefreshAsync();
         return true;
+    }
+
+    /// <summary>按名称或编号在工作树根解析项目目录；编号匹配取目录名中的数字段。</summary>
+    internal static bool TryResolveWorktreeProject(string nameOrNumber, out string name, out string path)
+    {
+        name = string.Empty;
+        path = string.Empty;
+        if (string.IsNullOrWhiteSpace(nameOrNumber))
+            return false;
+
+        try
+        {
+            var wanted = nameOrNumber.Trim();
+            var root = ReadWorktreeRoot();
+            if (!Directory.Exists(root))
+                return false;
+            foreach (var directory in Directory.EnumerateDirectories(root))
+            {
+                var dirName = Path.GetFileName(directory);
+                if (string.IsNullOrEmpty(dirName) || !ProjectNumber().IsMatch(dirName))
+                    continue;
+                if (dirName.Equals(wanted, StringComparison.OrdinalIgnoreCase)
+                    || ProjectNumber().Match(dirName).Value.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+                {
+                    name = dirName;
+                    path = directory;
+                    return true;
+                }
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        return false;
     }
 
     /// <summary>列出工作树根下全部编号合规的项目目录名，供"加入扩展坞"候选。</summary>
@@ -332,6 +356,65 @@ internal static partial class MercuryDockState
             return [];
         }
     }
+
+    /// <summary>手动加入的指令项，按加入时间升序。常驻显示，不参与权重与策略排序。</summary>
+    public static IReadOnlyList<DockCommandEntry> CommandEntries
+    {
+        get
+        {
+            lock (Gate)
+                return _preferences.Commands.ToList();
+        }
+    }
+
+    /// <summary>
+    /// 把一条总线指令加入扩展坞：折叠多余空白后按指令文本去重，重复加入视为成功。
+    /// </summary>
+    public static bool AddCommand(string command)
+    {
+        var normalized = NormalizeCommand(command);
+        if (normalized.Length == 0)
+            return false;
+
+        lock (Gate)
+        {
+            if (_preferences.Commands.Any(entry =>
+                    entry.Command.Equals(normalized, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            _preferences.Commands.Add(new DockCommandEntry(normalized, normalized, DateTimeOffset.UtcNow));
+            SavePreferences();
+        }
+
+        Changed?.Invoke();
+        return true;
+    }
+
+    /// <summary>按指令文本移除指令项；不存在时返回 false。</summary>
+    public static bool RemoveCommand(string command)
+    {
+        var normalized = NormalizeCommand(command);
+        var removed = false;
+        lock (Gate)
+        {
+            removed = _preferences.Commands.RemoveAll(entry =>
+                entry.Command.Equals(normalized, StringComparison.OrdinalIgnoreCase)) > 0;
+            if (removed)
+                SavePreferences();
+        }
+
+        if (removed)
+            Changed?.Invoke();
+        return removed;
+    }
+
+    /// <summary>折叠连续空白，保证同一指令的不同写法只存一份。</summary>
+    internal static string NormalizeCommand(string? command)
+        => string.IsNullOrWhiteSpace(command)
+            ? string.Empty
+            : string.Join(' ', command.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     public static void SetHidden(bool hidden)
     {
@@ -576,6 +659,8 @@ internal static partial class MercuryDockState
     {
         try
         {
+            if (Environment.GetEnvironmentVariable("MERCURYDOCK_STATE_DIRECTORY") is { Length: > 0 })
+                return;
             var legacy = Path.Combine(LegacyDockRoot, "state.json");
             if (File.Exists(StatePath) || !File.Exists(legacy))
                 return;
@@ -635,6 +720,7 @@ internal static partial class MercuryDockState
         public Dictionary<string, UsageEntry> Usage { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> Excluded { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public DockPolicy Policy { get; set; } = new();
+        public List<DockCommandEntry> Commands { get; set; } = [];
     }
 
     /// <summary>已衰减到 <see cref="Updated"/> 时刻的点击分数，而不是原始次数。</summary>

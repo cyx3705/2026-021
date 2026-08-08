@@ -4,22 +4,27 @@ using System.Windows.Media;
 
 namespace MercuryDock;
 
-/// <summary>MercuryDock 的 AppShell 视觉令牌适配层。</summary>
+/// <summary>
+/// MercuryDock 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
+/// 恒用深色色板，宿主处于浅色模式时页面也不会变白。字体与间距与深浅无关，继续跟随宿主。
+/// </summary>
 public static class DockTheme
 {
-    // Resolve AppShell tokens at control creation time. The fallback palette keeps
-    // the module usable when loaded by a host without AppShell resource dictionaries.
-    public static SolidColorBrush PanelBackground => Brush("Shell.Brush.Surface", Color.FromRgb(0x1D, 0x20, 0x1F));
-    public static SolidColorBrush PanelBorder => Brush("Shell.Brush.ControlBorder", Color.FromRgb(0x34, 0x37, 0x36));
-    public static SolidColorBrush Label => Brush("Shell.Brush.TextPrimary", Color.FromRgb(0xE2, 0xDA, 0xC6));
-    public static SolidColorBrush Muted => Brush("Shell.Brush.TextSecondary", Color.FromRgb(0xAC, 0xA5, 0x93));
-    public static SolidColorBrush Hover => Brush("Shell.Brush.SurfaceHover", Color.FromRgb(0x2A, 0x2D, 0x2C));
-    public static SolidColorBrush Pressed => Brush("Shell.Brush.SurfacePressed", Color.FromRgb(0x34, 0x37, 0x36));
-    public static SolidColorBrush SurfaceAlt => Brush("Shell.Brush.SurfaceAlt", Color.FromRgb(0x24, 0x26, 0x25));
-    public static SolidColorBrush AccentSoft => Brush("Shell.Brush.AccentSoft", Color.FromRgb(0x5A, 0x48, 0x24));
-    public static SolidColorBrush Accent => Brush("Shell.Brush.Accent", Color.FromRgb(0xD9, 0xA4, 0x41));
-    public static SolidColorBrush AccentHover => Brush("Shell.Brush.AccentHover", Color.FromRgb(0xE8, 0xB6, 0x5C));
-    public static SolidColorBrush TextOnAccent => Brush("Shell.Brush.TextOnAccent", Color.FromRgb(0x17, 0x19, 0x18));
+    public static SolidColorBrush PanelBackground => Frozen(Color.FromRgb(0x1D, 0x20, 0x1F));
+    public static SolidColorBrush PanelBorder => Frozen(Color.FromRgb(0x34, 0x37, 0x36));
+    public static SolidColorBrush Label => Frozen(Color.FromRgb(0xE2, 0xDA, 0xC6));
+    public static SolidColorBrush Muted => Frozen(Color.FromRgb(0xAC, 0xA5, 0x93));
+    public static SolidColorBrush Hover => Frozen(Color.FromRgb(0x2A, 0x2D, 0x2C));
+    public static SolidColorBrush Pressed => Frozen(Color.FromRgb(0x34, 0x37, 0x36));
+    public static SolidColorBrush SurfaceAlt => Frozen(Color.FromRgb(0x24, 0x26, 0x25));
+    public static SolidColorBrush AccentSoft => Frozen(Color.FromRgb(0x5A, 0x48, 0x24));
+    public static SolidColorBrush Accent => Frozen(Color.FromRgb(0xD9, 0xA4, 0x41));
+    public static SolidColorBrush AccentHover => Frozen(Color.FromRgb(0xE8, 0xB6, 0x5C));
+    public static SolidColorBrush TextOnAccent => Frozen(Color.FromRgb(0x17, 0x19, 0x18));
+
+    /// <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
+    public static SolidColorBrush Selection => Frozen(Color.FromRgb(0xEA, 0xDC, 0x9E));
+    public static SolidColorBrush SelectionText => TextOnAccent;
     public static Color Glow => Accent.Color;
     public static FontFamily FontFamily => Find("Shell.Font.Family") as FontFamily ?? new FontFamily("Microsoft YaHei UI, Segoe UI");
     public static double BodyFontSize => FindDouble("Shell.Font.Body", 13);
@@ -63,9 +68,6 @@ public static class DockTheme
         template.Triggers.Add(disabled);
         button.Template = template;
     }
-
-    private static SolidColorBrush Brush(string key, Color fallback)
-        => Find(key) as SolidColorBrush ?? Frozen(fallback);
 
     private static object? Find(string key)
         => Application.Current?.TryFindResource(key);

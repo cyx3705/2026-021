@@ -13,9 +13,9 @@ namespace MercuryDock;
 /// 扩展坞管理页面，停靠在 OHS 主窗口右侧。
 /// </summary>
 /// <remarks>
-/// 本页面运行在桌面 Shell 进程，活动坞本体运行在服务宿主进程，两者不共享内存。
-/// 所有写操作落到 state.json，由 <see cref="MercuryDockState.StartWatching"/> 的文件监视完成跨进程同步；
-/// 不得假设改完内存对面就能看到。
+/// 管理页与桌面坞都运行在桌面 Shell 进程；dock.* 与 mercury.dock.open 指令注册在服务进程，
+/// 经总线远程转发透明执行。所有状态写操作落到 state.json，由
+/// <see cref="MercuryDockState.StartWatching"/> 的文件监视完成跨进程同步。
 /// </remarks>
 public static class MercuryDockManagerView
 {
@@ -36,13 +36,19 @@ public static class MercuryDockManagerView
         private readonly TextBox _minItems = new() { Width = 56 };
         private readonly TextBox _maxItems = new() { Width = 56 };
         private readonly TextBox _halfLife = new() { Width = 56 };
-        private readonly ComboBox _candidates = new() { Width = 220 };
+        private readonly ComboBox _commandInput = new() { Width = 220, IsEditable = true };
+        private readonly ComboBox _argumentInput = new() { Width = 200, IsEditable = true };
+        private readonly TextBlock _status = new();
+        private bool _commandsLoaded;
 
         public ManagerPage()
         {
+            // 页面只有深色模式：整页铺深色底，避免透出宿主浅色停靠框背景。
+            Background = DockTheme.PanelBackground;
             var root = new DockPanel
             {
                 Margin = new Thickness(12),
+                Background = DockTheme.PanelBackground,
             };
             root.SetValue(TextElement.FontFamilyProperty, DockTheme.FontFamily);
             root.SetValue(TextElement.FontSizeProperty, DockTheme.BodyFontSize);
@@ -66,7 +72,13 @@ public static class MercuryDockManagerView
             policyBar.Children.Add(Gap("半衰期(天)"));
             policyBar.Children.Add(_halfLife);
 
-            ConfigureCandidates(_candidates);
+            ConfigureCombo(_commandInput, "要执行的总线指令；默认 mercury.dock.open，可改输任意指令");
+            ConfigureCombo(_argumentInput, "指令参数；打开项目时为项目名或编号");
+            // 常驻默认指令：可删除改输其他指令，下拉候选来自服务侧全量清单。
+            _commandInput.Text = MercuryDockAliasCommands.OpenCommandName;
+            _commandInput.SelectionChanged += (_, _) => ReloadArgumentCandidates();
+            _commandInput.LostFocus += (_, _) => ReloadArgumentCandidates();
+
             var add = new Button
             {
                 Content = "加入扩展坞",
@@ -74,22 +86,24 @@ public static class MercuryDockManagerView
                 VerticalAlignment = VerticalAlignment.Center,
             };
             DockTheme.StyleButton(add, accent: true);
-            add.Click += (_, _) =>
-            {
-                if (_candidates.SelectedItem is AddCandidate candidate
-                    && MercuryDockState.AddToDock(candidate.Name))
-                {
-                    ReloadCandidates();
-                }
-            };
+            add.Click += (_, _) => AddEntry();
 
             var addBar = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
-            addBar.Children.Add(_candidates);
+            addBar.Children.Add(_commandInput);
+            addBar.Children.Add(_argumentInput);
+            _argumentInput.Margin = new Thickness(8, 0, 0, 0);
             addBar.Children.Add(add);
+
+            _status.TextWrapping = TextWrapping.Wrap;
+            _status.FontFamily = DockTheme.FontFamily;
+            _status.FontSize = DockTheme.SmallFontSize;
+            _status.Foreground = DockTheme.Muted;
+            _status.Margin = new Thickness(0, 6, 0, 0);
 
             var optionsStack = new StackPanel();
             optionsStack.Children.Add(policyBar);
             optionsStack.Children.Add(addBar);
+            optionsStack.Children.Add(_status);
 
             // 圆角矩形把策略与加入扩展坞收进同一块区域，与列表、按钮的 8 圆角保持一致。
             var optionsFrame = new Border
@@ -107,7 +121,8 @@ public static class MercuryDockManagerView
 
             root.Children.Add(new TextBlock
             {
-                Text = "点列表首列图钉固定/取消固定；右键可刷新、排除或恢复收录；策略改完自动保存。固定项无论打开次数如何都会显示，光圈亮度随权重变化。",
+                Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；"
+                    + "策略改完自动保存。加入框默认 mercury.dock.open（打开项目目录），可改输任意总线指令，加入后常驻桌面坞。",
                 TextWrapping = TextWrapping.Wrap,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
@@ -123,10 +138,12 @@ public static class MercuryDockManagerView
             _list.Foreground = DockTheme.Label;
             _list.FontFamily = DockTheme.FontFamily;
             _list.FontSize = DockTheme.BodyFontSize;
-            _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.AccentSoft;
-            _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.Label;
-            _list.ItemContainerStyle = BuildRowStyle();
-            // 右键按下先选中行，菜单里的排除/恢复收录才有确定的作用对象。
+            // 选中恒为淡黄底深字，聚焦与失焦一致，不再用白色或暗金。
+            _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Selection;
+            _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.SelectionText;
+            _list.Resources[SystemColors.ControlBrushKey] = DockTheme.Selection;
+            _list.Resources[SystemColors.ControlTextBrushKey] = DockTheme.SelectionText;
+            // 右键按下先选中行，菜单里的排除/移除才有确定的作用对象。
             _list.PreviewMouseRightButtonDown += (_, args) =>
             {
                 if (args.OriginalSource is DependencyObject source
@@ -157,7 +174,8 @@ public static class MercuryDockManagerView
             {
                 LoadPolicy();
                 Reload();
-                ReloadCandidates();
+                ReloadArgumentCandidates();
+                _ = LoadCommandCatalogAsync();
                 _ = MercuryDockState.RefreshAsync();
             };
         }
@@ -171,24 +189,15 @@ public static class MercuryDockManagerView
                 Width = 44,
                 CellTemplate = BuildPinTemplate(),
             });
-            view.Columns.Add(Column("项目", nameof(DockProject.Name), 150));
-            view.Columns.Add(Column("权重", nameof(DockProject.Weight), 60, "F2"));
-            view.Columns.Add(Column("点击", nameof(DockProject.Clicks), 50, "F1"));
-            view.Columns.Add(Column("最近打开", nameof(DockProject.LastOpened), 120, "yyyy-MM-dd HH:mm"));
-            view.Columns.Add(new GridViewColumn
-            {
-                Header = "已排除",
-                Width = 56,
-                DisplayMemberBinding = new Binding(nameof(DockProject.Excluded))
-                {
-                    Converter = ExcludedTextConverter.Instance,
-                    ConverterCulture = CultureInfo.CurrentCulture,
-                },
-            });
+            view.Columns.Add(Column("名称", nameof(DockRow.Name), 140));
+            view.Columns.Add(Column("指令", nameof(DockRow.Command), 220));
+            view.Columns.Add(Column("权重", nameof(DockRow.Weight), 60, "F2"));
+            view.Columns.Add(Column("点击", nameof(DockRow.Clicks), 50, "F1"));
+            view.Columns.Add(Column("最近打开", nameof(DockRow.LastOpened), 120, "yyyy-MM-dd HH:mm"));
             return view;
         }
 
-        /// <summary>图钉开关：已固定全亮、未固定半透明，点击直接切换，不再占用按钮条。</summary>
+        /// <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
         private static DataTemplate BuildPinTemplate()
         {
             var template = new DataTemplate();
@@ -198,35 +207,22 @@ public static class MercuryDockManagerView
             button.SetValue(Button.BackgroundProperty, Brushes.Transparent);
             button.SetValue(Button.BorderThicknessProperty, new Thickness(0));
             button.SetValue(Button.PaddingProperty, new Thickness(2, 0, 2, 0));
-            button.SetBinding(UIElement.OpacityProperty, new Binding(nameof(DockProject.Pinned))
+            button.SetBinding(UIElement.OpacityProperty, new Binding(nameof(DockRow.Pinned))
             {
                 Converter = PinOpacityConverter.Instance,
             });
-            button.SetBinding(Button.ToolTipProperty, new Binding(nameof(DockProject.Pinned))
+            button.SetBinding(Button.ToolTipProperty, new Binding(nameof(DockRow.IsCommand))
             {
                 Converter = PinTipConverter.Instance,
             });
             button.AddHandler(Button.ClickEvent, new RoutedEventHandler((sender, _) =>
             {
-                if (sender is Button { DataContext: DockProject row })
+                // 指令项恒为常驻，图钉只对项目行生效。
+                if (sender is Button { DataContext: DockRow { IsCommand: false } row })
                     MercuryDockState.Pin(row.Name, !row.Pinned);
             }));
             template.VisualTree = button;
             return template;
-        }
-
-        /// <summary>被排除的项目整行调暗，与正常收录行一眼区分。</summary>
-        private static Style BuildRowStyle()
-        {
-            var style = new Style(typeof(ListViewItem));
-            var dimmed = new DataTrigger
-            {
-                Binding = new Binding(nameof(DockProject.Excluded)),
-                Value = true,
-            };
-            dimmed.Setters.Add(new Setter(UIElement.OpacityProperty, 0.45));
-            style.Triggers.Add(dimmed);
-            return style;
         }
 
         private void RebuildContextMenu()
@@ -237,11 +233,27 @@ public static class MercuryDockManagerView
             refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
             _listMenu.Items.Add(refresh);
 
-            if (_list.SelectedItem is DockProject row)
+            if (_list.SelectedItem is not DockRow row)
+                return;
+            _listMenu.Items.Add(new Separator());
+            if (row.IsCommand)
             {
-                var exclude = new MenuItem { Header = row.Excluded ? "恢复收录" : "排除" };
-                exclude.Click += (_, _) => MercuryDockState.Exclude(row.Name, !row.Excluded);
-                _listMenu.Items.Add(new Separator());
+                var remove = new MenuItem { Header = "移除该指令" };
+                remove.Click += (_, _) =>
+                {
+                    if (MercuryDockState.RemoveCommand(row.Command))
+                        SetStatus($"已移除指令 {row.Command}");
+                };
+                _listMenu.Items.Add(remove);
+            }
+            else
+            {
+                var exclude = new MenuItem { Header = "排除" };
+                exclude.Click += (_, _) =>
+                {
+                    MercuryDockState.Exclude(row.Name, excluded: true);
+                    SetStatus($"已排除 {row.Name}；在加入框选 mercury.dock.open 可找回");
+                };
                 _listMenu.Items.Add(exclude);
             }
         }
@@ -302,7 +314,7 @@ public static class MercuryDockManagerView
             };
         }
 
-        private void ConfigureCandidates(ComboBox input)
+        private static void ConfigureCombo(ComboBox input, string tip)
         {
             input.Height = 28;
             input.Padding = DockTheme.ControlPadding;
@@ -313,25 +325,44 @@ public static class MercuryDockManagerView
             input.BorderBrush = DockTheme.PanelBorder;
             input.BorderThickness = new Thickness(1);
             input.VerticalContentAlignment = VerticalAlignment.Center;
-            input.ToolTip = "工作树中尚未入坞的项目；加入即固定";
+            input.ToolTip = tip;
         }
 
         private void OnChanged() => Dispatcher.BeginInvoke(() =>
         {
             LoadPolicy();
             Reload();
-            ReloadCandidates();
+            ReloadArgumentCandidates();
         });
 
+        /// <summary>列表只显示已入坞的条目：项目（固定+策略选中）加手动指令项。</summary>
         private void Reload()
         {
-            var selected = (_list.SelectedItem as DockProject)?.Name;
-            _list.ItemsSource = MercuryDockState.AllProjects;
+            var selected = (_list.SelectedItem as DockRow)?.Key;
+            var rows = MercuryDockState.Projects
+                .Select(project => new DockRow(
+                    project.Name,
+                    MercuryDockAliasCommands.BuildOpenCommandText(project.Name),
+                    project.Pinned,
+                    false,
+                    project.Weight,
+                    project.Clicks,
+                    project.LastOpened))
+                .Concat(MercuryDockState.CommandEntries.Select(entry => new DockRow(
+                    entry.Label,
+                    entry.Command,
+                    true,
+                    true,
+                    0,
+                    0,
+                    null)))
+                .ToList();
+            _list.ItemsSource = rows;
             if (selected == null)
                 return;
             foreach (var item in _list.Items)
             {
-                if (item is DockProject row && row.Name == selected)
+                if (item is DockRow row && row.Key == selected)
                 {
                     _list.SelectedItem = item;
                     break;
@@ -339,10 +370,48 @@ public static class MercuryDockManagerView
             }
         }
 
-        /// <summary>候选 = 工作树内存在但当前不在坞里的项目；被排除的排前并标注，加入即找回。</summary>
-        private void ReloadCandidates()
+        /// <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
+        private async Task LoadCommandCatalogAsync()
         {
-            var selected = (_candidates.SelectedItem as AddCandidate)?.Name;
+            if (_commandsLoaded)
+                return;
+            _commandsLoaded = true;
+
+            IReadOnlyList<string> names = [];
+            var bus = MercuryDockUiModule.Bus;
+            if (bus != null)
+            {
+                try
+                {
+                    var result = await bus.ExecuteAsync("command.list", "UI").ConfigureAwait(false);
+                    if (result.Success)
+                        names = MercuryDockAliasCommands.ParseCommandNames(result.Data);
+                }
+                catch (Exception)
+                {
+                    // 服务不可达时回退静态清单，不打扰页面。
+                }
+            }
+
+            await Dispatcher.BeginInvoke(() =>
+            {
+                var items = names.Count > 0 ? names : MercuryDockAliasCommands.FallbackCommandNames();
+                _commandInput.ItemsSource = items
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            });
+        }
+
+        /// <summary>参数候选：打开项目指令时为工作树未入坞项目（排除项标注排前），其他指令自由输入。</summary>
+        private void ReloadArgumentCandidates()
+        {
+            if (!IsOpenProjectCommand(_commandInput.Text))
+            {
+                _argumentInput.ItemsSource = null;
+                return;
+            }
+
+            var selected = (_argumentInput.SelectedItem as AddCandidate)?.Name;
             var docked = MercuryDockState.Projects
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -350,7 +419,7 @@ public static class MercuryDockManagerView
                 .Where(item => item.Excluded)
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _candidates.ItemsSource = MercuryDockState.ListWorktreeProjects()
+            _argumentInput.ItemsSource = MercuryDockState.ListWorktreeProjects()
                 .Where(name => !docked.Contains(name))
                 .Select(name => new AddCandidate(name, excluded.Contains(name)))
                 .OrderByDescending(candidate => candidate.Excluded)
@@ -358,15 +427,57 @@ public static class MercuryDockManagerView
                 .ToList();
             if (selected == null)
                 return;
-            foreach (var item in _candidates.Items)
+            foreach (var item in _argumentInput.Items)
             {
                 if (item is AddCandidate candidate && candidate.Name == selected)
                 {
-                    _candidates.SelectedItem = item;
+                    _argumentInput.SelectedItem = item;
                     break;
                 }
             }
         }
+
+        /// <summary>加入：打开项目指令且参数命中工作树项目走 AddToDock，其余作为自定义指令常驻入坞。</summary>
+        private void AddEntry()
+        {
+            var command = _commandInput.Text.Trim();
+            var argument = _argumentInput.Text.Trim();
+            if (command.Length == 0)
+            {
+                SetStatus("请输入要加入的指令");
+                return;
+            }
+
+            if (IsOpenProjectCommand(command)
+                && argument.Length > 0
+                && MercuryDockState.AddToDock(argument))
+            {
+                SetStatus($"已加入扩展坞并固定 {argument}");
+                _argumentInput.Text = string.Empty;
+                return;
+            }
+
+            var text = argument.Length == 0
+                ? command
+                : command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(argument);
+            if (MercuryDockState.AddCommand(text))
+            {
+                SetStatus($"已加入指令 {text}");
+                _argumentInput.Text = string.Empty;
+            }
+            else
+            {
+                SetStatus("指令为空，未加入");
+            }
+        }
+
+        private static bool IsOpenProjectCommand(string? command)
+            => string.Equals(
+                command?.Trim(),
+                MercuryDockAliasCommands.OpenCommandName,
+                StringComparison.OrdinalIgnoreCase);
+
+        private void SetStatus(string text) => _status.Text = text;
 
         private void LoadPolicy()
         {
@@ -389,7 +500,20 @@ public static class MercuryDockManagerView
             LoadPolicy();
         }
 
-        /// <summary>"加入扩展坞"下拉项；Excluded 仅用于标注与排序。</summary>
+        /// <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
+        private sealed record DockRow(
+            string Name,
+            string Command,
+            bool Pinned,
+            bool IsCommand,
+            double Weight,
+            double Clicks,
+            DateTimeOffset? LastOpened)
+        {
+            public string Key => IsCommand ? "cmd:" + Command : "proj:" + Name;
+        }
+
+        /// <summary>"加入扩展坞"参数下拉项；Excluded 仅用于标注与排序。</summary>
         private sealed record AddCandidate(string Name, bool Excluded)
         {
             public override string ToString() => Excluded ? $"{Name}（已排除）" : Name;
@@ -412,18 +536,7 @@ public static class MercuryDockManagerView
         public static readonly PinTipConverter Instance = new();
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-            => value is true ? "取消固定" : "固定";
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-            => throw new NotSupportedException();
-    }
-
-    private sealed class ExcludedTextConverter : IValueConverter
-    {
-        public static readonly ExcludedTextConverter Instance = new();
-
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-            => value is true ? "已排除" : string.Empty;
+            => value is true ? "指令项常驻，右键可移除" : "固定/取消固定";
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotSupportedException();
