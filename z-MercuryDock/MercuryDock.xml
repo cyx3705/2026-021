@@ -106,6 +106,12 @@
         <member name="P:MercuryDock.DockTheme.Selection">
             <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
         </member>
+        <member name="P:MercuryDock.DockTheme.InputPadding">
+            <summary>
+            输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
+            输入框垂直压到 2，按钮等无光标控件继续用 ControlPadding。
+            </summary>
+        </member>
         <member name="T:MercuryDock.DockWeight">
             <summary>
             收录权重的纯计算：指数衰减计数、信号合并与光圈亮度映射。
@@ -259,11 +265,14 @@
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.LoadCommandCatalogAsync">
             <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
         </member>
-        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.ArgumentOptions(System.String)">
-            <summary>参数候选：打开项目指令时为工作树未入坞项目（排除项标注排前），其他指令自由输入。</summary>
+        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.EntryOptions(System.String)">
+            <summary>
+            单行候选：首个空格之前是指令（域→类→方法级联），空格之后是参数。
+            打开项目指令的参数候选为工作树未入坞项目（排除项标注排前），其他指令参数自由输入。
+            </summary>
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.AddEntry">
-            <summary>加入：打开项目指令且参数命中工作树项目走 AddToDock，其余作为自定义指令常驻入坞。</summary>
+            <summary>加入：指令行拆为 指令+参数；打开项目且命中工作树走 AddToDock，其余作为自定义指令常驻入坞。</summary>
         </member>
         <member name="T:MercuryDock.MercuryDockManagerView.ManagerPage.DockRow">
             <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
