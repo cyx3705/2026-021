@@ -256,6 +256,12 @@
             <see cref="M:MercuryDock.MercuryDockState.StartWatching"/> 的文件监视完成跨进程同步。
             </remarks>
         </member>
+        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildRowStyle">
+            <summary>
+            紧凑行样式 + 自绘选中模板。3.2.2 裸 Style 盖掉了宿主 Shell.Item.Base，
+            回退系统白底选中；此处显式淡黄底深字，聚焦/失焦一致。
+            </summary>
+        </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildPinTemplate">
             <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
         </member>
