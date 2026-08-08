@@ -46,10 +46,10 @@ public static class MercuryDockManagerView
         {
             // 页面只有深色模式：整页铺深色底，避免透出宿主浅色停靠框背景。
             Background = DockTheme.PanelBackground;
-            // 页面边距与命令集页(McpToolsView Margin=10)对齐。
+            // 收紧页边；顶栏只留工具条，状态挪到底部，避免头与表格之间被状态行撑开。
             var root = new DockPanel
             {
-                Margin = new Thickness(10),
+                Margin = new Thickness(6),
                 Background = DockTheme.PanelBackground,
             };
             root.SetValue(TextElement.FontFamilyProperty, DockTheme.FontFamily);
@@ -104,27 +104,23 @@ public static class MercuryDockManagerView
             policyGroup.Children.Add(Gap("半衰期(天)"));
             policyGroup.Children.Add(_halfLife);
 
-            var toolbar = new DockPanel();
+            var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 2) };
             DockPanel.SetDock(add, Dock.Right);
             DockPanel.SetDock(policyGroup, Dock.Left);
             toolbar.Children.Add(add);
             toolbar.Children.Add(policyGroup);
             toolbar.Children.Add(_entryInput);
+            DockPanel.SetDock(toolbar, Dock.Top);
+            root.Children.Add(toolbar);
 
-            // 状态行贴在顶栏下；空文本时高度为 0，不额外拉开与表格的间距。
             _status.TextWrapping = TextWrapping.Wrap;
             _status.FontFamily = DockTheme.FontFamily;
             _status.FontSize = DockTheme.SmallFontSize;
             _status.Foreground = DockTheme.Muted;
-            _status.Margin = new Thickness(0, 2, 0, 0);
 
-            var header = new StackPanel();
-            header.Children.Add(toolbar);
-            header.Children.Add(_status);
-            DockPanel.SetDock(header, Dock.Top);
-            root.Children.Add(header);
-
-            root.Children.Add(new TextBlock
+            var footer = new StackPanel { Margin = new Thickness(2, 4, 0, 0) };
+            footer.Children.Add(_status);
+            footer.Children.Add(new TextBlock
             {
                 Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；策略改完自动保存。"
                     + "顶栏单行：指令+参数同一框，输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.dock.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
@@ -132,19 +128,20 @@ public static class MercuryDockManagerView
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Muted,
-                Margin = new Thickness(2, 8, 0, 0),
+                Margin = new Thickness(0, 2, 0, 0),
             });
-            DockPanel.SetDock(root.Children[^1], Dock.Bottom);
+            DockPanel.SetDock(footer, Dock.Bottom);
+            root.Children.Add(footer);
 
             _list.View = BuildColumns();
-            // 与命令集页 ToolList 一致：顶栏下 8px，正文字号 Body，行距由 Shell.Item.Base 同款 Padding(8,4) 决定。
-            _list.Margin = new Thickness(0, 8, 0, 0);
+            // 头与表间距压到 2px；正文字号 Small，行距 Padding(4,1)，比 Body/(8,4) 明显更紧。
+            _list.Margin = new Thickness(0, 2, 0, 0);
             _list.Background = DockTheme.PanelBackground;
             _list.BorderBrush = DockTheme.PanelBorder;
             _list.BorderThickness = new Thickness(1);
             _list.Foreground = DockTheme.Label;
             _list.FontFamily = DockTheme.FontFamily;
-            _list.FontSize = DockTheme.BodyFontSize;
+            _list.FontSize = DockTheme.SmallFontSize;
             // 行距略收紧，并自带选中模板：淡黄底深字，覆盖宿主/系统白底选中。
             _list.ItemContainerStyle = BuildRowStyle();
             // 兜底：未走自定义模板时的系统选中色（含失焦白底）。
@@ -194,7 +191,7 @@ public static class MercuryDockManagerView
         {
             var view = new GridView
             {
-                // 对齐命令集页 Shell.GridHeader：小字号表头、26 高、透明底发丝分隔。
+                // 对齐命令集页紧凑表头观感，但高度压到 20。
                 ColumnHeaderContainerStyle = BuildHeaderStyle(),
             };
             view.Columns.Add(new GridViewColumn
@@ -212,14 +209,18 @@ public static class MercuryDockManagerView
         }
 
         /// <summary>
-        /// 对齐命令集页行距：Shell.Item.Base 的 Padding(8,4)，正文字号跟随 ListView Body。
-        /// 自绘选中模板保留淡黄底深字，避免系统白底。
+        /// 表格正文字号 Small、行距 Padding(4,1)，比命令集默认 Body/(8,4) 更紧；
+        /// 自绘选中模板保留淡黄底深字。
         /// </summary>
         private static Style BuildRowStyle()
         {
             var style = new Style(typeof(ListViewItem));
-            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 4, 8, 4)));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 1, 4, 1)));
+            style.Setters.Add(new Setter(Control.FontFamilyProperty, DockTheme.FontFamily));
+            style.Setters.Add(new Setter(Control.FontSizeProperty, DockTheme.SmallFontSize));
+            style.Setters.Add(new Setter(TextElement.FontSizeProperty, DockTheme.SmallFontSize));
             style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
             style.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.Label));
@@ -227,7 +228,7 @@ public static class MercuryDockManagerView
             return style;
         }
 
-        /// <summary>对齐命令集页 Shell.GridHeader：Small 字号、26 高、左对齐。</summary>
+        /// <summary>紧凑表头：Small 字号、高 20。</summary>
         private static Style BuildHeaderStyle()
         {
             var style = new Style(typeof(GridViewColumnHeader));
@@ -236,8 +237,8 @@ public static class MercuryDockManagerView
             style.Setters.Add(new Setter(Control.ForegroundProperty, DockTheme.Muted));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
-            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 0, 8, 0)));
-            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 26.0));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 0, 4, 0)));
+            style.Setters.Add(new Setter(FrameworkElement.HeightProperty, 20.0));
             style.Setters.Add(new Setter(Control.TemplateProperty, BuildHeaderTemplate()));
             return style;
         }
@@ -341,7 +342,10 @@ public static class MercuryDockManagerView
             button.SetValue(Button.CursorProperty, Cursors.Hand);
             button.SetValue(Button.BackgroundProperty, Brushes.Transparent);
             button.SetValue(Button.BorderThicknessProperty, new Thickness(0));
-            button.SetValue(Button.PaddingProperty, new Thickness(2, 0, 2, 0));
+            button.SetValue(Button.PaddingProperty, new Thickness(0));
+            button.SetValue(Control.FontSizeProperty, DockTheme.SmallFontSize);
+            button.SetValue(FrameworkElement.HeightProperty, 16.0);
+            button.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
             button.SetBinding(UIElement.OpacityProperty, new Binding(nameof(DockRow.Pinned))
             {
                 Converter = PinOpacityConverter.Instance,
@@ -405,16 +409,26 @@ public static class MercuryDockManagerView
         }
 
         private static GridViewColumn Column(string header, string path, double width, string? format = null)
-            => new()
+        {
+            // 显式 CellTemplate 固定 Small 字号；Foreground 不写死，选中时继承行上的深色字。
+            var template = new DataTemplate();
+            var text = new FrameworkElementFactory(typeof(TextBlock));
+            text.SetBinding(TextBlock.TextProperty, new Binding(path)
+            {
+                StringFormat = format,
+                ConverterCulture = CultureInfo.CurrentCulture,
+            });
+            text.SetValue(TextBlock.FontFamilyProperty, DockTheme.FontFamily);
+            text.SetValue(TextBlock.FontSizeProperty, DockTheme.SmallFontSize);
+            text.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            template.VisualTree = text;
+            return new GridViewColumn
             {
                 Header = header,
                 Width = width,
-                DisplayMemberBinding = new Binding(path)
-                {
-                    StringFormat = format,
-                    ConverterCulture = CultureInfo.CurrentCulture,
-                },
+                CellTemplate = template,
             };
+        }
 
         private static UIElement Gap(string text) => new TextBlock
         {

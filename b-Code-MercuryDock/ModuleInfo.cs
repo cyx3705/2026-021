@@ -8,6 +8,6 @@ public sealed class ModuleInfo : ModuleInfoBase
     public string CommandPrefix => "dock";
     public override string Description => "活动项目坞与资源管理器 OHS 项目入口";
     public override string Author => "OneHistory";
-    public override string Version => "3.2.4";
+    public override string Version => "3.2.5";
     public override Type? MainClassType => typeof(MercuryDockCommands);
 }
