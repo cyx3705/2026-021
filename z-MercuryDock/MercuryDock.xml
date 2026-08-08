@@ -109,7 +109,7 @@
         <member name="P:MercuryDock.DockTheme.InputPadding">
             <summary>
             输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
-            输入框垂直压到 2，按钮等无光标控件继续用 ControlPadding。
+            垂直压到 0，水平仍跟宿主；按钮等无光标控件继续用 ControlPadding。
             </summary>
         </member>
         <member name="T:MercuryDock.DockWeight">
@@ -248,7 +248,7 @@
         </member>
         <member name="T:MercuryDock.MercuryDockManagerView">
             <summary>
-            扩展坞管理页面，停靠在 OHS 主窗口右侧。
+            扩展坞管理页面，默认注册为中央主文档区页签。
             </summary>
             <remarks>
             管理页与桌面坞都运行在桌面 Shell 进程；dock.* 与 mercury.dock.open 指令注册在服务进程，
