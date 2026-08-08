@@ -10,7 +10,7 @@ using HistoryVulcan.Core.Docking;
 namespace MercuryDock;
 
 /// <summary>
-/// 扩展坞管理页面，停靠在 OHS 主窗口右侧。
+/// 扩展坞管理页面，默认注册为中央主文档区页签。
 /// </summary>
 /// <remarks>
 /// 管理页与桌面坞都运行在桌面 Shell 进程；dock.* 与 mercury.dock.open 指令注册在服务进程，
@@ -23,8 +23,9 @@ public static class MercuryDockManagerView
     {
         Id = "dock.manager",
         Title = "扩展坞管理",
-        DefaultSide = DockSide.Right,
-        DefaultRatio = 0.38,
+        // 中央主文档区页签；仍走 RegisterToolWindow，仅 DefaultSide 决定落位。
+        DefaultSide = DockSide.Center,
+        DefaultRatio = 1,
         IsSingleton = true,
         ContentFactory = static () => new ManagerPage(),
     };
@@ -56,22 +57,6 @@ public static class MercuryDockManagerView
             ConfigureInput(_maxItems);
             ConfigureInput(_halfLife);
 
-            var policyBar = new WrapPanel();
-            policyBar.Children.Add(new TextBlock
-            {
-                Text = "最少显示",
-                FontFamily = DockTheme.FontFamily,
-                FontSize = DockTheme.BodyFontSize,
-                Foreground = DockTheme.Label,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 4, 0),
-            });
-            policyBar.Children.Add(_minItems);
-            policyBar.Children.Add(Gap("最多显示"));
-            policyBar.Children.Add(_maxItems);
-            policyBar.Children.Add(Gap("半衰期(天)"));
-            policyBar.Children.Add(_halfLife);
-
             // 单行入口：指令与参数同一框。空格前按域→类→方法级联，空格后切参数候选；
             // Shift+W/S 移动、Tab 确认（叶子带参即加入）、Esc 关闭。
             _entryInput.Hint = "指令+参数同一框：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数）；如 mercury.dock.open 2026-024-HistoryVulcan";
@@ -84,6 +69,9 @@ public static class MercuryDockManagerView
             };
             // 常驻默认指令：可删除改输其他指令，候选来自服务侧全量清单。
             _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
+            _entryInput.MinWidth = 220;
+            _entryInput.VerticalAlignment = VerticalAlignment.Center;
+            _entryInput.Margin = new Thickness(12, 0, 0, 0);
 
             var add = new Button
             {
@@ -94,40 +82,50 @@ public static class MercuryDockManagerView
             DockTheme.StyleButton(add, accent: true);
             add.Click += (_, _) => AddEntry();
 
-            var addBar = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            // 顶栏单行：策略三组靠左，指令入口占满中间，加入按钮钉右侧；不再套圆角框。
+            var policyGroup = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            policyGroup.Children.Add(new TextBlock
+            {
+                Text = "最少显示",
+                FontFamily = DockTheme.FontFamily,
+                FontSize = DockTheme.BodyFontSize,
+                Foreground = DockTheme.Label,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+            });
+            policyGroup.Children.Add(_minItems);
+            policyGroup.Children.Add(Gap("最多显示"));
+            policyGroup.Children.Add(_maxItems);
+            policyGroup.Children.Add(Gap("半衰期(天)"));
+            policyGroup.Children.Add(_halfLife);
+
+            var toolbar = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
             DockPanel.SetDock(add, Dock.Right);
-            addBar.Children.Add(add);
-            addBar.Children.Add(_entryInput);
+            DockPanel.SetDock(policyGroup, Dock.Left);
+            toolbar.Children.Add(add);
+            toolbar.Children.Add(policyGroup);
+            toolbar.Children.Add(_entryInput);
 
             _status.TextWrapping = TextWrapping.Wrap;
             _status.FontFamily = DockTheme.FontFamily;
             _status.FontSize = DockTheme.SmallFontSize;
             _status.Foreground = DockTheme.Muted;
-            _status.Margin = new Thickness(0, 6, 0, 0);
+            _status.Margin = new Thickness(0, 0, 0, 6);
 
-            var optionsStack = new StackPanel();
-            optionsStack.Children.Add(policyBar);
-            optionsStack.Children.Add(addBar);
-            optionsStack.Children.Add(_status);
-
-            // 圆角矩形把策略与加入扩展坞收进同一块区域，与列表、按钮的 8 圆角保持一致。
-            var optionsFrame = new Border
-            {
-                CornerRadius = new CornerRadius(8),
-                BorderBrush = DockTheme.PanelBorder,
-                BorderThickness = new Thickness(1),
-                Background = DockTheme.SurfaceAlt,
-                Padding = new Thickness(10, 8, 10, 8),
-                Margin = new Thickness(0, 0, 0, 8),
-                Child = optionsStack,
-            };
-            DockPanel.SetDock(optionsFrame, Dock.Top);
-            root.Children.Add(optionsFrame);
+            var header = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+            header.Children.Add(toolbar);
+            header.Children.Add(_status);
+            DockPanel.SetDock(header, Dock.Top);
+            root.Children.Add(header);
 
             root.Children.Add(new TextBlock
             {
                 Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；策略改完自动保存。"
-                    + "加入框指令+参数同一行：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.dock.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
+                    + "顶栏单行：指令+参数同一框，输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.dock.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
                 TextWrapping = TextWrapping.Wrap,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
@@ -143,6 +141,12 @@ public static class MercuryDockManagerView
             _list.Foreground = DockTheme.Label;
             _list.FontFamily = DockTheme.FontFamily;
             _list.FontSize = DockTheme.BodyFontSize;
+            // 行距略收紧：默认 ListViewItem 偏疏，中央页签下更需紧凑。
+            var rowStyle = new Style(typeof(ListViewItem));
+            rowStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 1, 4, 1)));
+            rowStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 22.0));
+            rowStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            _list.ItemContainerStyle = rowStyle;
             // 选中恒为淡黄底深字，聚焦与失焦一致，不再用白色或暗金。
             _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Selection;
             _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.SelectionText;

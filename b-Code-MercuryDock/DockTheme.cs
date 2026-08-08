@@ -35,9 +35,9 @@ public static class DockTheme
 
     /// <summary>
     /// 输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
-    /// 输入框垂直压到 2，按钮等无光标控件继续用 ControlPadding。
+    /// 垂直压到 0，水平仍跟宿主；按钮等无光标控件继续用 ControlPadding。
     /// </summary>
-    public static Thickness InputPadding => new(ControlPadding.Left, 2, ControlPadding.Right, 2);
+    public static Thickness InputPadding => new(ControlPadding.Left, 0, ControlPadding.Right, 0);
 
     public static void StyleButton(Button button, bool accent = false)
     {

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using MercuryDock;
 using HistoryVulcan.Core.Commands;
+using HistoryVulcan.Core.Docking;
 using HistoryVulcan.Core.Modules;
 using BaseVariable;
 
@@ -22,7 +23,7 @@ Equal(1, moduleInfos.Count, "独立程序集必须只有一个模块入口");
 Equal("MercuryDock", moduleInfos[0].ModuleName, "模块域必须使用稳定模块名");
 Equal("dock", moduleInfos[0].GetType().GetProperty("CommandPrefix")?.GetValue(moduleInfos[0]),
     "旧命令前缀必须保持兼容");
-Equal("3.2.1", moduleInfos[0].Version, "模块版本");
+Equal("3.2.2", moduleInfos[0].Version, "模块版本");
 Equal(typeof(MercuryDockCommands), moduleInfos[0].MainClassType, "命令入口类型");
 
 Equal(
@@ -126,6 +127,7 @@ True(policy.MinItems >= DockPolicy.LowestItems, "最少显示数下限");
 True(policy.MaxItems <= DockPolicy.HighestItems, "最多显示数上限");
 True(policy.HalfLifeDays >= DockPolicy.ShortestHalfLifeDays, "半衰期下限");
 Equal("dock.manager", MercuryDockManagerView.CreateDescriptor().Id, "管理页面窗口 ID");
+Equal(DockSide.Center, MercuryDockManagerView.CreateDescriptor().DefaultSide, "管理页默认注册到中央主文档区");
 
 // 3.1.0 指令总线：别名指令经 RegisterCommands 注册，dock.* 反射指令不受影响。
 True(
