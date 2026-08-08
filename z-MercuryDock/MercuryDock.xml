@@ -165,11 +165,26 @@
         <member name="M:MercuryDock.MercuryDockAliasCommands.BuildOpenCommandText(System.String)">
             <summary>组装调用文本；参数含空白/引号/等号时自动加引号。</summary>
         </member>
-        <member name="M:MercuryDock.MercuryDockAliasCommands.ParseCommandNames(System.Object)">
-            <summary>command.list 的 Data 跨进程为 JsonElement，本进程为只读列表；模块侧自行解析名字段。</summary>
+        <member name="M:MercuryDock.MercuryDockAliasCommands.ParseCommandCatalog(System.Object)">
+            <summary>command.list 的 Data 跨进程为 JsonElement，本进程为只读列表；模块侧自行解析各字段。</summary>
         </member>
-        <member name="M:MercuryDock.MercuryDockAliasCommands.FallbackCommandNames">
+        <member name="M:MercuryDock.MercuryDockAliasCommands.FallbackCommandCatalog">
             <summary>服务清单不可得时的保底候选：常驻默认指令加本模块 16 条 dock.*。</summary>
+        </member>
+        <member name="T:MercuryDock.CommandCatalogItem">
+            <summary>指令目录项：名字按点号分层（域.类.方法），Domain/CommandClass 为注册表元数据。</summary>
+        </member>
+        <member name="M:MercuryDock.CommandCatalogItem.#ctor(System.String,System.String,System.String,System.String)">
+            <summary>指令目录项：名字按点号分层（域.类.方法），Domain/CommandClass 为注册表元数据。</summary>
+        </member>
+        <member name="T:MercuryDock.CommandOptionTree">
+            <summary>
+            指令名按点号分层的候选树：一级一级下钻（域 → 类 → 方法）。
+            同一节点既是完整指令又带下级时按分支处理（指令本身仍可手工输入全文）。
+            </summary>
+        </member>
+        <member name="M:MercuryDock.CommandOptionTree.ChildrenOf(System.String)">
+            <summary>按当前输入给出下一级候选：最后一个点号之前是已确认路径，之后是正在输入的过滤段。</summary>
         </member>
         <member name="M:MercuryDock.MercuryDockCommands.explorer">
             <summary>返回 OHS 项目入口的当前注册状态。</summary>
@@ -244,7 +259,7 @@
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.LoadCommandCatalogAsync">
             <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
         </member>
-        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.ReloadArgumentCandidates">
+        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.ArgumentOptions(System.String)">
             <summary>参数候选：打开项目指令时为工作树未入坞项目（排除项标注排前），其他指令自由输入。</summary>
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.AddEntry">
@@ -255,12 +270,6 @@
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.DockRow.#ctor(System.String,System.String,System.Boolean,System.Boolean,System.Double,System.Double,System.Nullable{System.DateTimeOffset})">
             <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
-        </member>
-        <member name="T:MercuryDock.MercuryDockManagerView.ManagerPage.AddCandidate">
-            <summary>"加入扩展坞"参数下拉项；Excluded 仅用于标注与排序。</summary>
-        </member>
-        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.AddCandidate.#ctor(System.String,System.Boolean)">
-            <summary>"加入扩展坞"参数下拉项；Excluded 仅用于标注与排序。</summary>
         </member>
         <member name="T:MercuryDock.DockCommandEntry">
             <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
@@ -445,6 +454,27 @@
         </member>
         <member name="T:MercuryDock.RecentFolders.IShellLinkW">
             <summary>只声明首个槽位 GetPath；本模块不调用其余方法。</summary>
+        </member>
+        <member name="T:MercuryDock.SuggestOption">
+            <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>
+        </member>
+        <member name="M:MercuryDock.SuggestOption.#ctor(System.String,System.String,System.String,System.Boolean)">
+            <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>
+        </member>
+        <member name="T:MercuryDock.SuggestBox">
+            <summary>
+            无下拉箭头的建议输入框：输入即过滤并向下自动弹出候选，
+            Shift+W/S 或方向键上下移动，Tab/Enter 确认（分支项确认后继续下一级），Esc 关闭。
+            </summary>
+        </member>
+        <member name="P:MercuryDock.SuggestBox.Source">
+            <summary>按当前输入给出候选；为 null 时永不弹出。</summary>
+        </member>
+        <member name="E:MercuryDock.SuggestBox.Committed">
+            <summary>确认叶子项时触发；分支项确认不触发（继续下钻）。</summary>
+        </member>
+        <member name="E:MercuryDock.SuggestBox.Edited">
+            <summary>输入框文本发生任何变化（含确认回填）时触发。</summary>
         </member>
         <member name="T:BaseVariable.ModuleInfoBase">
             <summary>AppShell 模块识别合同的兼容副本。</summary>
