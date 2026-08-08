@@ -258,9 +258,12 @@
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildRowStyle">
             <summary>
-            紧凑行样式 + 自绘选中模板。3.2.2 裸 Style 盖掉了宿主 Shell.Item.Base，
-            回退系统白底选中；此处显式淡黄底深字，聚焦/失焦一致。
+            对齐命令集页行距：Shell.Item.Base 的 Padding(8,4)，正文字号跟随 ListView Body。
+            自绘选中模板保留淡黄底深字，避免系统白底。
             </summary>
+        </member>
+        <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildHeaderStyle">
+            <summary>对齐命令集页 Shell.GridHeader：Small 字号、26 高、左对齐。</summary>
         </member>
         <member name="M:MercuryDock.MercuryDockManagerView.ManagerPage.BuildPinTemplate">
             <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
