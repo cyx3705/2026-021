@@ -19,10 +19,12 @@
     "activeRoots": [
       "b-Office/current",
       "b-Office/package",
-      "b-Code"
+      "b-Code",
+      "b-Code-MercuryDock"
     ],
     "sourceRoots": [
-      "b-Code"
+      "b-Code",
+      "b-Code-MercuryDock"
     ],
     "generatedRoots": [],
     "archiveRoots": [
@@ -46,11 +48,11 @@
   },
   "commands": {
     "setup": null,
-    "build": null,
-    "test": null,
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Publish-MercuryModules.ps1",
+    "test": "dotnet run --project .\\b-Code-MercuryDock\\tests\\Smoke\\Smoke.csproj -c Release",
     "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1",
     "run": null,
-    "package": null
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Publish-MercuryModules.ps1 -Publish"
   },
   "externalDependencies": [],
   "contextExclusions": [

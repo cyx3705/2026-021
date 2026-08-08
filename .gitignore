@@ -41,6 +41,7 @@
 TestResults/
 artifacts/
 work/
+b-Publish/
 
 # Local and generated files
 *.bak

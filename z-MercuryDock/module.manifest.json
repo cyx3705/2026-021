@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "type": "HistoryVulcan.Module",
+  "name": "MercuryDock",
+  "version": "3.0.0",
+  "description": "Active project dock and Explorer project entry for HistoryVulcan.",
+  "artifact": "MercuryDock.dll",
+  "docs": "MercuryDock.xml",
+  "mcpExposure": "standard",
+  "ui": true
+}
