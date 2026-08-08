@@ -36,8 +36,7 @@ public static class MercuryDockManagerView
         private readonly TextBox _minItems = new() { Width = 56 };
         private readonly TextBox _maxItems = new() { Width = 56 };
         private readonly TextBox _halfLife = new() { Width = 56 };
-        private readonly SuggestBox _commandInput = new();
-        private readonly SuggestBox _argumentInput = new();
+        private readonly SuggestBox _entryInput = new();
         private readonly TextBlock _status = new();
         private CommandOptionTree _commandTree = CommandOptionTree.Build(MercuryDockAliasCommands.FallbackCommandCatalog());
         private bool _commandsLoaded;
@@ -73,16 +72,18 @@ public static class MercuryDockManagerView
             policyBar.Children.Add(Gap("半衰期(天)"));
             policyBar.Children.Add(_halfLife);
 
-            // 指令框：无下拉箭头，输入即弹候选，Shift+W/S 移动、Tab 确认并逐级下钻（域→类→方法）。
-            _commandInput.Hint = "要执行的总线指令：输入即弹出候选，Shift+W/S 上下移动，Tab 确认并逐级下钻（域→类→方法）";
-            _commandInput.Source = text => _commandTree.ChildrenOf(text);
-            _commandInput.Committed += _ => _argumentInput.Focus();
+            // 单行入口：指令与参数同一框。空格前按域→类→方法级联，空格后切参数候选；
+            // Shift+W/S 移动、Tab 确认（叶子带参即加入）、Esc 关闭。
+            _entryInput.Hint = "指令+参数同一框：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数）；如 mercury.dock.open 2026-024-HistoryVulcan";
+            _entryInput.Source = EntryOptions;
+            _entryInput.Committed += text =>
+            {
+                // 级联选到参数（含空格）即视为完整指令行，直接加入；仅选到指令则继续等参数。
+                if (text.Contains(' '))
+                    AddEntry();
+            };
             // 常驻默认指令：可删除改输其他指令，候选来自服务侧全量清单。
-            _commandInput.Text = MercuryDockAliasCommands.OpenCommandName;
-
-            _argumentInput.Hint = "指令参数：打开项目时为项目名或编号，输入即过滤；其他指令自由输入";
-            _argumentInput.Source = ArgumentOptions;
-            _argumentInput.Committed += _ => AddEntry();
+            _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
 
             var add = new Button
             {
@@ -93,16 +94,10 @@ public static class MercuryDockManagerView
             DockTheme.StyleButton(add, accent: true);
             add.Click += (_, _) => AddEntry();
 
-            // 指令框独占一行，参数框与按钮同行，窄面板下不再换行截断。
-            _commandInput.Margin = new Thickness(0, 8, 0, 0);
-            var argRow = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var addBar = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
             DockPanel.SetDock(add, Dock.Right);
-            argRow.Children.Add(add);
-            argRow.Children.Add(_argumentInput);
-
-            var addBar = new StackPanel();
-            addBar.Children.Add(_commandInput);
-            addBar.Children.Add(argRow);
+            addBar.Children.Add(add);
+            addBar.Children.Add(_entryInput);
 
             _status.TextWrapping = TextWrapping.Wrap;
             _status.FontFamily = DockTheme.FontFamily;
@@ -132,7 +127,7 @@ public static class MercuryDockManagerView
             root.Children.Add(new TextBlock
             {
                 Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；策略改完自动保存。"
-                    + "指令框输入即弹候选：Shift+W/S 上下移动，Tab 确认并逐级下钻（域→类→方法）；默认 mercury.dock.open 打开项目目录，可改输任意总线指令，加入后常驻桌面坞。",
+                    + "加入框指令+参数同一行：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.dock.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
                 TextWrapping = TextWrapping.Wrap,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
@@ -303,7 +298,7 @@ public static class MercuryDockManagerView
         private void ConfigureInput(TextBox input)
         {
             input.Height = 28;
-            input.Padding = DockTheme.ControlPadding;
+            input.Padding = DockTheme.InputPadding;
             input.FontFamily = DockTheme.FontFamily;
             input.FontSize = DockTheme.BodyFontSize;
             input.Foreground = DockTheme.Label;
@@ -404,13 +399,21 @@ public static class MercuryDockManagerView
             });
         }
 
-        /// <summary>参数候选：打开项目指令时为工作树未入坞项目（排除项标注排前），其他指令自由输入。</summary>
-        private IReadOnlyList<SuggestOption> ArgumentOptions(string text)
+        /// <summary>
+        /// 单行候选：首个空格之前是指令（域→类→方法级联），空格之后是参数。
+        /// 打开项目指令的参数候选为工作树未入坞项目（排除项标注排前），其他指令参数自由输入。
+        /// </summary>
+        private IReadOnlyList<SuggestOption> EntryOptions(string text)
         {
-            if (!IsOpenProjectCommand(_commandInput.Text))
+            var spaceIndex = text.IndexOf(' ');
+            if (spaceIndex < 0)
+                return _commandTree.ChildrenOf(text);
+
+            var command = text[..spaceIndex].Trim();
+            var fragment = text[(spaceIndex + 1)..].Trim();
+            if (command.Length == 0 || !IsOpenProjectCommand(command))
                 return [];
 
-            var filter = text.Trim();
             var docked = MercuryDockState.Projects
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -420,46 +423,52 @@ public static class MercuryDockManagerView
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             return MercuryDockState.ListWorktreeProjects()
                 .Where(name => !docked.Contains(name))
-                .Where(name => filter.Length == 0
-                    || name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+                .Where(name => fragment.Length == 0
+                    || name.Contains(fragment, StringComparison.OrdinalIgnoreCase))
                 .Select(name => (Name: name, Excluded: excluded.Contains(name)))
                 .OrderByDescending(candidate => candidate.Excluded)
                 .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(candidate => new SuggestOption(
-                    candidate.Name,
+                    command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(candidate.Name),
                     candidate.Name,
                     candidate.Excluded ? "已排除，加入即找回" : null,
                     false))
                 .ToList();
         }
 
-        /// <summary>加入：打开项目指令且参数命中工作树项目走 AddToDock，其余作为自定义指令常驻入坞。</summary>
+        /// <summary>加入：指令行拆为 指令+参数；打开项目且命中工作树走 AddToDock，其余作为自定义指令常驻入坞。</summary>
         private void AddEntry()
         {
-            var command = _commandInput.Text.Trim();
-            var argument = _argumentInput.Text.Trim();
-            if (command.Length == 0)
+            var line = _entryInput.Text.Trim();
+            if (line.Length == 0)
             {
                 SetStatus("请输入要加入的指令");
                 return;
             }
 
+            var spaceIndex = line.IndexOf(' ');
+            var command = spaceIndex < 0 ? line : line[..spaceIndex];
+            var argument = spaceIndex < 0 ? string.Empty : line[(spaceIndex + 1)..].Trim();
+            // 剥掉候选或用户手工加的外层引号再匹配项目；重新组合时只需给裸参数补引号。
+            var bareArgument = argument.Length > 1 && argument.StartsWith('"') && argument.EndsWith('"')
+                ? argument[1..^1]
+                : argument;
             if (IsOpenProjectCommand(command)
-                && argument.Length > 0
-                && MercuryDockState.AddToDock(argument))
+                && bareArgument.Length > 0
+                && MercuryDockState.AddToDock(bareArgument))
             {
-                SetStatus($"已加入扩展坞并固定 {argument}");
-                _argumentInput.Text = string.Empty;
+                SetStatus($"已加入扩展坞并固定 {bareArgument}");
+                _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
                 return;
             }
 
             var text = argument.Length == 0
                 ? command
-                : command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(argument);
+                : command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(bareArgument);
             if (MercuryDockState.AddCommand(text))
             {
                 SetStatus($"已加入指令 {text}");
-                _argumentInput.Text = string.Empty;
+                _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
             }
             else
             {

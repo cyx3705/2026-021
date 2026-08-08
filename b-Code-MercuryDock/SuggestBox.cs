@@ -26,7 +26,8 @@ internal sealed class SuggestBox : UserControl
         _input = new TextBox
         {
             Height = 28,
-            Padding = DockTheme.ControlPadding,
+            // 垂直内边距过大会把文字裁掉一半，输入框专用 InputPadding。
+            Padding = DockTheme.InputPadding,
             FontFamily = DockTheme.FontFamily,
             FontSize = DockTheme.BodyFontSize,
             Foreground = DockTheme.Label,
