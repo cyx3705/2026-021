@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "type": "HistoryVulcan.Module",
+  "name": "HistoryMercury",
+  "version": "4.1.0",
+  "description": "Active project dock and Explorer entry for HistoryVesta projects.",
+  "artifact": "HistoryMercury.dll",
+  "docs": "HistoryMercury.xml",
+  "mcpExposure": "standard",
+  "ui": true
+}
