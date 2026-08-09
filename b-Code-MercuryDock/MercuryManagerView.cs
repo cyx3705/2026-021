@@ -7,17 +7,17 @@ using System.Windows.Input;
 using System.Windows.Media;
 using HistoryVulcan.Core.Docking;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 扩展坞管理页面，默认注册为中央主文档区页签。
 /// </summary>
 /// <remarks>
-/// 管理页与桌面坞都运行在桌面 Shell 进程；dock.* 与 mercury.dock.open 指令注册在服务进程，
+/// 管理页与桌面坞都运行在桌面 Shell 进程；mercury 三段式指令注册在服务进程，
 /// 经总线远程转发透明执行。所有状态写操作落到 state.json，由
-/// <see cref="MercuryDockState.StartWatching"/> 的文件监视完成跨进程同步。
+/// <see cref="MercuryState.StartWatching"/> 的文件监视完成跨进程同步。
 /// </remarks>
-public static class MercuryDockManagerView
+public static class MercuryManagerView
 {
     public static ToolWindowDescriptor CreateDescriptor() => new()
     {
@@ -39,7 +39,7 @@ public static class MercuryDockManagerView
         private readonly TextBox _halfLife = new() { Width = 56 };
         private readonly SuggestBox _entryInput = new();
         private readonly TextBlock _status = new();
-        private CommandOptionTree _commandTree = CommandOptionTree.Build(MercuryDockAliasCommands.FallbackCommandCatalog());
+        private CommandOptionTree _commandTree = CommandOptionTree.Build(MercuryCommandCatalog.FallbackCommandCatalog());
         private bool _commandsLoaded;
 
         public ManagerPage()
@@ -60,7 +60,7 @@ public static class MercuryDockManagerView
 
             // 单行入口：指令与参数同一框。空格前按域→类→方法级联，空格后切参数候选；
             // Shift+W/S 移动、Tab 确认（叶子带参即加入）、Esc 关闭。
-            _entryInput.Hint = "指令+参数同一框：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数）；如 mercury.dock.open 2026-024-HistoryVulcan";
+            _entryInput.Hint = "指令+参数同一框：输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数）；如 mercury.proj.open 2026-024-HistoryVulcan";
             _entryInput.Source = EntryOptions;
             _entryInput.Committed += text =>
             {
@@ -69,7 +69,7 @@ public static class MercuryDockManagerView
                     AddEntry();
             };
             // 常驻默认指令：可删除改输其他指令，候选来自服务侧全量清单。
-            _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
+            _entryInput.Text = MercuryCommandCatalog.ProjectOpenCommandName;
             _entryInput.MinWidth = 220;
             _entryInput.VerticalAlignment = VerticalAlignment.Center;
             _entryInput.Margin = new Thickness(12, 0, 0, 0);
@@ -123,7 +123,7 @@ public static class MercuryDockManagerView
             footer.Children.Add(new TextBlock
             {
                 Text = "列表只显示已入坞的项目与指令；点首列图钉固定/取消固定项目；右键可刷新、排除项目或移除指令；策略改完自动保存。"
-                    + "顶栏单行：指令+参数同一框，输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.dock.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
+                    + "顶栏单行：指令+参数同一框，输入即弹候选，Shift+W/S 移动，Tab 逐级确认（域→类→方法→空格→参数），选到参数即加入；默认 mercury.proj.open 打开项目目录，可改输任意总线指令常驻桌面坞。",
                 TextWrapping = TextWrapping.Wrap,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
@@ -175,15 +175,15 @@ public static class MercuryDockManagerView
             root.Children.Add(_list);
             Content = root;
 
-            MercuryDockState.StartWatching();
-            MercuryDockState.Changed += OnChanged;
-            Unloaded += (_, _) => MercuryDockState.Changed -= OnChanged;
+            MercuryState.StartWatching();
+            MercuryState.Changed += OnChanged;
+            Unloaded += (_, _) => MercuryState.Changed -= OnChanged;
             Loaded += (_, _) =>
             {
                 LoadPolicy();
                 Reload();
                 _ = LoadCommandCatalogAsync();
-                _ = MercuryDockState.RefreshAsync();
+                _ = MercuryState.RefreshAsync();
             };
         }
 
@@ -358,7 +358,7 @@ public static class MercuryDockManagerView
             {
                 // 指令项恒为常驻，图钉只对项目行生效。
                 if (sender is Button { DataContext: DockRow { IsCommand: false } row })
-                    MercuryDockState.Pin(row.Name, !row.Pinned);
+                    MercuryState.Pin(row.Name, !row.Pinned);
             }));
             template.VisualTree = button;
             return template;
@@ -369,7 +369,7 @@ public static class MercuryDockManagerView
             _listMenu.Items.Clear();
 
             var refresh = new MenuItem { Header = "刷新" };
-            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
+            refresh.Click += async (_, _) => await MercuryState.RefreshAsync();
             _listMenu.Items.Add(refresh);
 
             if (_list.SelectedItem is not DockRow row)
@@ -380,7 +380,7 @@ public static class MercuryDockManagerView
                 var remove = new MenuItem { Header = "移除该指令" };
                 remove.Click += (_, _) =>
                 {
-                    if (MercuryDockState.RemoveCommand(row.Command))
+                    if (MercuryState.RemoveCommand(row.Command))
                         SetStatus($"已移除指令 {row.Command}");
                 };
                 _listMenu.Items.Add(remove);
@@ -390,8 +390,8 @@ public static class MercuryDockManagerView
                 var exclude = new MenuItem { Header = "排除" };
                 exclude.Click += (_, _) =>
                 {
-                    MercuryDockState.Exclude(row.Name, excluded: true);
-                    SetStatus($"已排除 {row.Name}；在加入框选 mercury.dock.open 可找回");
+                    MercuryState.Exclude(row.Name, excluded: true);
+                    SetStatus($"已排除 {row.Name}；在加入框选 mercury.proj.open 可找回");
                 };
                 _listMenu.Items.Add(exclude);
             }
@@ -473,16 +473,16 @@ public static class MercuryDockManagerView
         private void Reload()
         {
             var selected = (_list.SelectedItem as DockRow)?.Key;
-            var rows = MercuryDockState.Projects
+            var rows = MercuryState.Projects
                 .Select(project => new DockRow(
                     project.Name,
-                    MercuryDockAliasCommands.BuildOpenCommandText(project.Name),
+                    MercuryCommandCatalog.BuildOpenProjectCommand(project.Name),
                     project.Pinned,
                     false,
                     project.Weight,
                     project.Clicks,
                     project.LastOpened))
-                .Concat(MercuryDockState.CommandEntries.Select(entry => new DockRow(
+                .Concat(MercuryState.CommandEntries.Select(entry => new DockRow(
                     entry.Label,
                     entry.Command,
                     true,
@@ -512,14 +512,14 @@ public static class MercuryDockManagerView
             _commandsLoaded = true;
 
             IReadOnlyList<CommandCatalogItem> items = [];
-            var bus = MercuryDockUiModule.Bus;
+            var bus = MercuryUiModule.Bus;
             if (bus != null)
             {
                 try
                 {
                     var result = await bus.ExecuteAsync("command.list", "UI").ConfigureAwait(false);
                     if (result.Success)
-                        items = MercuryDockAliasCommands.ParseCommandCatalog(result.Data);
+                        items = MercuryCommandCatalog.ParseCommandCatalog(result.Data);
                 }
                 catch (Exception)
                 {
@@ -530,14 +530,14 @@ public static class MercuryDockManagerView
             await Dispatcher.BeginInvoke(() =>
             {
                 if (items.Count == 0)
-                    items = MercuryDockAliasCommands.FallbackCommandCatalog();
+                    items = MercuryCommandCatalog.FallbackCommandCatalog();
                 // 服务侧清单可能来自旧版模块：保证常驻默认指令永远在候选树里。
                 if (items.All(item => !item.Name.Equals(
-                        MercuryDockAliasCommands.OpenCommandName, StringComparison.OrdinalIgnoreCase)))
+                        MercuryCommandCatalog.ProjectOpenCommandName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    items = items.Concat(MercuryDockAliasCommands.FallbackCommandCatalog()
+                    items = items.Concat(MercuryCommandCatalog.FallbackCommandCatalog()
                         .Where(item => item.Name.Equals(
-                            MercuryDockAliasCommands.OpenCommandName, StringComparison.OrdinalIgnoreCase)))
+                            MercuryCommandCatalog.ProjectOpenCommandName, StringComparison.OrdinalIgnoreCase)))
                         .ToList();
                 }
                 _commandTree = CommandOptionTree.Build(items);
@@ -559,14 +559,14 @@ public static class MercuryDockManagerView
             if (command.Length == 0 || !IsOpenProjectCommand(command))
                 return [];
 
-            var docked = MercuryDockState.Projects
+            var docked = MercuryState.Projects
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var excluded = MercuryDockState.AllProjects
+            var excluded = MercuryState.AllProjects
                 .Where(item => item.Excluded)
                 .Select(item => item.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return MercuryDockState.ListWorktreeProjects()
+            return MercuryState.ListWorktreeProjects()
                 .Where(name => !docked.Contains(name))
                 .Where(name => fragment.Length == 0
                     || name.Contains(fragment, StringComparison.OrdinalIgnoreCase))
@@ -600,20 +600,20 @@ public static class MercuryDockManagerView
                 : argument;
             if (IsOpenProjectCommand(command)
                 && bareArgument.Length > 0
-                && MercuryDockState.AddToDock(bareArgument))
+                && MercuryState.AddToDock(bareArgument))
             {
                 SetStatus($"已加入扩展坞并固定 {bareArgument}");
-                _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
+                _entryInput.Text = MercuryCommandCatalog.ProjectOpenCommandName;
                 return;
             }
 
             var text = argument.Length == 0
                 ? command
                 : command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(bareArgument);
-            if (MercuryDockState.AddCommand(text))
+            if (MercuryState.AddCommand(text))
             {
                 SetStatus($"已加入指令 {text}");
-                _entryInput.Text = MercuryDockAliasCommands.OpenCommandName;
+                _entryInput.Text = MercuryCommandCatalog.ProjectOpenCommandName;
             }
             else
             {
@@ -624,14 +624,14 @@ public static class MercuryDockManagerView
         private static bool IsOpenProjectCommand(string? command)
             => string.Equals(
                 command?.Trim(),
-                MercuryDockAliasCommands.OpenCommandName,
+                MercuryCommandCatalog.ProjectOpenCommandName,
                 StringComparison.OrdinalIgnoreCase);
 
         private void SetStatus(string text) => _status.Text = text;
 
         private void LoadPolicy()
         {
-            var policy = MercuryDockState.Policy;
+            var policy = MercuryState.Policy;
             // 跨进程回写不得覆盖正在输入的框，否则用户打一半的字会被顶掉。
             if (!_minItems.IsKeyboardFocusWithin)
                 _minItems.Text = policy.MinItems.ToString(CultureInfo.InvariantCulture);
@@ -646,7 +646,7 @@ public static class MercuryDockManagerView
             int? min = int.TryParse(_minItems.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var m) ? m : null;
             int? max = int.TryParse(_maxItems.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var x) ? x : null;
             double? half = double.TryParse(_halfLife.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var h) ? h : null;
-            MercuryDockState.SetPolicy(min, max, half);
+            MercuryState.SetPolicy(min, max, half);
             LoadPolicy();
         }
 

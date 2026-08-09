@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "template": {
-    "isTemplate": true,
+    "isTemplate": false,
     "source": "0000-000-Template",
     "strictValidationArgument": "-Instantiation"
   },
   "project": {
-    "id": "0000-001",
-    "name": "AIReady",
-    "title": "OneHistory AI-Ready 项目模板",
+    "id": "2026-021",
+    "name": "HistoryMercury",
+    "title": "HistoryMercury / MercuryDock",
     "kind": [
-      "template",
-      "multidisciplinary"
+      "software",
+      "tooling"
     ],
-    "status": "template"
+    "status": "active"
   },
   "paths": {
     "activeRoots": [
@@ -26,7 +26,11 @@
       "b-Code",
       "b-Code-MercuryDock"
     ],
-    "generatedRoots": [],
+    "generatedRoots": [
+      "b-Code-MercuryDock/bin",
+      "b-Code-MercuryDock/obj",
+      "b-Publish/current"
+    ],
     "archiveRoots": [
       "b-Office/history"
     ],
@@ -49,12 +53,14 @@
   "commands": {
     "setup": null,
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Publish-MercuryModules.ps1",
-    "test": "dotnet run --project .\\b-Code-MercuryDock\\tests\\Smoke\\Smoke.csproj -c Release",
-    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1",
+    "test": "dotnet run --project .\\b-Code-MercuryDock\\tests\\Smoke\\Smoke.csproj -c Release -p:NuGetAudit=false",
+    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1 -Instantiation",
     "run": null,
-    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Publish-MercuryModules.ps1 -Publish"
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Publish-MercuryModules.ps1"
   },
-  "externalDependencies": [],
+  "externalDependencies": [
+    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-HistoryVulcan/host"
+  ],
   "contextExclusions": [
     "b-Office/history/**",
     "b-Publish/**",

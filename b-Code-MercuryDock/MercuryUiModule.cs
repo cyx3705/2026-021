@@ -6,22 +6,25 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Modules;
+using Mercury.CommandSurface;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在有 WPF Application 的宿主中建窗。
 /// </summary>
 /// <remarks>
 /// 当前 HistoryVulcan 组合下只有桌面 Shell 进程会实例化 UI 模块（服务进程 EnableUiModules=false），
-/// 因此管理页与桌面坞都运行在 Shell 进程；模块指令（dock.* 与别名 mercury.dock.open）注册在服务进程，
+/// 因此管理页与桌面坞都运行在 Shell 进程；模块指令由 mercury 三段式目录注册在服务进程，
 /// Shell 侧经 <see cref="CommandBus"/> 的远程执行器透明转发，模块代码无需关心进程边界。
 /// </remarks>
-public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleContextAware
+public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAware, IShellCommandWorkbenchAware
 {
     private static DockWindow? _window;
     private IShellUiRegistrar? _shellUi;
+    private IShellCommandWorkbenchHost? _commandWorkbench;
     private IDisposable? _managerWindow;
+    private CommandSurfaceFeature? _commandSurface;
 
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
     internal static CommandBus? Bus { get; private set; }
@@ -31,25 +34,32 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
         set => _shellUi = value;
     }
 
+    IShellCommandWorkbenchHost? IShellCommandWorkbenchAware.CommandWorkbench
+    {
+        set => _commandWorkbench = value;
+    }
+
     public void Attach(IModuleContext context)
     {
         Bus = context.Bus;
-        context.RegisterCommands(MercuryDockAliasCommands.Register);
+        context.RegisterCommands(MercuryCommandCatalog.Register);
     }
 
     public void CreateUi()
     {
-        MercuryDockState.StartWatching();
+        MercuryState.StartWatching();
         if (!DockShortcutFolder.IsExplorerRegistrationDisabled)
         {
-            DockShortcutFolder.StartWatching(MercuryDockState.ApplyShortcutFolderChanges);
+            DockShortcutFolder.StartWatching(MercuryState.ApplyShortcutFolderChanges);
             _ = ExplorerNamespaceRegistration.RegisterOrUpdate(DockShortcutFolder.Path);
         }
 
-        _ = MercuryDockState.RefreshAsync();
+        _ = MercuryState.RefreshAsync();
 
         if (_shellUi != null)
-            _managerWindow ??= _shellUi.RegisterToolWindow(MercuryDockManagerView.CreateDescriptor(), "MercuryDock");
+            _managerWindow ??= _shellUi.RegisterToolWindow(MercuryManagerView.CreateDescriptor(), "HistoryMercury");
+
+        _commandSurface ??= CommandSurfaceFeature.TryAttach(_commandWorkbench, _shellUi);
 
         if (_window != null)
             return;
@@ -60,12 +70,14 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             return;
         _window = new DockWindow();
         _window.Show();
-        if (MercuryDockState.Hidden)
+        if (MercuryState.Hidden)
             _window.Hide();
     }
 
     public void DestroyUi()
     {
+        _commandSurface?.Dispose();
+        _commandSurface = null;
         _managerWindow?.Dispose();
         _managerWindow = null;
         _window?.Close();
@@ -81,7 +93,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
 
         public DockWindow()
         {
-            var (width, height) = MercuryDockState.Size;
+            var (width, height) = MercuryState.Size;
             Width = width;
             Height = height;
             MinWidth = DockLayout.MinWidth;
@@ -119,8 +131,8 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             SourceInitialized += OnSourceInitialized;
             Loaded += (_, _) => ApplyAnchor();
             SizeChanged += OnSizeChanged;
-            MercuryDockState.Changed += OnChanged;
-            Closed += (_, _) => MercuryDockState.Changed -= OnChanged;
+            MercuryState.Changed += OnChanged;
+            Closed += (_, _) => MercuryState.Changed -= OnChanged;
             RefreshItems();
         }
 
@@ -137,7 +149,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             // 交互调整期间由系统的尺寸循环负责几何，结束时统一保存并贴合。
             if (_resizing)
                 return;
-            MercuryDockState.SaveSize(ActualWidth, ActualHeight);
+            MercuryState.SaveSize(ActualWidth, ActualHeight);
             // 右下角是锚点：尺寸变了要按新尺寸重新贴合，左上角随之移动。
             ApplyAnchor();
         }
@@ -184,7 +196,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
 
                 case WmExitSizeMove:
                     _resizing = false;
-                    MercuryDockState.SaveSize(ActualWidth, ActualHeight);
+                    MercuryState.SaveSize(ActualWidth, ActualHeight);
                     ApplyAnchor();
                     return IntPtr.Zero;
 
@@ -236,7 +248,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
         private void OnChanged()
             => Dispatcher.BeginInvoke(() =>
             {
-                if (MercuryDockState.Hidden)
+                if (MercuryState.Hidden)
                     Hide();
                 else
                 {
@@ -249,19 +261,19 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
         private void RefreshItems()
         {
             _items.Children.Clear();
-            _items.Children.Add(OhsButton());
+            _items.Children.Add(HistoryVulcanButton());
 
-            var projects = MercuryDockState.Projects;
+            var projects = MercuryState.Projects;
             // 光圈亮度按当前列表最大权重归一化，保证任何时候都有对比度。
             var maximum = projects.Count == 0 ? 0 : projects.Max(item => item.Weight);
             foreach (var project in projects)
                 _items.Children.Add(ProjectButton(project, maximum));
 
             // 手动加入的指令项常驻项目之后：不参与权重与策略排序，点击即经总线执行。
-            foreach (var entry in MercuryDockState.CommandEntries)
+            foreach (var entry in MercuryState.CommandEntries)
                 _items.Children.Add(CommandButton(entry));
 
-            if (projects.Count == 0 && MercuryDockState.CommandEntries.Count == 0)
+            if (projects.Count == 0 && MercuryState.CommandEntries.Count == 0)
             {
                 _items.Children.Add(new TextBlock
                 {
@@ -274,8 +286,8 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             }
         }
 
-        /// <summary>OHS 入口：不参与排序、不发光、不可取消。</summary>
-        private static Button OhsButton()
+        /// <summary>HistoryVulcan 入口：不参与排序、不发光、不可取消。</summary>
+        private static Button HistoryVulcanButton()
         {
             var glyph = new Border
             {
@@ -285,7 +297,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
                 Background = DockTheme.Accent,
                 Child = new TextBlock
                 {
-                    Text = "OHS",
+                    Text = "HV",
                     FontFamily = DockTheme.FontFamily,
                     FontSize = DockTheme.BodyFontSize,
                     FontWeight = FontWeights.SemiBold,
@@ -304,8 +316,8 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
                 Foreground = DockTheme.Label,
                 HorizontalAlignment = HorizontalAlignment.Center,
             });
-            var button = NakedButton(stack, "打开 OHS 主界面");
-            button.Click += (_, _) => OhsLauncher.Open();
+            var button = NakedButton(stack, "打开 HistoryVulcan 主界面");
+            button.Click += (_, _) => HistoryVulcanLauncher.Open();
             return button;
         }
 
@@ -349,9 +361,9 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             button.Click += (_, _) => OpenProject(project);
             var menu = StyledMenu();
             var pin = new MenuItem { Header = project.Pinned ? "取消置顶" : "置顶" };
-            pin.Click += (_, _) => MercuryDockState.Pin(project.Name, !project.Pinned);
+            pin.Click += (_, _) => MercuryState.Pin(project.Name, !project.Pinned);
             var refresh = new MenuItem { Header = "刷新" };
-            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
+            refresh.Click += async (_, _) => await MercuryState.RefreshAsync();
             menu.Items.Add(pin);
             menu.Items.Add(refresh);
             button.ContextMenu = menu;
@@ -400,9 +412,9 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
             };
             var menu = StyledMenu();
             var remove = new MenuItem { Header = "移除该指令" };
-            remove.Click += (_, _) => MercuryDockState.RemoveCommand(entry.Command);
+            remove.Click += (_, _) => MercuryState.RemoveCommand(entry.Command);
             var refresh = new MenuItem { Header = "刷新" };
-            refresh.Click += async (_, _) => await MercuryDockState.RefreshAsync();
+            refresh.Click += async (_, _) => await MercuryState.RefreshAsync();
             menu.Items.Add(remove);
             menu.Items.Add(refresh);
             button.ContextMenu = menu;
@@ -425,7 +437,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
         {
             // 服务未就绪或指令失败时回退本地打开，保证桌面坞永远能开目录。
             var result = await Bus!
-                .ExecuteAsync(MercuryDockAliasCommands.BuildOpenCommandText(project.Name), "UI")
+                .ExecuteAsync(MercuryCommandCatalog.BuildOpenProjectCommand(project.Name), "UI")
                 .ConfigureAwait(false);
             if (!result.Success)
                 OpenProjectLocally(project);
@@ -435,7 +447,7 @@ public sealed class MercuryDockUiModule : IUiModule, IShellUiAware, IModuleConte
         {
             try
             {
-                MercuryDockState.RecordOpen(project.Name);
+                MercuryState.RecordOpen(project.Name);
                 Process.Start(new ProcessStartInfo(project.Path) { UseShellExecute = true });
             }
             catch (Exception)

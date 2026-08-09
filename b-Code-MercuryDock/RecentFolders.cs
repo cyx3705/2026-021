@@ -4,7 +4,7 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 从 Windows 最近使用项读取"项目主文件夹最近一次在资源管理器打开"的时间。

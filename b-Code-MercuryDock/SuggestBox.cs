@@ -5,7 +5,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>
 public sealed record SuggestOption(string Text, string Display, string? Detail, bool IsBranch);

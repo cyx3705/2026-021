@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 活动坞的纯布局规则：锚点、尺寸钳制与边框命中测试。

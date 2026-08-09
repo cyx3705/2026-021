@@ -1,22 +1,14 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace MercuryDock;
+namespace Mercury;
 
-/// <summary>
-/// 打开 OHS 主界面。
-/// </summary>
-/// <remarks>
-/// OHS 是单入口产品：桌面前端与服务宿主同为一个 OneHistoryStudio.exe，靠 --service-host 区分。
-/// 活动坞运行在服务进程内，因此 Environment.ProcessPath 就是要启动的目标，不需要任何路径配置。
-/// 已有前端时唤到前台而不是再开一个；识别前端时必须排除本进程，否则会把服务宿主自己当成前端
-/// （服务宿主持有活动坞窗口，MainWindowHandle 并不为空）。
-/// </remarks>
-internal static class OhsLauncher
+/// <summary>打开或唤起 HistoryVulcan 主界面。</summary>
+internal static class HistoryVulcanLauncher
 {
     private const int ShowRestore = 9;
 
-    /// <summary>返回是否唤起了已有前端；false 表示新启动了一个。</summary>
+    /// <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
     public static bool Open()
     {
         var current = Process.GetCurrentProcess();
@@ -46,7 +38,7 @@ internal static class OhsLauncher
             }
             catch (Exception)
             {
-                // 进程可能在枚举后退出，忽略并继续。
+                // The peer can exit while the process list is being enumerated.
             }
         }
 

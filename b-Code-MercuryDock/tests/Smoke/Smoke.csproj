@@ -6,10 +6,26 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+  <PropertyGroup>
+    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\bin\$(Configuration)\net8.0\HistoryVulcan.Core.dll')">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\bin\$(Configuration)\net8.0\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Shell\bin\$(Configuration)\net8.0-windows\HistoryVulcan.Shell.dll')">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Shell\bin\$(Configuration)\net8.0-windows\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
+    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
+    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == '' and Exists('$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\bin\$(Configuration)\net8.0\HistoryVulcan.Services.dll')">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\bin\$(Configuration)\net8.0\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
+    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
+  </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\MercuryDock.csproj" />
+    <ProjectReference Include="..\..\HistoryMercury.csproj" />
     <Reference Include="HistoryVulcan.Core">
-      <HintPath>$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HintPath>
+      <HintPath>$(HistoryVulcanCoreDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Shell">
+      <HintPath>$(HistoryVulcanShellDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Services">
+      <HintPath>$(HistoryVulcanServicesDll)</HintPath>
       <Private>true</Private>
     </Reference>
   </ItemGroup>

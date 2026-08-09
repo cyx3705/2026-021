@@ -2,10 +2,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
-/// MercuryDock 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
+/// HistoryMercury 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
 /// 恒用深色色板，宿主处于浅色模式时页面也不会变白。字体与间距与深浅无关，继续跟随宿主。
 /// </summary>
 public static class DockTheme

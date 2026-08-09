@@ -2,7 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 让活动坞永不遮挡其他窗口：保持普通顶层窗口，但把 z-order 钉死在最底。
@@ -110,10 +110,7 @@ public static class DesktopLayer
         {
             lock (Gate)
             {
-                var root = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "OneHistoryStudio",
-                    "MercuryDock");
+                var root = MercuryPaths.DataRoot;
                 Directory.CreateDirectory(root);
                 File.AppendAllText(
                     Path.Combine(root, "layer.log"),

@@ -15,7 +15,15 @@ $transactionId = [Guid]::NewGuid().ToString('N')
 $stamp = [DateTimeOffset]::UtcNow.ToString('yyyyMMdd-HHmmss')
 
 $modules = @(
-    [ordered]@{ Name = 'MercuryDock'; Project = 'b-Code-MercuryDock\\MercuryDock.csproj'; Release = 'b-Code-MercuryDock\\bin\\Release\\net8.0-windows'; ZDirectory = 'z-MercuryDock' }
+    [ordered]@{
+        Name = 'HistoryMercury'
+        Project = 'b-Code-MercuryDock\\HistoryMercury.csproj'
+        Manifest = 'b-Code-MercuryDock\\module.manifest.json'
+        Release = 'b-Code-MercuryDock\\bin\\Release\\net8.0-windows'
+        ZDirectory = 'z-HistoryMercury'
+        PreviousNames = @('MercuryDock')
+        PreviousZDirectories = @('z-MercuryDock')
+    }
 )
 
 function Invoke-Dotnet {
@@ -90,8 +98,7 @@ function New-ModuleTree {
         [Parameter(Mandatory = $true)][string]$Destination
     )
 
-    $sourceZ = Join-Path $repoRoot $Module.ZDirectory
-    $sourceManifest = Join-Path $sourceZ 'module.manifest.json'
+    $sourceManifest = Join-Path $repoRoot $Module.Manifest
     $releaseRoot = Join-Path $repoRoot $Module.Release
     $version = [string]((Get-Content -LiteralPath $sourceManifest -Raw -Encoding UTF8 | ConvertFrom-Json).version)
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
@@ -152,6 +159,12 @@ try {
         $validate = { param($root) Assert-ModuleTree $root $module.Name $version }
         Invoke-Promotion $stage $candidate $candidateBackup $validate
         if (Test-Path -LiteralPath $candidateBackup) { Remove-Item -LiteralPath $candidateBackup -Recurse -Force }
+        foreach ($previousName in @($module.PreviousNames)) {
+            $obsoleteCandidate = Join-Path $candidateRoot $previousName
+            if (Test-Path -LiteralPath $obsoleteCandidate) {
+                Remove-Item -LiteralPath $obsoleteCandidate -Recurse -Force
+            }
+        }
         Write-Host "Candidate $($module.Name) ${version}: $candidate"
     }
 
@@ -166,7 +179,29 @@ try {
             $backup = Join-Path $historyRoot "$($module.Name)\\$version-$stamp"
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
             $validate = { param($root) Assert-ModuleTree $root $module.Name $version }
-            Invoke-Promotion $formalStage $destination $backup $validate
+            $retiredSlots = @()
+            try {
+                foreach ($previousZDirectory in @($module.PreviousZDirectories)) {
+                    $previousSlot = Join-Path $repoRoot $previousZDirectory
+                    if (-not (Test-Path -LiteralPath $previousSlot)) {
+                        continue
+                    }
+                    $previousName = Split-Path -Leaf $previousZDirectory
+                    $retired = Join-Path $historyRoot "$previousName\\retired-$stamp"
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $retired) | Out-Null
+                    Move-Item -LiteralPath $previousSlot -Destination $retired
+                    $retiredSlots += [pscustomobject]@{ Slot = $previousSlot; Archive = $retired }
+                }
+                Invoke-Promotion $formalStage $destination $backup $validate
+            }
+            catch {
+                foreach ($retired in $retiredSlots) {
+                    if ((Test-Path -LiteralPath $retired.Archive) -and -not (Test-Path -LiteralPath $retired.Slot)) {
+                        Move-Item -LiteralPath $retired.Archive -Destination $retired.Slot
+                    }
+                }
+                throw
+            }
             Write-Host "Formal $($module.Name) ${version}: $destination"
         }
     }

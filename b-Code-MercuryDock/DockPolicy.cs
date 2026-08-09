@@ -1,4 +1,4 @@
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>收录策略：显示条数区间与时效半衰期。可在扩展坞管理页面调整。</summary>
 public sealed class DockPolicy

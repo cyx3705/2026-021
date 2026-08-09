@@ -1,6 +1,6 @@
 namespace BaseVariable;
 
-/// <summary>AppShell 模块识别合同的兼容副本。</summary>
+/// <summary>HistoryVulcan 模块识别合同的兼容副本。</summary>
 public abstract class ModuleInfoBase
 {
     public virtual string ModuleName => GetType().Assembly.GetName().Name ?? "UnknownModule";

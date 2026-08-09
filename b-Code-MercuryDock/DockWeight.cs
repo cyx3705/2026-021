@@ -1,4 +1,4 @@
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>
 /// 收录权重的纯计算：指数衰减计数、信号合并与光圈亮度映射。

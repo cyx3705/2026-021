@@ -6,7 +6,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace MercuryDock;
+namespace Mercury;
 
 public static class ProjectIconGenerator
 {
@@ -22,9 +22,7 @@ public static class ProjectIconGenerator
 
     public static BitmapSource Create(string projectName, string? cacheRoot = null)
     {
-        var cache = cacheRoot ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OneHistoryStudio", "MercuryDock", "icons");
+        var cache = cacheRoot ?? Path.Combine(MercuryPaths.DataRoot, "icons");
         Directory.CreateDirectory(cache);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("v1:" + projectName)));
         var path = Path.Combine(cache, hash + ".png");

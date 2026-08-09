@@ -3,7 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace MercuryDock;
+namespace Mercury;
 
 public sealed record DockProject(
     string Name,
@@ -19,24 +19,23 @@ public sealed record DockProject(
 /// <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
 public sealed record DockCommandEntry(string Command, string Label, DateTimeOffset Added);
 
-internal static partial class MercuryDockState
+internal static partial class MercuryState
 {
     private static readonly object Gate = new();
     private static FileSystemWatcher? _watcher;
-    private static readonly string AppRoot = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "OneHistoryStudio");
-
     /// <summary>
-    /// 状态目录可用 MERCURYDOCK_STATE_DIRECTORY 整体改向（烟测隔离用），此时旧版迁移自动跳过。
+    /// 状态目录可用 MERCURY_STATE_DIRECTORY 整体改向（烟测隔离用），此时旧版迁移自动跳过。
     /// </summary>
     private static readonly string DockRoot =
-        Environment.GetEnvironmentVariable("MERCURYDOCK_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
+        Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
             ? overrideRoot
-            : Path.Combine(AppRoot, "MercuryDock");
-    private static readonly string LegacyDockRoot = Path.Combine(AppRoot, "ActiveDock");
+            : MercuryPaths.DataRoot;
+    private static readonly string PreviousMercuryDockRoot = MercuryPaths.PreviousDataRoot;
+    private static readonly string LegacyMercuryDockRoot = MercuryPaths.LegacyMercuryDockDataRoot;
+    private static readonly string LegacyActiveDockRoot = MercuryPaths.LegacyActiveDockDataRoot;
     private static readonly string StatePath = Path.Combine(DockRoot, "state.json");
-    private static readonly string SettingsPath = Path.Combine(AppRoot, "settings.json");
+    private static readonly string SettingsPath = MercuryPaths.SettingsPath;
+    private static readonly string LegacySettingsPath = MercuryPaths.LegacySettingsPath;
 
     /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到这里。</summary>
     private const string DefaultWorktreeRoot = @"C:\OneHistory\HistoryVesta";
@@ -545,11 +544,13 @@ internal static partial class MercuryDockState
 
     private static string ReadWorktreeRoot()
     {
-        try
+        foreach (var settingsPath in new[] { SettingsPath, LegacySettingsPath })
         {
-            if (File.Exists(SettingsPath))
+            try
             {
-                using var doc = JsonDocument.Parse(File.ReadAllText(SettingsPath));
+                if (!File.Exists(settingsPath))
+                    continue;
+                using var doc = JsonDocument.Parse(File.ReadAllText(settingsPath));
                 // 整库改名后配置值可能指向已不存在的目录，必须校验存在性再采用，
                 // 否则扫描结果恒空、活动坞只剩"暂无活动项目"。
                 if (doc.RootElement.TryGetProperty("proj.worktreeroot", out var value)
@@ -559,9 +560,9 @@ internal static partial class MercuryDockState
                     return configured;
                 }
             }
-        }
-        catch (JsonException)
-        {
+            catch (JsonException)
+            {
+            }
         }
 
         return DefaultWorktreeRoot;
@@ -652,19 +653,25 @@ internal static partial class MercuryDockState
     }
 
     /// <summary>
-    /// 3.0.0 改名 MercuryDock 后，把 ActiveDock 时代的偏好一次性复制到新数据目录，
+    /// HistoryVulcan 数据根首次启用时，优先迁移旧 MercuryDock 偏好，再兼容更早的 ActiveDock 偏好。
     /// 保留固定项、排除名单、使用记录与策略。旧文件保留不删，便于回退对照。
     /// </summary>
     private static void MigrateLegacyState()
     {
         try
         {
-            if (Environment.GetEnvironmentVariable("MERCURYDOCK_STATE_DIRECTORY") is { Length: > 0 })
+            if (Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 })
                 return;
-            var legacy = Path.Combine(LegacyDockRoot, "state.json");
-            if (File.Exists(StatePath) || !File.Exists(legacy))
+            if (File.Exists(StatePath))
                 return;
-            File.Copy(legacy, StatePath);
+            foreach (var root in new[] { PreviousMercuryDockRoot, LegacyMercuryDockRoot, LegacyActiveDockRoot })
+            {
+                var legacy = Path.Combine(root, "state.json");
+                if (!File.Exists(legacy))
+                    continue;
+                File.Copy(legacy, StatePath);
+                return;
+            }
         }
         catch (Exception)
         {

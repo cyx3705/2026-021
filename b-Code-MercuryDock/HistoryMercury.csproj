@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
+    <AssemblyName>HistoryMercury</AssemblyName>
+    <RootNamespace>Mercury</RootNamespace>
+    <Version>4.1.0</Version>
+  </PropertyGroup>
+  <PropertyGroup>
+    <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
+    <HistoryVulcanShellProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Shell\HistoryVulcan.Shell.csproj</HistoryVulcanShellProj>
+    <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
+    <HistoryVulcanSourceAvailable Condition="Exists('$(HistoryVulcanCoreProj)') and Exists('$(HistoryVulcanShellProj)') and Exists('$(HistoryVulcanServicesProj)')">true</HistoryVulcanSourceAvailable>
+    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
+    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
+    <ProjectReference Include="$(HistoryVulcanCoreProj)">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="$(HistoryVulcanShellProj)">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="$(HistoryVulcanServicesProj)">
+      <Private>false</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' != 'true'">
+    <Reference Include="HistoryVulcan.Core">
+      <HintPath>$(HistoryVulcanCoreDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Shell">
+      <HintPath>$(HistoryVulcanShellDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Services">
+      <HintPath>$(HistoryVulcanServicesDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

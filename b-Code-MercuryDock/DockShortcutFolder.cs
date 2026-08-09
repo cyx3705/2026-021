@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 
-namespace MercuryDock;
+namespace Mercury;
 
 /// <summary>Keeps the Explorer-facing shortcut folder identical to the current dock list.</summary>
 public static class DockShortcutFolder
@@ -17,13 +17,13 @@ public static class DockShortcutFolder
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public const string FolderName = "\u5feb\u6377\u65b9\u5f0f";
-    public const string ModuleSlotName = "MercuryDock";
+    public const string ModuleSlotName = "HistoryMercury";
 
     public static string Path => ResolvePath();
 
     public static bool IsExplorerRegistrationDisabled
         => string.Equals(
-            Environment.GetEnvironmentVariable("MERCURYDOCK_DISABLE_EXPLORER_REGISTRATION"),
+            Environment.GetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION"),
             "1",
             StringComparison.Ordinal);
 
@@ -99,14 +99,9 @@ public static class DockShortcutFolder
 
     private static string ResolvePath()
     {
-        // OHS can shadow-copy a module into a transient load directory. Explorer must
+        // HistoryVulcan can shadow-copy a module into a transient load directory. Explorer must
         // always target the durable module slot instead of that transient location.
-        return System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "OneHistoryStudio",
-            "Modules",
-            ModuleSlotName,
-            FolderName);
+        return System.IO.Path.Combine(MercuryPaths.ModuleSlotRoot, FolderName);
     }
 
     private static string LinkPath(string folder, DockProject project)

@@ -1,0 +1,65 @@
+<UserControl x:Class="Mercury.CommandSurface.McpToolsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <!-- 视图是独立 BAML:StaticResource 必须在自己的作用域里找得到 -->
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/HistoryVulcan.Shell;component/Themes/ShellControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <DockPanel Margin="10">
+        <!--
+            3.2.1:顶部只保留有效的域/类/MCP 筛选和刷新动作，
+            段间用发丝线切分，窄宽度下整条自动换行。
+        -->
+        <Border DockPanel.Dock="Top" Style="{StaticResource Shell.Segment.Bar}">
+            <WrapPanel Orientation="Horizontal">
+                <TextBlock Text="域" Style="{StaticResource Shell.Segment.Label}" />
+                <ComboBox x:Name="DomainFilterBox" Width="130"
+                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          SelectionChanged="OnDomainFilterChanged" />
+                <TextBlock Text="类" Style="{StaticResource Shell.Segment.Label}" />
+                <ComboBox x:Name="ClassFilterBox" Width="110"
+                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          SelectionChanged="OnClassFilterChanged" />
+                <TextBlock Text="MCP" Style="{StaticResource Shell.Segment.Label}" />
+                <ComboBox x:Name="McpFilterBox" Width="120" SelectedIndex="0"
+                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          SelectionChanged="OnFilterChanged">
+                    <ComboBoxItem Content="全部" />
+                    <ComboBoxItem Content="当前可见" />
+                    <ComboBoxItem Content="当前隐藏" />
+                    <ComboBoxItem Content="硬排除" />
+                    <ComboBoxItem Content="危险拒绝" />
+                </ComboBox>
+                <Border Style="{StaticResource Shell.Segment.Divider}" />
+                <Button x:Name="RefreshButton" Content="刷新"
+                        Style="{StaticResource Shell.Segment.Button}" Click="OnRefreshClick" />
+            </WrapPanel>
+        </Border>
+
+        <TextBlock DockPanel.Dock="Bottom" x:Name="StatusText"
+                   Foreground="{DynamicResource Shell.Brush.TextSecondary}"
+                   FontSize="{DynamicResource Shell.Font.Small}"
+                   Margin="2,8,0,0"
+                   Text="命令注册表是能力真值；MCP 只是策略投影" TextWrapping="Wrap" />
+
+        <ListView x:Name="ToolList" Margin="0,8,0,0" SelectionChanged="OnToolSelected">
+            <ListView.View>
+                <GridView ColumnHeaderContainerStyle="{StaticResource Shell.GridHeader}">
+                    <GridViewColumn Header="域" Width="90" DisplayMemberBinding="{Binding Domain}" />
+                    <GridViewColumn Header="类" Width="90" DisplayMemberBinding="{Binding CommandClass}" />
+                    <GridViewColumn Header="方法" Width="120" DisplayMemberBinding="{Binding Method}" />
+                    <GridViewColumn Header="MCP" Width="85" DisplayMemberBinding="{Binding McpState}" />
+                    <GridViewColumn Header="参数" Width="48" DisplayMemberBinding="{Binding ParameterCount}" />
+                    <GridViewColumn Header="说明" Width="340" DisplayMemberBinding="{Binding Summary}" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+    </DockPanel>
+</UserControl>
