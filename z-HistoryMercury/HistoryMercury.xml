@@ -502,7 +502,10 @@
             </summary>
         </member>
         <member name="M:Mercury.ProjectIconGenerator.ShortLabel(System.String)">
-            <summary>磁贴上显示的短标签：去掉编号前缀后最多 6 个字符。</summary>
+            <summary>磁贴上显示的项目后缀：去掉编号前缀及品牌前缀，不添加省略号。</summary>
+        </member>
+        <member name="M:Mercury.ProjectIconGenerator.FitFontSize(System.String,System.Double,System.Double)">
+            <summary>按像素宽度选择完整标签可用的字号，保证 UI 不以省略号牺牲项目特征。</summary>
         </member>
         <member name="T:Mercury.RecentFolders">
              <summary>
