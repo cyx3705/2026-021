@@ -227,6 +227,22 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
     }
 
     Equal(0, shortcuts.Registrations.Count, "Owner registrar dispose must release every registration.");
+
+    using (var owner = shortcuts.CreateOwnerRegistrar("HistoryMercury"))
+    {
+        new MercuryShortcutModule().RegisterShortcuts(owner);
+        var focusConsole = shortcuts.Registrations.Single();
+        Equal("focus-console", focusConsole.Id, "Mercury shortcut module registration id.");
+        Equal("mercury.shortcut.wakeconsole", focusConsole.CommandText,
+            "Mercury shortcut module command target.");
+    }
+
+    Equal(0, shortcuts.Registrations.Count,
+        "Disposing the Mercury owner must release focus-console before reload.");
+    using (var reloadedOwner = shortcuts.CreateOwnerRegistrar("HistoryMercury"))
+        new MercuryShortcutModule().RegisterShortcuts(reloadedOwner);
+    Equal(0, shortcuts.Registrations.Count,
+        "Reloaded Mercury owner must release focus-console without leaking.");
 }
 
 var matcher = new Mercury.Input.GlobalShortcutMatcher();
