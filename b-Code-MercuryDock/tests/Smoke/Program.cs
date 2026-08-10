@@ -7,6 +7,7 @@ using HistoryVulcan.Core.Docking;
 using HistoryVulcan.Core.Input;
 using HistoryVulcan.Core.Modules;
 using Mercury;
+using Mercury.CommandSurface;
 
 var previousExplorerRegistrationSetting = Environment.GetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION");
 Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", "1");
@@ -57,7 +58,7 @@ Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manag
 var registry = new CommandRegistry();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-Equal(17, commands.Count, "Command count");
+Equal(19, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -65,7 +66,27 @@ True(commands.All(command => command.Name.StartsWith("mercury.", StringCompariso
 True(!commands.Any(command => command.Name.StartsWith("dock.", StringComparison.Ordinal)
     || command.Name.StartsWith("mercury.dock.open", StringComparison.Ordinal)),
     "Legacy command names must not remain registered.");
-True(registry.TryGet("mercury.status", out var status) && status.Readonly, "Status command must be readonly.");
+True(registry.TryGet("mercury.app.status", out var status) && status.Readonly, "Status command must be readonly.");
+True(status.CommandClass == "app", "Status must declare the app class.");
+
+// DEC-025：合法形态恰有两种——三段业务指令，或两段无类直接方法。
+True(commands.All(command => command.Name.Split('.').Length is 2 or 3),
+    "Every mercury command must be <domain>.<class>.<method> or <domain>.<method>.");
+// 三段指令必须声明类；两段直接方法必须不声明类，否则两种形态会互相污染。
+True(commands.Where(command => command.Name.Split('.').Length == 3)
+        .All(command => !string.IsNullOrWhiteSpace(command.CommandClass)),
+    "Three-segment commands must declare a class.");
+True(commands.Where(command => command.Name.Split('.').Length == 2)
+        .All(command => string.IsNullOrWhiteSpace(command.CommandClass)),
+    "Two-segment direct methods must stay classless.");
+
+// mercury.go 是域聚焦的唯一入口，且必须是无类直接方法：
+// 它切换的是控制台状态，不隶属任何业务类。
+True(registry.TryGet("mercury.go", out var go), "Domain-focus command must be registered.");
+True(string.IsNullOrWhiteSpace(go.CommandClass), "mercury.go must be a classless direct method.");
+True(go.Parameters.Any(parameter => parameter.Name == "domain" && !parameter.Required),
+    "mercury.go must take an optional domain parameter so the bare form exits focus.");
+True(registry.TryGet("mercury.shortcut.wakeconsole", out _), "Wake-console orchestration command must be registered.");
 True(registry.TryGet("mercury.proj.pin", out var pin) && !pin.Readonly, "Project write command must be present.");
 True(registry.TryGet("mercury.usage.forget", out var forget) && forget.IsDangerous,
     "Usage reset must require confirmation.");
@@ -76,7 +97,7 @@ Equal("mercury.proj.open \"a b\"", MercuryCommandCatalog.BuildOpenProjectCommand
     "Whitespace project name command text");
 
 using var catalog = JsonDocument.Parse("""
-[{"commandName":"mercury.proj.open","domain":"Mercury","commandClass":"proj","summary":"Open project"},
+[{"commandName":"mercury.proj.open","domain":"Mercury","commandClass":"proj","summary":"打开项目"},
  {"commandName":"mercury.usage.list","domain":"Mercury","commandClass":"usage"},
  {"other":1}]
 """);
@@ -146,12 +167,12 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
            new NullShellLog()))
 {
     using var first = shortcuts.Register(
-        new GlobalShortcutDescriptor("long", [new GlobalShortcutStroke(0x41), new GlobalShortcutStroke(0x42)], "vulcan.core.help"),
+        new GlobalShortcutDescriptor("long", [new GlobalShortcutStroke(0x41), new GlobalShortcutStroke(0x42)], "vulcan.command.help"),
         "one");
     try
     {
         shortcuts.Register(
-            new GlobalShortcutDescriptor("short", [new GlobalShortcutStroke(0x41)], "vulcan.core.help"),
+            new GlobalShortcutDescriptor("short", [new GlobalShortcutStroke(0x41)], "vulcan.command.help"),
             "two");
         throw new InvalidOperationException("Prefix conflict must be rejected.");
     }
@@ -162,7 +183,7 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
     try
     {
         shortcuts.Register(
-            new GlobalShortcutDescriptor("same", [new GlobalShortcutStroke(0x41), new GlobalShortcutStroke(0x42)], "vulcan.core.help"),
+            new GlobalShortcutDescriptor("same", [new GlobalShortcutStroke(0x41), new GlobalShortcutStroke(0x42)], "vulcan.command.help"),
             "three");
         throw new InvalidOperationException("Exact conflict must be rejected.");
     }
@@ -173,7 +194,7 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
     try
     {
         shortcuts.Register(
-            new GlobalShortcutDescriptor("empty", [], "vulcan.core.help"),
+            new GlobalShortcutDescriptor("empty", [], "vulcan.command.help"),
             "test");
         throw new InvalidOperationException("Empty stroke sequence must be rejected.");
     }
@@ -184,7 +205,7 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
     try
     {
         shortcuts.Register(
-            new GlobalShortcutDescriptor("fast", [new GlobalShortcutStroke(1)], "vulcan.core.help", 99),
+            new GlobalShortcutDescriptor("fast", [new GlobalShortcutStroke(1)], "vulcan.command.help", 99),
             "test");
         throw new InvalidOperationException("Interval below 100ms must be rejected.");
     }
@@ -199,8 +220,8 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
 {
     using (var owner = shortcuts.CreateOwnerRegistrar("module:test"))
     {
-        owner.Register(new GlobalShortcutDescriptor("one", [new GlobalShortcutStroke(0x41)], "vulcan.core.help"));
-        owner.Register(new GlobalShortcutDescriptor("two", [new GlobalShortcutStroke(0x42)], "vulcan.core.help"));
+        owner.Register(new GlobalShortcutDescriptor("one", [new GlobalShortcutStroke(0x41)], "vulcan.command.help"));
+        owner.Register(new GlobalShortcutDescriptor("two", [new GlobalShortcutStroke(0x42)], "vulcan.command.help"));
         Equal(2, shortcuts.Registrations.Count, "Owner registrar must keep both registrations.");
     }
 
@@ -212,7 +233,7 @@ var slash = new GlobalShortcutRegistrationInfo(
     "slash",
     "test",
     [new GlobalShortcutStroke(0xBF), new GlobalShortcutStroke(0xBF)],
-    "vulcan.core.help",
+    "vulcan.command.help",
     350);
 var start = System.Diagnostics.Stopwatch.GetTimestamp();
 Equal(0, matcher.Process([slash], new GlobalShortcutStroke(0xBF), start).Count, "First slash must not fire.");
@@ -228,7 +249,74 @@ Equal(0, matcher.Process(
         start + (long)(System.Diagnostics.Stopwatch.Frequency * 0.5)).Count,
     "Timeout must discard incomplete sequence.");
 
-Console.WriteLine("HistoryMercury.Smoke: PASS (17 mercury commands, one direct registration source, HistoryMercury identity slot, shell UI, Explorer shortcut folder, global shortcuts).");
+// 分段补全：域 → 类 → 方法 → 参数。域清单从传入定义现算，不硬编码。
+var completion = new CommandCompletionEngine();
+var catalogue = new List<CommandCompletionDefinition>
+{
+    new("janus.proj.list", "列出项目", []),
+    new("janus.proj.commit", "提交", [new ParameterSpec { Name = "name", Description = "项目名" }]),
+    new("janus.gitrule.scan", "扫描规则", []),
+    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域" }]),
+    new("vulcan.ui.reset", "重置布局", []),
+};
+
+static string[] Inserts(HistoryVulcan.Core.CommandSurface.ConsoleCompletionResult result)
+    => result.Candidates.Select(candidate => candidate.InsertText).ToArray();
+
+// 第一段选域，落点带点号。
+var domains = completion.Complete("", 0, catalogue);
+True(Inserts(domains).SequenceEqual(["janus.", "mercury.", "vulcan."]),
+    "Empty input offers every registered domain.");
+True(domains.Candidates.All(candidate => candidate.Kind == HistoryVulcan.Core.CommandSurface.ConsoleCompletionKind.Domain),
+    "Domain stage yields domain candidates.");
+
+// 第二段选类，同时给出该域的无类直接方法。
+var janusClasses = completion.Complete("janus.", 6, catalogue);
+True(Inserts(janusClasses).SequenceEqual(["janus.gitrule.", "janus.proj."]),
+    "Second stage offers the classes of the typed domain.");
+var mercuryStage = completion.Complete("mercury.", 8, catalogue);
+True(Inserts(mercuryStage).Contains("mercury.go "),
+    "A domain's classless direct methods appear at the class stage with a trailing space.");
+
+// 第三段选方法，落点带尾随空格以直接进入参数段。
+var methods = completion.Complete("janus.proj.", 11, catalogue);
+True(Inserts(methods).SequenceEqual(["janus.proj.commit ", "janus.proj.list "]),
+    "Third stage offers methods and lands on the parameter stage.");
+
+// 参数候选来自注册的 ParameterSpec，不是猜的。
+var parameters = completion.Complete("janus.proj.commit ", 18, catalogue);
+True(Inserts(parameters).SequenceEqual(["name="]),
+    "Parameter candidates come from the registered ParameterSpec.");
+
+// 域聚焦：省略域前缀直接补类，同时其他域的绝对名仍然补得出来（脱固入口不能消失）。
+var focused = completion.Complete("", 0, catalogue, "janus");
+True(Inserts(focused).Take(2).SequenceEqual(["gitrule.", "proj."]),
+    "Focused domain classes come first and drop the domain prefix.");
+True(Inserts(focused).Contains("mercury."),
+    "Other registered domains stay reachable while focused, so focus can always be left.");
+
+// 聚焦时省略域前缀后，参数段仍要能解析到正确的命令。
+var focusedParameters = completion.Complete("proj.commit ", 12, catalogue, "janus");
+True(Inserts(focusedParameters).SequenceEqual(["name="]),
+    "Focused input resolves to the full command before reading its parameters.");
+
+// 活动坞磁贴：底色随使用频率由纯白线性趋近柔和强调色，不再用光晕表达频率。
+Equal(0d, DockWeight.TileTint(0, 10), "Unused project keeps a plain white tile.");
+Equal(1d, DockWeight.TileTint(10, 10), "The most-used project reaches the fully tinted end.");
+Equal(0.5d, DockWeight.TileTint(5, 10), "Tint is linear in the normalised weight.");
+Equal(0d, DockWeight.TileTint(5, 0), "A zero maximum must not divide by zero.");
+
+var coldTile = DockTheme.TileBackground(0);
+var hotTile = DockTheme.TileBackground(1);
+True(coldTile.Color == DockTheme.TileBase, "Zero-frequency tile is #FFFFFF.");
+True(hotTile.Color == DockTheme.TileTintTarget, "Maximum-frequency tile is #FAF0D8.");
+True(DockTheme.TileBackground(0.5).Color.B < coldTile.Color.B
+     && DockTheme.TileBackground(0.5).Color.B > hotTile.Color.B,
+    "Mid frequency sits between the two ends (blue channel drops as it yellows).");
+True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 0x12),
+    "Tile text uses the documented deep-yellow accent.");
+
+Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, HistoryMercury identity slot, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
 
 static void True(bool condition, string message)
 {

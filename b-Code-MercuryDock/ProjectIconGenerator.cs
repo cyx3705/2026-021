@@ -72,7 +72,8 @@ public static class ProjectIconGenerator
         encoder.Save(stream);
     }
 
-    private static string ShortLabel(string name)
+    /// <summary>磁贴上显示的短标签：去掉编号前缀后最多 6 个字符。</summary>
+    public static string ShortLabel(string name)
     {
         var dash = name.IndexOf('-', 8);
         var value = dash >= 0 && dash + 1 < name.Length ? name[(dash + 1)..] : name;

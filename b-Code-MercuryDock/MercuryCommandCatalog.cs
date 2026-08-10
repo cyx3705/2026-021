@@ -22,7 +22,7 @@ internal static class MercuryCommandCatalog
             .Select(command => new CommandCatalogItem(
                 command.Name,
                 "Mercury",
-                command.CommandClass ?? "core",
+                command.CommandClass ?? string.Empty,
                 command.Summary))
             .ToList();
 
@@ -57,48 +57,94 @@ internal static class MercuryCommandCatalog
 
     private static IReadOnlyList<CommandDescriptor> CreateDescriptors() =>
     [
-        Readonly("mercury.status", "status", "Show the managed Explorer entry.",
+        // mercury.go 是本域的无类直接方法（两段名）：它切换的是控制台的域聚焦，
+        // 不隶属任何业务类。因为首段 mercury 是已注册域，聚焦到任何域时都能直接输入，
+        // 所以各域都不必自备「退出聚焦」指令。
+        Direct("mercury.go", "聚焦到指定指令域；省略 domain 则退出聚焦。",
+            context => MercuryCommands.Go(context.GetString("domain")),
+            DomainParameter()),
+        Readonly("mercury.app.status", "app", "查看托管的资源管理器入口状态。",
             _ => MercuryCommands.Status()),
-        Write("mercury.explorer.register", "explorer", "Register the managed Explorer entry.",
+        Async("mercury.shortcut.wakeconsole", "shortcut", "组合调用 Vulcan 窗口指令以唤出并聚焦控制台。",
+            async _ => await MercuryCommands.WakeConsoleAsync().ConfigureAwait(false)),
+        Write("mercury.explorer.register", "explorer", "注册托管的资源管理器入口。",
             _ => MercuryCommands.RegisterExplorer()),
-        Write("mercury.explorer.remove", "explorer", "Remove the managed Explorer entry.",
-            _ => MercuryCommands.RemoveExplorer(), "Remove the managed Explorer entry?"),
-        Readonly("mercury.proj.list", "proj", "List active projects.",
+        Write("mercury.explorer.remove", "explorer", "移除托管的资源管理器入口。",
+            _ => MercuryCommands.RemoveExplorer(), "确定移除托管的资源管理器入口？"),
+        Readonly("mercury.proj.list", "proj", "列出活动项目。",
             _ => MercuryCommands.ListProjects()),
-        Write("mercury.proj.pin", "proj", "Pin an active project.",
+        Write("mercury.proj.pin", "proj", "置顶活动项目。",
             context => MercuryCommands.PinProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.unpin", "proj", "Unpin an active project.",
+        Write("mercury.proj.unpin", "proj", "取消置顶活动项目。",
             context => MercuryCommands.UnpinProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.add", "proj", "Add and pin a project.",
+        Write("mercury.proj.add", "proj", "添加并置顶项目。",
             context => MercuryCommands.AddProject(context.RequireString("name")), NameParameter()),
-        Async("mercury.proj.refresh", "proj", "Rescan active projects.",
+        Async("mercury.proj.refresh", "proj", "重新扫描活动项目。",
             async _ => await MercuryCommands.RefreshProjectsAsync().ConfigureAwait(false)),
-        Write("mercury.proj.exclude", "proj", "Exclude a project from the dock.",
+        Write("mercury.proj.exclude", "proj", "从项目坞排除项目。",
             context => MercuryCommands.ExcludeProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.include", "proj", "Include a project in the dock.",
+        Write("mercury.proj.include", "proj", "将项目重新纳入项目坞。",
             context => MercuryCommands.IncludeProject(context.RequireString("name")), NameParameter()),
         new CommandDescriptor
         {
             Name = ProjectOpenCommandName,
             CommandClass = "proj",
-            Summary = "Open a project directory.",
+            Summary = "打开项目目录。",
             Example = "mercury.proj.open 2026-021-HistoryMercury",
             Parameters = [NameParameter()],
             Handler = CommandDescriptor.Sync(context => MercuryCommands.OpenProject(context.GetString("name"))),
         },
-        Write("mercury.dock.hide", "dock", "Hide the dock.", _ => MercuryCommands.HideDock()),
-        Write("mercury.dock.show", "dock", "Show the dock.", _ => MercuryCommands.ShowDock()),
-        Write("mercury.dock.policy", "dock", "Read or update dock policy.",
+        Write("mercury.dock.hide", "dock", "隐藏项目坞。", _ => MercuryCommands.HideDock()),
+        Write("mercury.dock.show", "dock", "显示项目坞。", _ => MercuryCommands.ShowDock()),
+        Write("mercury.dock.policy", "dock", "查看或更新项目坞策略。",
             context => MercuryCommands.SetDockPolicy(
                 context.Has("min") ? context.GetInt("min") : null,
                 context.Has("max") ? context.GetInt("max") : null,
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
             OptionalIntParameter("min"), OptionalIntParameter("max"), OptionalDoubleParameter("halflife")),
-        Write("mercury.app.open", "app", "Open HistoryVulcan.", _ => MercuryCommands.OpenHost()),
-        Readonly("mercury.usage.list", "usage", "List project usage.", _ => MercuryCommands.ListUsage()),
-        Write("mercury.usage.forget", "usage", "Clear project usage history.",
-            context => MercuryCommands.ForgetUsage(context.GetString("name")), "Clear all selected usage history?", OptionalNameParameter()),
+        Write("mercury.app.open", "app", "打开 HistoryVulcan。", _ => MercuryCommands.OpenHost()),
+        Readonly("mercury.usage.list", "usage", "列出项目使用记录。", _ => MercuryCommands.ListUsage()),
+        Write("mercury.usage.forget", "usage", "清除项目使用历史。",
+            context => MercuryCommands.ForgetUsage(context.GetString("name")), "确定清除所选使用历史？", OptionalNameParameter()),
     ];
+
+    private static CommandDescriptor Async(
+        string name,
+        string commandClass,
+        string summary,
+        Func<CommandContext, Task<CommandResult>> handler)
+        => new()
+        {
+            Name = name,
+            CommandClass = commandClass,
+            Summary = summary,
+            Handler = handler,
+        };
+
+    /// <summary>
+    /// 无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
+    /// 注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
+    /// </summary>
+    private static CommandDescriptor Direct(
+        string name,
+        string summary,
+        Func<CommandContext, string> handler,
+        params ParameterSpec[] parameters)
+        => new()
+        {
+            Name = name,
+            Summary = summary,
+            Parameters = parameters,
+            Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
+        };
+
+    private static ParameterSpec DomainParameter() => new()
+    {
+        Name = "domain",
+        Description = "要聚焦的指令域；省略则退出聚焦回到「全部」。",
+        Required = false,
+        Position = 0,
+    };
 
     private static CommandDescriptor Readonly(string name, string commandClass, string summary, Func<CommandContext, object?> handler)
         => new()
@@ -148,7 +194,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec NameParameter() => new()
     {
         Name = "name",
-        Description = "Project name or number.",
+        Description = "项目名称或序号。",
         Required = true,
         Position = 0,
     };
@@ -156,7 +202,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec OptionalNameParameter() => new()
     {
         Name = "name",
-        Description = "Project name or number; omit to clear all.",
+        Description = "项目名称或序号；省略则清除全部。",
         Required = false,
         Position = 0,
     };
@@ -164,7 +210,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec OptionalIntParameter(string name) => new()
     {
         Name = name,
-        Description = "Optional integer policy value.",
+        Description = "可选整数策略值。",
         Type = ParamType.Int,
         Required = false,
     };
@@ -172,7 +218,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec OptionalDoubleParameter(string name) => new()
     {
         Name = name,
-        Description = "Optional decimal policy value.",
+        Description = "可选小数策略值。",
         Type = ParamType.Double,
         Required = false,
     };
@@ -262,8 +308,8 @@ internal sealed class CommandOptionTree
     private static string Describe(Node node)
     {
         if (node.Command is { Summary.Length: > 0 } command)
-            return node.Children.Count > 0 ? command.Summary + " (has subcommands)" : command.Summary;
-        return $"{node.Children.Count} subcommands";
+            return node.Children.Count > 0 ? command.Summary + "（含下级命令）" : command.Summary;
+        return $"{node.Children.Count} 个下级命令";
     }
 
     private sealed class Node

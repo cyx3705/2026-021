@@ -9,7 +9,7 @@ internal static class HistoryVulcanLauncher
     private const int ShowRestore = 9;
 
     /// <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
-    public static bool Open()
+    public static bool Open(string? arguments = null)
     {
         var current = Process.GetCurrentProcess();
         Process[] peers;
@@ -48,7 +48,11 @@ internal static class HistoryVulcanLauncher
 
         try
         {
-            Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(executable)
+            {
+                UseShellExecute = true,
+                Arguments = arguments ?? string.Empty,
+            });
         }
         catch (Exception)
         {

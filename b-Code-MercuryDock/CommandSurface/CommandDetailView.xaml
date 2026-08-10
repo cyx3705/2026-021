@@ -16,7 +16,7 @@
                    Margin="0,6,0,0" TextWrapping="Wrap" />
 
         <TabControl x:Name="DetailTabs" IsEnabled="False">
-            <TabItem Header="Help">
+            <TabItem Header="帮助">
                 <Grid Margin="6">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -42,7 +42,7 @@
                     <TextBox Grid.Row="3" x:Name="ExampleBox" IsReadOnly="True" Margin="0,8,0,0"
                              FontFamily="{DynamicResource Shell.Font.MonoFamily}" Background="{DynamicResource Shell.Brush.SurfaceAlt}" />
                     <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,8,0,0">
-                        <Button Content="查看 Help" Click="OnHelpClick" />
+                        <Button Content="查看帮助" Click="OnHelpClick" />
                         <Button x:Name="CopyExampleButton" Content="复制示例" Margin="8,0,0,0"
                                 Click="OnCopyExampleClick" />
                     </StackPanel>
@@ -58,7 +58,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" x:Name="McpStatusText" TextWrapping="Wrap" />
-                    <TextBlock Grid.Row="1" Text="JSON Input Schema" Foreground="{DynamicResource Shell.Brush.TextSecondary}" FontSize="{DynamicResource Shell.Font.Small}"
+                    <TextBlock Grid.Row="1" Text="JSON 输入结构" Foreground="{DynamicResource Shell.Brush.TextSecondary}" FontSize="{DynamicResource Shell.Font.Small}"
                                Margin="0,8,0,2" />
                     <TextBox Grid.Row="2" x:Name="SchemaBox" IsReadOnly="True" AcceptsReturn="True"
                              FontFamily="{DynamicResource Shell.Font.MonoFamily}" Background="{DynamicResource Shell.Brush.SurfaceAlt}" TextWrapping="NoWrap"

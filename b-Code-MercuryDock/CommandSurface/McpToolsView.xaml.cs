@@ -187,7 +187,7 @@ public partial class McpToolsView : UserControl
         var dangerous = allRows.Count(row => row.McpState == "dangerous");
         var modules = allRows.Count(row => row.Source == "module");
         StatusText.Text = $"显示 {list.Count}/{allRows.Count} 条；硬排除 {hardExcluded}，" +
-                          $"readonly {readonlyCount}，standard {standardCount}，危险拒绝 {dangerous}，模块 {modules}";
+                          $"只读 {readonlyCount}，标准 {standardCount}，危险拒绝 {dangerous}，模块 {modules}";
     }
 
     private void OnFilterChanged(object sender, EventArgs e) => ApplyMcpFilter();

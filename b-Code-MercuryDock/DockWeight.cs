@@ -1,7 +1,7 @@
 namespace Mercury;
 
 /// <summary>
-/// 收录权重的纯计算：指数衰减计数、信号合并与光圈亮度映射。
+/// 收录权重的纯计算：指数衰减计数、信号合并与磁贴底色偏黄程度映射。
 /// 不触碰文件与界面，便于 Smoke 直接断言。
 /// </summary>
 /// <remarks>
@@ -16,11 +16,6 @@ public static class DockWeight
     /// <summary>资源管理器打开一次的计权。</summary>
     public const double RecentWeight = 0.5;
 
-    /// <summary>光圈最大不透明度。</summary>
-    public const double MaxGlowOpacity = 0.85;
-
-    /// <summary>光圈最大模糊半径。</summary>
-    public const double MaxGlowBlur = 18;
 
     /// <summary>把分数从 <paramref name="updated"/> 衰减到 <paramref name="now"/>。</summary>
     public static double Decay(double score, DateTimeOffset updated, DateTimeOffset now, double halfLifeDays)
@@ -65,11 +60,9 @@ public static class DockWeight
         return Math.Min(weight / maximum, 1);
     }
 
-    /// <summary>白色光圈的不透明度；零权重不发光。</summary>
-    public static double GlowOpacity(double weight, double maximum)
-        => Normalize(weight, maximum) * MaxGlowOpacity;
-
-    /// <summary>白色光圈的模糊半径。</summary>
-    public static double GlowBlur(double weight, double maximum)
-        => Normalize(weight, maximum) * MaxGlowBlur;
+    /// <summary>
+    /// 磁贴底色的偏黄程度，0 为纯白、1 为最黄。权重归一化后直接作为插值系数：
+    /// 打开越频繁的项目底色越偏黄。
+    /// </summary>
+    public static double TileTint(double weight, double maximum) => Normalize(weight, maximum);
 }

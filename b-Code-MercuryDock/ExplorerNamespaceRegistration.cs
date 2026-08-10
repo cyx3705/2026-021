@@ -47,19 +47,19 @@ public static class ExplorerNamespaceRegistration
     public static RegistrationResult RegisterOrUpdate(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
-            return RegistrationResult.Failed("Project root is empty.");
+            return RegistrationResult.Failed("项目根路径为空。");
 
         try
         {
             var fullPath = Path.GetFullPath(path.Trim());
             if (!Directory.Exists(fullPath))
-                return RegistrationResult.Failed($"Project root does not exist: {fullPath}");
+                return RegistrationResult.Failed($"项目根路径不存在：{fullPath}");
 
             using var root = Registry.CurrentUser.CreateSubKey(
                 ClassesClsid + EntryClsid,
                 RegistryKeyPermissionCheck.ReadWriteSubTree);
             if (root == null)
-                return RegistrationResult.Failed("Cannot open the per-user CLSID registry key.");
+                return RegistrationResult.Failed("无法打开每用户 CLSID 注册表项。");
 
             MigrateLegacyBackup();
             CapturePreviousRegistration(root);
@@ -95,7 +95,7 @@ public static class ExplorerNamespaceRegistration
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or SecurityException or ArgumentException or NotSupportedException)
         {
-            return RegistrationResult.Failed($"Explorer registration failed: {ex.Message}");
+            return RegistrationResult.Failed($"资源管理器注册失败：{ex.Message}");
         }
     }
 
@@ -111,7 +111,7 @@ public static class ExplorerNamespaceRegistration
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or SecurityException)
         {
-            return RegistrationResult.Failed($"Explorer registration removal failed: {ex.Message}");
+            return RegistrationResult.Failed($"移除资源管理器注册失败：{ex.Message}");
         }
     }
 
@@ -184,7 +184,7 @@ public static class ExplorerNamespaceRegistration
     public readonly record struct RegistrationResult(bool Success, string Message, string? Path)
     {
         public static RegistrationResult Succeeded(string? path)
-            => new(true, path == null ? "HistoryVesta project entry removed." : $"HistoryVesta project entry points to {path}.", path);
+            => new(true, path == null ? "已移除 HistoryVesta 项目入口。" : $"HistoryVesta 项目入口指向 {path}。", path);
 
         public static RegistrationResult Failed(string message)
             => new(false, message, null);

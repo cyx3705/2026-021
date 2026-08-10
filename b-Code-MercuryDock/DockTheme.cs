@@ -25,7 +25,26 @@ public static class DockTheme
     /// <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
     public static SolidColorBrush Selection => Frozen(Color.FromRgb(0xEA, 0xDC, 0x9E));
     public static SolidColorBrush SelectionText => TextOnAccent;
-    public static Color Glow => Accent.Color;
+    /// <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
+    /// <c>Shell.Brush.Surface</c>(#FFFFFF) 与 <c>Shell.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
+    public static Color TileBase => Color.FromRgb(0xFF, 0xFF, 0xFF);
+
+    /// <summary>磁贴底色偏黄端。</summary>
+    public static Color TileTintTarget => Color.FromRgb(0xFA, 0xF0, 0xD8);
+
+    /// <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Shell.Brush.Accent</c>(#A87A12)。
+    /// 白底与 #FAF0D8 底上对比度都足够。</summary>
+    public static SolidColorBrush TileText => Frozen(Color.FromRgb(0xA8, 0x7A, 0x12));
+
+    /// <summary>按偏黄程度插值出磁贴底色画刷；<paramref name="tint"/> 取 [0,1]。</summary>
+    public static SolidColorBrush TileBackground(double tint)
+    {
+        var t = Math.Clamp(tint, 0, 1);
+        return Frozen(Color.FromRgb(
+            (byte)Math.Round(TileBase.R + ((TileTintTarget.R - TileBase.R) * t)),
+            (byte)Math.Round(TileBase.G + ((TileTintTarget.G - TileBase.G) * t)),
+            (byte)Math.Round(TileBase.B + ((TileTintTarget.B - TileBase.B) * t))));
+    }
     public static FontFamily FontFamily => Find("Shell.Font.Family") as FontFamily ?? new FontFamily("Microsoft YaHei UI, Segoe UI");
     public static double BodyFontSize => FindDouble("Shell.Font.Body", 13);
     public static double SmallFontSize => FindDouble("Shell.Font.Small", 11);

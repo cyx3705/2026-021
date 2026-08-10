@@ -110,7 +110,7 @@ public static class DockShortcutFolder
             System.IO.Path.DirectorySeparatorChar,
             System.IO.Path.AltDirectorySeparatorChar));
         if (string.IsNullOrWhiteSpace(name))
-            throw new InvalidOperationException("Project path has no directory name.");
+            throw new InvalidOperationException("项目路径没有可用的目录名。");
         return System.IO.Path.Combine(folder, name + ".lnk");
     }
 

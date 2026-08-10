@@ -226,9 +226,13 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
             await EnsureDetailAsync(commandName, cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<CommandCompletionDefinition> definitions;
+        string focusedDomain;
         lock (_gate)
         {
-            definitions = RowsInCurrentTaxonomyLocked().Select(row =>
+            // 补全用**全量**命令，不用域筛选后的子集：域聚焦时仍必须能补出其他域的绝对名
+            // （否则 mercury.go 这类脱固入口在聚焦状态下就补不出来了）。
+            // 聚焦域另行传入，由补全引擎决定候选的先后与是否省略域前缀。
+            definitions = _allRows.Select(row =>
             {
                 if (_details.TryGetValue(row.CommandName, out var detail))
                     return Definition(detail);
@@ -236,8 +240,9 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
                     return Definition(local);
                 return new CommandCompletionDefinition(row.CommandName, row.Summary, []);
             }).ToList();
+            focusedDomain = _filter.Domain;
         }
-        return _completion.Complete(text, caretIndex, definitions);
+        return _completion.Complete(text, caretIndex, definitions, focusedDomain);
     }
 
     public async Task<CommandCatalogDetail?> GetDetailAsync(

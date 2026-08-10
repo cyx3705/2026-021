@@ -29,6 +29,13 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
     internal static CommandBus? Bus { get; private set; }
 
+    /// <summary>
+    /// 共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
+    /// <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
+    /// 无 UI 宿主（服务进程、烟测）下为 null。
+    /// </summary>
+    internal static CommandCatalogSession? CatalogSession { get; private set; }
+
     IShellUiRegistrar IShellUiAware.ShellUi
     {
         set => _shellUi = value;
@@ -60,6 +67,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
             _managerWindow ??= _shellUi.RegisterToolWindow(MercuryManagerView.CreateDescriptor(), "HistoryMercury");
 
         _commandSurface ??= CommandSurfaceFeature.TryAttach(_commandWorkbench, _shellUi);
+        CatalogSession = _commandSurface?.Session;
 
         if (_window != null)
             return;
@@ -323,27 +331,27 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
 
         private static Button ProjectButton(DockProject project, double maximum)
         {
-            var image = new Image
+            // 磁贴当场绘制而不用缓存的 PNG：底色随使用频率变化，按名字缓存的位图表达不了。
+            var host = new Border
             {
-                Source = ProjectIconGenerator.Create(project.Name),
                 Width = 52,
                 Height = 52,
-                Stretch = Stretch.Uniform,
-            };
-
-            var opacity = DockWeight.GlowOpacity(project.Weight, maximum);
-            var host = new Border { Child = image };
-            if (opacity > 0)
-            {
-                // ShadowDepth=0 即纯发光而非投影；权重越高越亮。
-                host.Effect = new DropShadowEffect
+                CornerRadius = new CornerRadius(8),
+                Background = DockTheme.TileBackground(DockWeight.TileTint(project.Weight, maximum)),
+                Child = new TextBlock
                 {
-                    Color = DockTheme.Glow,
-                    ShadowDepth = 0,
-                    Opacity = opacity,
-                    BlurRadius = DockWeight.GlowBlur(project.Weight, maximum),
-                };
-            }
+                    Text = ProjectIconGenerator.ShortLabel(project.Name),
+                    FontFamily = DockTheme.FontFamily,
+                    FontSize = 15,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = DockTheme.TileText,
+                    TextAlignment = TextAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 4, 0),
+                },
+            };
 
             var label = new TextBlock
             {

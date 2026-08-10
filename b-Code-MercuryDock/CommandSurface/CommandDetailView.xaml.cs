@@ -152,8 +152,8 @@ public partial class CommandDetailView : UserControl
         var statusResult = await bus.ExecuteAsync($"vulcan.prompt.get name={name}", "UI");
         var historyResult = await bus.ExecuteAsync($"vulcan.prompt.history name={name} limit=50", "UI");
         var proposalsResult = await bus.ExecuteAsync($"vulcan.mcp.pending name={name} limit=100", "UI");
-        var correctionsResult = await bus.ExecuteAsync($"vulcan.correction.list name={name} limit=100", "UI");
-        var incidentsResult = await bus.ExecuteAsync($"vulcan.incident.list name={name} limit=100", "UI");
+        var correctionsResult = await bus.ExecuteAsync($"vulcan.prompt.corrections name={name} limit=100", "UI");
+        var incidentsResult = await bus.ExecuteAsync($"vulcan.prompt.incidents name={name} limit=100", "UI");
         if (!IsCurrent(commandName))
             return;
 
@@ -178,7 +178,7 @@ public partial class CommandDetailView : UserControl
     private async void OnHelpClick(object sender, RoutedEventArgs e)
     {
         if (_current is { } row)
-            await (_busAccessor()?.ExecuteAsync($"vulcan.core.help {CommandParser.QuoteArg(row.CommandName)}", "UI")
+            await (_busAccessor()?.ExecuteAsync($"vulcan.command.help {CommandParser.QuoteArg(row.CommandName)}", "UI")
                    ?? Task.FromResult(CommandResult.Fail("总线未就绪")));
     }
 
