@@ -13,10 +13,37 @@
         <member name="T:Mercury.CommandSurface.CommandCompletionEngine">
             <summary>为控制台输入提供命令、参数名和允许值候选；不执行命令也不改变注册表。</summary>
         </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.MatchesCommandPrefix(System.String,System.String)">
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.CompleteCommandName(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
             <summary>
-            Matches full names (`vulcan.win.reset`) and shorter typed prefixes (`win.` / `win.re`).
+            命令名按 域 → 类 → 方法 分段推进补全（DEC-025）。
             </summary>
+            <remarks>
+            已输入的点号数量决定当前处在哪一段：0 个点选域、1 个点选类、2 个点选方法。
+            域聚焦时首段可以省略，此时同一个 token 既可能是域也可能是聚焦域下的类，
+            两种解释都给出候选，由用户选（REQ-CMD-012 第 4 条）。
+            域清单不来自任何常量表，而是从传入的已注册命令定义现算。
+            </remarks>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.DomainCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition})">
+            <summary>已注册域的候选。域集合从命令定义现算，不硬编码。</summary>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.ClassCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
+            <summary>`域.类前缀` → 该域下匹配的类。</summary>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.DirectMethodCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
+            <summary>该域的无类直接方法（两段名）。补全后带尾随空格，直接进入参数段。</summary>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.MethodCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
+            <summary>`域.类.方法前缀` → 匹配的方法。补全后带尾随空格。</summary>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.ResolveAgainstFocus(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
+            <summary>
+            把用户输入的命令名按域聚焦规则还原成完整名：首段命中已注册域则原样，否则补聚焦域前缀。
+            与宿主 <c>DomainFocus.Resolve</c> 同一条规则，此处只对单个命令名生效。
+            </summary>
+        </member>
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.Segment(System.String,System.Int32)">
+            <summary>取第 <paramref name="index"/> 段；越界返回空串（尾随点号即空末段）。</summary>
         </member>
         <member name="T:Mercury.CommandSurface.CommandDetailView">
             <summary>所选指令的 Help、MCP 映射与提示词治理详情。</summary>
@@ -155,6 +182,20 @@
         <member name="P:Mercury.DockTheme.Selection">
             <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
         </member>
+        <member name="P:Mercury.DockTheme.TileBase">
+            <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
+            <c>Shell.Brush.Surface</c>(#FFFFFF) 与 <c>Shell.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
+        </member>
+        <member name="P:Mercury.DockTheme.TileTintTarget">
+            <summary>磁贴底色偏黄端。</summary>
+        </member>
+        <member name="P:Mercury.DockTheme.TileText">
+            <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Shell.Brush.Accent</c>(#A87A12)。
+            白底与 #FAF0D8 底上对比度都足够。</summary>
+        </member>
+        <member name="M:Mercury.DockTheme.TileBackground(System.Double)">
+            <summary>按偏黄程度插值出磁贴底色画刷；<paramref name="tint"/> 取 [0,1]。</summary>
+        </member>
         <member name="P:Mercury.DockTheme.InputPadding">
             <summary>
             输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
@@ -163,7 +204,7 @@
         </member>
         <member name="T:Mercury.DockWeight">
             <summary>
-            收录权重的纯计算：指数衰减计数、信号合并与光圈亮度映射。
+            收录权重的纯计算：指数衰减计数、信号合并与磁贴底色偏黄程度映射。
             不触碰文件与界面，便于 Smoke 直接断言。
             </summary>
             <remarks>
@@ -176,12 +217,6 @@
         </member>
         <member name="F:Mercury.DockWeight.RecentWeight">
             <summary>资源管理器打开一次的计权。</summary>
-        </member>
-        <member name="F:Mercury.DockWeight.MaxGlowOpacity">
-            <summary>光圈最大不透明度。</summary>
-        </member>
-        <member name="F:Mercury.DockWeight.MaxGlowBlur">
-            <summary>光圈最大模糊半径。</summary>
         </member>
         <member name="M:Mercury.DockWeight.Decay(System.Double,System.DateTimeOffset,System.DateTimeOffset,System.Double)">
             <summary>把分数从 <paramref name="updated"/> 衰减到 <paramref name="now"/>。</summary>
@@ -198,11 +233,11 @@
         <member name="M:Mercury.DockWeight.Normalize(System.Double,System.Double)">
             <summary>权重归一化到 [0,1]，基准取当前列表最大值。</summary>
         </member>
-        <member name="M:Mercury.DockWeight.GlowOpacity(System.Double,System.Double)">
-            <summary>白色光圈的不透明度；零权重不发光。</summary>
-        </member>
-        <member name="M:Mercury.DockWeight.GlowBlur(System.Double,System.Double)">
-            <summary>白色光圈的模糊半径。</summary>
+        <member name="M:Mercury.DockWeight.TileTint(System.Double,System.Double)">
+            <summary>
+            磁贴底色的偏黄程度，0 为纯白、1 为最黄。权重归一化后直接作为插值系数：
+            打开越频繁的项目底色越偏黄。
+            </summary>
         </member>
         <member name="T:Mercury.ExplorerNamespaceRegistration">
             <summary>Registers the dock-generated shortcut folder in the current user's Explorer namespace.</summary>
@@ -210,7 +245,7 @@
         <member name="T:Mercury.HistoryVulcanLauncher">
             <summary>打开或唤起 HistoryVulcan 主界面。</summary>
         </member>
-        <member name="M:Mercury.HistoryVulcanLauncher.Open">
+        <member name="M:Mercury.HistoryVulcanLauncher.Open(System.String)">
             <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
         </member>
         <member name="T:Mercury.Input.GlobalShortcutService">
@@ -245,6 +280,19 @@
         </member>
         <member name="M:Mercury.Input.GlobalShortcutService.Dispose">
             <inheritdoc />
+        </member>
+        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},HistoryVulcan.Core.Commands.ParameterSpec[])">
+            <summary>
+            无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
+            注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryCommands.Go(System.String)">
+            <summary>
+            切换控制台的域聚焦。聚焦状态存放在共享的命令目录会话里，与控制台域筛选下拉同源，
+            因此这里只写会话，下拉会自己跟上。
+            </summary>
+            <param name="domain">要聚焦的域；空表示退出聚焦。</param>
         </member>
         <member name="T:Mercury.MercuryManagerView">
             <summary>
@@ -295,6 +343,7 @@
         <member name="T:Mercury.MercuryShortcutModule">
             <summary>
             Registers HistoryMercury-owned global shortcuts with the Vulcan module host.
+            Hotkeys only dispatch Mercury orchestration commands; window work stays on vulcan.*.
             </summary>
         </member>
         <member name="M:Mercury.MercuryShortcutModule.RegisterShortcuts(HistoryVulcan.Core.Input.IGlobalShortcutRegistrar)">
@@ -417,6 +466,13 @@
         <member name="P:Mercury.MercuryUiModule.Bus">
             <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
         </member>
+        <member name="P:Mercury.MercuryUiModule.CatalogSession">
+            <summary>
+            共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
+            <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
+            无 UI 宿主（服务进程、烟测）下为 null。
+            </summary>
+        </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
         </member>
@@ -431,6 +487,9 @@
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.NakedButton(System.Object,System.String)">
             <summary>无边框透明按钮，悬停时叠一层浅色半透明，深底上不会闪出白块。</summary>
+        </member>
+        <member name="M:Mercury.ProjectIconGenerator.ShortLabel(System.String)">
+            <summary>磁贴上显示的短标签：去掉编号前缀后最多 6 个字符。</summary>
         </member>
         <member name="T:Mercury.RecentFolders">
              <summary>
