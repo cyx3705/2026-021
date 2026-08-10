@@ -7,7 +7,8 @@ namespace Mercury.CommandSurface;
 internal sealed record CommandCompletionDefinition(
     string Name,
     string Summary,
-    IReadOnlyList<ParameterSpec> Parameters);
+    IReadOnlyList<ParameterSpec> Parameters,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? DynamicValues = null);
 
 /// <summary>为控制台输入提供命令、参数名和允许值候选；不执行命令也不改变注册表。</summary>
 internal sealed class CommandCompletionEngine
@@ -34,7 +35,8 @@ internal sealed class CommandCompletionEngine
             return CreateResult(
                 tokenStart,
                 tokenEnd,
-                CompleteCommandName(token, definitions, focusedDomain));
+                CompleteCommandName(token, definitions, focusedDomain),
+                token);
         }
 
         var commandName = ResolveAgainstFocus(beforeTokens[0], definitions, focusedDomain);
@@ -49,7 +51,11 @@ internal sealed class CommandCompletionEngine
             var key = token[..equals];
             var parameter = command.Parameters.FirstOrDefault(item =>
                 item.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
-            if (parameter?.AllowedValues is not { Length: > 0 } values)
+            if (parameter == null)
+                return ConsoleCompletionResult.Empty;
+
+            var values = ValuesFor(command, parameter, definitions);
+            if (values.Count == 0)
                 return ConsoleCompletionResult.Empty;
 
             var valueStart = tokenStart + equals + 1;
@@ -57,13 +63,13 @@ internal sealed class CommandCompletionEngine
             var quoted = rawPrefix.StartsWith('"');
             var valuePrefix = quoted ? rawPrefix[1..] : rawPrefix;
             var candidates = values
-                .Where(value => value.StartsWith(valuePrefix, StringComparison.OrdinalIgnoreCase))
+                .Where(value => Matches(value, valuePrefix))
                 .Select(value => Candidate(
                     value,
                     quoted ? $"\"{value}\"" : value,
                     parameter.Description,
                     ConsoleCompletionKind.Value));
-            return CreateResult(valueStart, tokenEnd, candidates);
+            return CreateResult(valueStart, tokenEnd, candidates, valuePrefix);
         }
 
         var usedNames = beforeTokens.Skip(1)
@@ -75,26 +81,33 @@ internal sealed class CommandCompletionEngine
             .Where(item => item != null)
             .Select(item => item!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var positionalIndex = beforeTokens.Skip(1).Count(item => FindUnquotedEquals(item) < 0);
+        var nextPositional = command.Parameters.FirstOrDefault(parameter => parameter.Position == positionalIndex);
+        if (nextPositional != null)
+        {
+            var values = ValuesFor(command, nextPositional, definitions);
+            if (values.Count > 0)
+            {
+                var positional = values
+                    .Where(value => Matches(value, token))
+                    .Select(value => Candidate(value, value, "位置参数", ConsoleCompletionKind.Value));
+                return CreateResult(tokenStart, tokenEnd, positional, token);
+            }
+
+            // A free-form positional value is intentionally not guessed. The user can type it directly.
+            return ConsoleCompletionResult.Empty;
+        }
+
         var parameterCandidates = command.Parameters
+            .Where(parameter => parameter.Position == null)
             .Where(parameter => !usedNames.Contains(parameter.Name))
-            .Where(parameter => parameter.Name.StartsWith(token, StringComparison.OrdinalIgnoreCase))
+            .Where(parameter => Matches(parameter.Name, token))
             .Select(parameter => Candidate(
                 parameter.Name + "=",
                 parameter.Name + "=",
                 parameter.Description,
-                ConsoleCompletionKind.Parameter))
-            .ToList();
-
-        if (parameterCandidates.Count > 0 || token.Length == 0)
-            return CreateResult(tokenStart, tokenEnd, parameterCandidates);
-
-        var positionalIndex = beforeTokens.Skip(1).Count(item => FindUnquotedEquals(item) < 0);
-        var positional = command.Parameters
-            .Where(parameter => parameter.Position == positionalIndex)
-            .SelectMany(parameter => parameter.AllowedValues ?? [])
-            .Where(value => value.StartsWith(token, StringComparison.OrdinalIgnoreCase))
-            .Select(value => Candidate(value, value, "位置参数", ConsoleCompletionKind.Value));
-        return CreateResult(tokenStart, tokenEnd, positional);
+                ConsoleCompletionKind.Parameter));
+        return CreateResult(tokenStart, tokenEnd, parameterCandidates, token);
     }
 
     internal static string? CommandNameBeforeCurrentToken(string text, int caretIndex)
@@ -179,8 +192,7 @@ internal sealed class CommandCompletionEngine
                                   .Equals(domain, StringComparison.OrdinalIgnoreCase)
                               && SegmentCount(command.Name) >= 3)
             .Select(command => Segment(command.Name, 1))
-            .Where(item => item.Length > 0
-                           && item.StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.Length > 0 && Matches(item, typed))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(item => item, StringComparer.Ordinal)
             .Select(item =>
@@ -205,8 +217,7 @@ internal sealed class CommandCompletionEngine
             .Where(command => SegmentCount(command.Name) == 2
                               && Segment(command.Name, 0)
                                   .Equals(domain, StringComparison.OrdinalIgnoreCase)
-                              && Segment(command.Name, 1)
-                                  .StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+                               && Matches(Segment(command.Name, 1), typed))
             .OrderBy(command => command.Name, StringComparer.Ordinal)
             .Select(command =>
             {
@@ -240,8 +251,7 @@ internal sealed class CommandCompletionEngine
                                   .Equals(domain, StringComparison.OrdinalIgnoreCase)
                               && Segment(command.Name, 1)
                                   .Equals(commandClass, StringComparison.OrdinalIgnoreCase)
-                              && Segment(command.Name, 2)
-                                  .StartsWith(typed, StringComparison.OrdinalIgnoreCase))
+                               && Matches(Segment(command.Name, 2), typed))
             .OrderBy(command => command.Name, StringComparer.Ordinal)
             .Select(command =>
             {
@@ -297,19 +307,62 @@ internal sealed class CommandCompletionEngine
     private static ConsoleCompletionResult CreateResult(
         int start,
         int end,
-        IEnumerable<ConsoleCompletionCandidate> candidates)
+        IEnumerable<ConsoleCompletionCandidate> candidates,
+        string filter = "")
         => new()
         {
-            // 域候选排在类/方法之后：域聚焦时同一段里既有聚焦域的类，也有用于脱固的其他域，
-            // 前者才是常用项。同一档内仍按字母序，保证相同输入的候选顺序稳定可比。
+            // 精确命中、前缀命中、包含命中依次排列；同一档内保持稳定字典序。
             Candidates = candidates
-                .OrderBy(candidate => candidate.Kind == ConsoleCompletionKind.Domain ? 1 : 0)
+                .OrderBy(candidate => MatchRank(candidate.DisplayText, filter))
+                .ThenBy(candidate => candidate.Kind == ConsoleCompletionKind.Domain ? 1 : 0)
                 .ThenBy(candidate => candidate.DisplayText, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(candidate => candidate.DisplayText, StringComparer.Ordinal)
                 .ToList(),
             ReplaceStart = start,
             ReplaceLength = end - start,
         };
+
+    private static IReadOnlyList<string> ValuesFor(
+        CommandCompletionDefinition command,
+        ParameterSpec parameter,
+        IReadOnlyList<CommandCompletionDefinition> definitions)
+    {
+        if (command.DynamicValues?.TryGetValue(parameter.Name, out var dynamic) == true)
+            return dynamic;
+        if (parameter.AllowedValues is { Length: > 0 } values)
+            return values;
+
+        // mercury.go is the one semantic parameter whose values are the live command domains.
+        if (command.Name.Equals("mercury.go", StringComparison.OrdinalIgnoreCase)
+            && parameter.Name.Equals("domain", StringComparison.OrdinalIgnoreCase))
+        {
+            return definitions
+                .Select(item => Segment(item.Name, 0))
+                .Where(item => item.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        return [];
+    }
+
+    private static bool Matches(string value, string filter)
+        => filter.Length == 0 || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+    private static int MatchRank(string value, string filter)
+    {
+        if (filter.Length == 0)
+            return 2;
+        var candidate = value.TrimEnd('.', ' ');
+        var fragment = filter[(filter.LastIndexOf('.') + 1)..];
+        if (candidate.Equals(filter, StringComparison.OrdinalIgnoreCase)
+            || candidate.Equals(fragment, StringComparison.OrdinalIgnoreCase))
+            return 0;
+        if (candidate.StartsWith(filter, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
+            return 1;
+        return 2;
+    }
 
     private static (int Start, int End) TokenBounds(string text, int caret)
     {

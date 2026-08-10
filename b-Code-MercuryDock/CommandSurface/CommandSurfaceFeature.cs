@@ -54,8 +54,10 @@ public sealed class CommandSurfaceFeature : IDisposable
         {
             Id = StandardWindowIds.CommandDetail,
             Title = "指令详情",
-            DefaultSide = DockSide.Right,
-            DefaultRatio = 0.32,
+            // 左侧：右侧默认不再放页面。宽度与其他左侧页取同一个 0.38，
+            // 否则左栏宽度会取决于哪个模块最后装载。
+            DefaultSide = DockSide.Left,
+            DefaultRatio = 0.38,
             IsSingleton = true,
             ContentFactory = () => new CommandDetailView(Bus, selection, session),
         }, "HistoryMercury"));

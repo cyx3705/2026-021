@@ -342,11 +342,12 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 {
                     Text = ProjectIconGenerator.ShortLabel(project.Name),
                     FontFamily = DockTheme.FontFamily,
-                    FontSize = 15,
+                    FontSize = ProjectIconGenerator.FitFontSize(ProjectIconGenerator.ShortLabel(project.Name), 44, 15),
                     FontWeight = FontWeights.SemiBold,
                     Foreground = DockTheme.TileText,
                     TextAlignment = TextAlignment.Center,
-                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextTrimming = TextTrimming.None,
+                    TextWrapping = TextWrapping.NoWrap,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(4, 0, 4, 0),
@@ -360,7 +361,8 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Label,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextTrimming = TextTrimming.None,
+                TextWrapping = TextWrapping.NoWrap,
             };
             var stack = new StackPanel { Width = 68 };
             stack.Children.Add(host);
