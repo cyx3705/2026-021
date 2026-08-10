@@ -23,7 +23,8 @@ var moduleInfos = assembly.GetTypes()
 Equal(1, moduleInfos.Count, "Exactly one module entry point is required.");
 Equal("HistoryMercury", moduleInfos[0].ModuleName, "Module name");
 Equal("mercury", moduleInfos[0].GetType().GetProperty("CommandPrefix")?.GetValue(moduleInfos[0]), "Command prefix");
-Equal("4.1.0", moduleInfos[0].Version, "Module version");
+// 版本不写字面量：下面会直接与 module.manifest.json 比对，避免第三份副本再次漂移。
+True(!string.IsNullOrWhiteSpace(moduleInfos[0].Version), "Module version must be reported.");
 Equal(null, moduleInfos[0].MainClassType, "Commands must not use reflection projection.");
 
 var uiTypes = assembly.GetTypes()
@@ -248,6 +249,26 @@ Equal(0, matcher.Process(
         new GlobalShortcutStroke(0xBF),
         start + (long)(System.Diagnostics.Stopwatch.Frequency * 0.5)).Count,
     "Timeout must discard incomplete sequence.");
+
+// 模块身份：manifest 与 ModuleInfo 的版本必须逐字符相等。
+// 宿主在两者不一致时会静默跳过整个模块（只在服务进程日志留一行 module.discovery 警告），
+// 界面上表现为活动坞与命令集页一起消失——这条断言就是为了不再靠肉眼发现它。
+var moduleInfo = new ModuleInfo();
+var manifestPath = Path.Combine(
+    AppContext.BaseDirectory, "..", "..", "..", "..", "..", "module.manifest.json");
+True(File.Exists(manifestPath), $"module.manifest.json must be locatable at {Path.GetFullPath(manifestPath)}.");
+using (var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath)))
+{
+    var manifestRoot = manifestDoc.RootElement;
+    Equal(
+        manifestRoot.GetProperty("version").GetString(),
+        moduleInfo.Version,
+        "manifest version must equal ModuleInfo.Version (mismatch makes the host skip the module)");
+    Equal(
+        manifestRoot.GetProperty("name").GetString(),
+        moduleInfo.ModuleName,
+        "manifest name must equal ModuleInfo.ModuleName");
+}
 
 // 分段补全：域 → 类 → 方法 → 参数。域清单从传入定义现算，不硬编码。
 var completion = new CommandCompletionEngine();
