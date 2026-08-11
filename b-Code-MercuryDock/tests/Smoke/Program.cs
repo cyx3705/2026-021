@@ -313,14 +313,14 @@ var catalogue = new List<CommandCompletionDefinition>
     new("vulcan.ui.reset", "重置布局", []),
 };
 
-static string[] Inserts(HistoryVulcan.Core.CommandSurface.ConsoleCompletionResult result)
+static string[] Inserts(HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionResult result)
     => result.Candidates.Select(candidate => candidate.InsertText).ToArray();
 
 // 第一段选域，落点带点号。
 var domains = completion.Complete("", 0, catalogue);
 True(Inserts(domains).SequenceEqual(["janus.", "mercury.", "vulcan."]),
     "Empty input offers every registered domain.");
-True(domains.Candidates.All(candidate => candidate.Kind == HistoryVulcan.Core.CommandSurface.ConsoleCompletionKind.Domain),
+True(domains.Candidates.All(candidate => candidate.Kind == HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionKind.Domain),
     "Domain stage yields domain candidates.");
 True(Inserts(completion.Complete("erc", 3, catalogue)).SequenceEqual(["mercury."]),
     "Domain filtering supports case-insensitive contains matching.");
@@ -375,7 +375,7 @@ var freeTextPositional = completion.Complete(
 True(freeTextPositional.Candidates.Count == 1
      && freeTextPositional.Candidates[0].DisplayText == "project"
      && freeTextPositional.Candidates[0].InsertText.Length == 0
-     && freeTextPositional.Candidates[0].Kind == HistoryVulcan.Core.CommandSurface.ConsoleCompletionKind.Parameter,
+     && freeTextPositional.Candidates[0].Kind == HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionKind.Parameter,
     "Free-form Position=0 parameters expose only a structure candidate and never insert name=.");
 
 // 域聚焦：省略域前缀直接补类，同时其他域的绝对名仍然补得出来（脱固入口不能消失）。

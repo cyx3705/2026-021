@@ -269,7 +269,7 @@
         <member name="M:Mercury.Input.GlobalShortcutService.Stop">
             <inheritdoc />
         </member>
-        <member name="M:Mercury.Input.GlobalShortcutService.Register(HistoryVulcan.Core.Input.GlobalShortcutDescriptor,System.String)">
+        <member name="M:Mercury.Input.GlobalShortcutService.Register(Mercury.Input.GlobalShortcutDescriptor,System.String)">
             <inheritdoc />
         </member>
         <member name="M:Mercury.Input.GlobalShortcutService.CreateOwnerRegistrar(System.String)">
@@ -280,6 +280,108 @@
         </member>
         <member name="M:Mercury.Input.GlobalShortcutService.Dispose">
             <inheritdoc />
+        </member>
+        <member name="T:Mercury.Input.GlobalShortcutModifiers">
+             <summary>
+             全局快捷键的数据模型。
+            
+             这些类型此前住在 HistoryVulcan.Core.Input，是宿主公开面的一部分（46 行 API）。
+             但快捷键的实现、派发和生命周期从来都在 Mercury 这边，宿主只是持有契约并驱动注册——
+             结果是「改快捷键必须动宿主」。契约随实现走之后，宿主不再需要知道快捷键这个概念存在，
+             能力经 mercury.hotkey.* 命令暴露，调用方只依赖命令名与参数名。
+            
+             命名空间刻意用 Mercury.Input 而非沿用 HistoryVulcan.Core.Input：所有权已经转移，
+             名字应当说实话；顺带也避免与宿主尚未清理干净的旧类型撞名。
+             </summary>
+        </member>
+        <member name="T:Mercury.Input.GlobalShortcutStroke">
+            <summary>一次击键：虚拟键码 + 修饰键。</summary>
+        </member>
+        <member name="M:Mercury.Input.GlobalShortcutStroke.#ctor(System.Int32,Mercury.Input.GlobalShortcutModifiers)">
+            <summary>一次击键：虚拟键码 + 修饰键。</summary>
+        </member>
+        <member name="T:Mercury.Input.GlobalShortcutDescriptor">
+            <summary>
+            一个不吞按键的全局快捷键。击键按顺序求值；重复与前缀冲突的注册会被拒绝。
+            CommandText 即命中后要执行的指令文本——快捷键本质就是「按键序列 → 命令名」。
+            </summary>
+        </member>
+        <member name="M:Mercury.Input.GlobalShortcutDescriptor.#ctor(System.String,System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke},System.String,System.Int32)">
+            <summary>
+            一个不吞按键的全局快捷键。击键按顺序求值；重复与前缀冲突的注册会被拒绝。
+            CommandText 即命中后要执行的指令文本——快捷键本质就是「按键序列 → 命令名」。
+            </summary>
+        </member>
+        <member name="T:Mercury.Input.GlobalShortcutRegistrationInfo">
+            <summary>对外可见的注册快照，供 mercury.hotkey.list 呈现。</summary>
+        </member>
+        <member name="M:Mercury.Input.GlobalShortcutRegistrationInfo.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke},System.String,System.Int32)">
+            <summary>对外可见的注册快照，供 mercury.hotkey.list 呈现。</summary>
+        </member>
+        <member name="T:Mercury.Input.IGlobalShortcutRegistrar">
+            <summary>按 owner 隔离的注册面；释放时一并注销该 owner 的全部注册。</summary>
+        </member>
+        <member name="T:Mercury.Input.HotkeyCommands">
+             <summary>
+             <c>mercury.hotkey.*</c> 的业务实现。
+            
+             这是「命令即暴露面」的落点:快捷键能力不再经由任何 CLR 契约暴露,调用方只需要知道
+             命令名和参数名。因此 Mercury 可以任意重构快捷键实现,而宿主与其他模块一行不动。
+             </summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyCommands.Register(System.String,System.String,System.String,System.String,System.Nullable{System.Int32})">
+            <summary>注册一个「按键序列 → 命令」的全局快捷键。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyCommands.Unregister(System.String)">
+            <summary>注销此前注册的快捷键。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyCommands.List">
+            <summary>列出当前生效的快捷键注册。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyCommands.ParseStrokes(System.String)">
+            <summary>
+            按键序列文法:逗号分隔多次击键,每次击键为「修饰键+主键」。
+            例:<c>Ctrl+Alt+M</c>、<c>Slash,Slash</c>(连按两次 /)、<c>VK:0xBF</c>(直接给虚拟键码)。
+            修饰键:Ctrl/Control、Alt、Shift、Win/Windows。
+            </summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyCommands.Describe(System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke})">
+            <summary>把按键序列还原成文法文本，使 list 的输出可以直接回填给 register。</summary>
+        </member>
+        <member name="T:Mercury.Input.HotkeyService">
+             <summary>
+             HistoryMercury 自持的全局快捷键服务。
+            
+             此前的装配路径是:Vulcan 的 App 在模块系统之外用 <c>Assembly.LoadFrom</c> 全盘预扫描模块
+             DLL,按约定构造签名反射构造出 <c>IGlobalShortcutHost</c> 实现,再交给 ModuleHost;ModuleHost
+             又扫描各模块的 <c>IGlobalShortcutModule</c> 驱动注册。为一个「按键 → 命令名」的功能,宿主
+             付出了 46 行公开类型契约 + 一次不可卸载的预扫描 + 一套扫描驱动逻辑。
+            
+             现在改为:快捷键完全是 Mercury 的私事。Mercury 在自己的模块生命周期里构造并启动服务,
+             并以 <c>mercury.hotkey.*</c> 命令对外提供能力。任何模块(或人、或 AI)要注册快捷键,
+             走命令总线即可,不需要引用任何类型。宿主不再需要知道「快捷键」这个概念存在。
+            
+             注册项本身就是「按键序列 → 命令文本」,所以命令化没有任何信息损失——
+             <see cref="T:Mercury.Input.GlobalShortcutDescriptor"/> 从一开始就带着 CommandText。
+             </summary>
+        </member>
+        <member name="P:Mercury.Input.HotkeyService.Current">
+            <summary>当前实例;未启动时为 null。命令层据此给出明确的失败信息而不是空引用。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyService.Start(HistoryVulcan.Core.Commands.CommandBus,HistoryVulcan.Core.Logging.IShellLog)">
+            <summary>
+            在模块上下文接入时构造并启动。重复调用是幂等的:热重载会重新 Attach,
+            但键盘钩子必须唯一,否则同一组按键会触发两次。
+            </summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyService.Register(Mercury.Input.GlobalShortcutDescriptor,System.String)">
+            <summary>注册一个快捷键；同 id 重复注册会先注销旧的，使热重载可重入。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyService.Unregister(System.String)">
+            <summary>按 id 注销；返回是否确有该注册。</summary>
+        </member>
+        <member name="M:Mercury.Input.HotkeyService.Stop">
+            <summary>模块卸载时停止并释放钩子。</summary>
         </member>
         <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},System.Boolean,HistoryVulcan.Core.Commands.ParameterSpec[])">
             <summary>
@@ -339,15 +441,6 @@
         </member>
         <member name="T:Mercury.MercuryPaths">
             <summary>HistoryMercury runtime locations and read-only migration sources.</summary>
-        </member>
-        <member name="T:Mercury.MercuryShortcutModule">
-            <summary>
-            Registers HistoryMercury-owned global shortcuts with the Vulcan module host.
-            Hotkeys only dispatch Mercury orchestration commands; window work stays on vulcan.*.
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryShortcutModule.RegisterShortcuts(HistoryVulcan.Core.Input.IGlobalShortcutRegistrar)">
-            <inheritdoc />
         </member>
         <member name="T:Mercury.DockCommandEntry">
             <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
@@ -473,6 +566,12 @@
             无 UI 宿主（服务进程、烟测）下为 null。
             </summary>
         </member>
+        <member name="M:Mercury.MercuryUiModule.RegisterOwnShortcuts(HistoryVulcan.Core.Modules.IModuleContext)">
+            <summary>
+            Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
+            用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
+            </summary>
+        </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
         </member>
@@ -565,9 +664,6 @@
         </member>
         <member name="E:Mercury.SuggestBox.Edited">
             <summary>输入框文本发生任何变化（含确认回填）时触发。</summary>
-        </member>
-        <member name="T:BaseVariable.ModuleInfoBase">
-            <summary>HistoryVulcan 模块识别合同的兼容副本。</summary>
         </member>
         <member name="T:System.Text.RegularExpressions.Generated.ProjectNumber_0">
             <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ProjectNumber method.</summary>

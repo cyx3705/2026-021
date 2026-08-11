@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -6,7 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using HistoryVulcan.Core.Docking;
-using HistoryVulcan.Core.CommandSurface;
+using HistoryVulcan.Extensibility.CommandSurface;
 using Mercury.CommandSurface;
 
 namespace Mercury;

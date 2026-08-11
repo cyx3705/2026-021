@@ -15,13 +15,19 @@
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
     <HistoryVulcanShellProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Shell\HistoryVulcan.Shell.csproj</HistoryVulcanShellProj>
     <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
+    <!-- 演进层：CommandSurface 与命令工作台契约的家；不受宿主冻结门禁约束，随交互形态迭代。 -->
+    <HistoryVulcanExtensibilityProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Extensibility\HistoryVulcan.Extensibility.csproj</HistoryVulcanExtensibilityProj>
     <HistoryVulcanSourceAvailable Condition="Exists('$(HistoryVulcanCoreProj)') and Exists('$(HistoryVulcanShellProj)') and Exists('$(HistoryVulcanServicesProj)')">true</HistoryVulcanSourceAvailable>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
     <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
     <ProjectReference Include="$(HistoryVulcanCoreProj)">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="$(HistoryVulcanExtensibilityProj)">
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="$(HistoryVulcanShellProj)">
@@ -34,6 +40,10 @@
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' != 'true'">
     <Reference Include="HistoryVulcan.Core">
       <HintPath>$(HistoryVulcanCoreDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Extensibility">
+      <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="HistoryVulcan.Shell">

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -7,6 +7,7 @@ using System.Windows.Media.Effects;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Logging;
 using HistoryVulcan.Core.Modules;
+using HistoryVulcan.Extensibility.Modules;
 using Mercury.CommandSurface;
 
 namespace Mercury;

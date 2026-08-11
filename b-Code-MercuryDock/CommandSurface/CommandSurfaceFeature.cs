@@ -1,6 +1,7 @@
-using HistoryVulcan.Core.Commands;
+﻿using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Docking;
 using HistoryVulcan.Core.Modules;
+using HistoryVulcan.Extensibility.Modules;
 
 namespace Mercury.CommandSurface;
 
