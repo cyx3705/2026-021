@@ -14,6 +14,6 @@ public sealed class MercuryShortcutModule : IGlobalShortcutModule
         registrar.Register(new GlobalShortcutDescriptor(
             "focus-console",
             [new GlobalShortcutStroke(0xBF), new GlobalShortcutStroke(0xBF)],
-            "mercury.shortcut.wakeconsole"));
+            "vulcan.app.focusconsole"));
     }
 }

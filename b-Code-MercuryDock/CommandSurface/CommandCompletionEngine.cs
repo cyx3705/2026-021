@@ -94,8 +94,17 @@ internal sealed class CommandCompletionEngine
                 return CreateResult(tokenStart, tokenEnd, positional, token);
             }
 
-            // A free-form positional value is intentionally not guessed. The user can type it directly.
-            return ConsoleCompletionResult.Empty;
+            // Free-form positional values are not guessed; expose only the parameter shape.
+            IEnumerable<ConsoleCompletionCandidate> structure = Matches(nextPositional.Name, token)
+                ? [Candidate(
+                    nextPositional.Name,
+                    token,
+                    string.IsNullOrWhiteSpace(nextPositional.Description)
+                        ? "位置参数，直接输入值"
+                        : nextPositional.Description + "；位置参数，直接输入值",
+                    ConsoleCompletionKind.Parameter)]
+                : [];
+            return CreateResult(tokenStart, tokenEnd, structure, token);
         }
 
         var parameterCandidates = command.Parameters
@@ -169,8 +178,7 @@ internal sealed class CommandCompletionEngine
         IReadOnlyList<CommandCompletionDefinition> definitions)
         => definitions
             .Select(command => Segment(command.Name, 0))
-            .Where(domain => domain.Length > 0
-                             && domain.StartsWith(token, StringComparison.OrdinalIgnoreCase))
+            .Where(domain => domain.Length > 0 && Matches(domain, token))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(domain => domain, StringComparer.Ordinal)
             .Select(domain => Candidate(

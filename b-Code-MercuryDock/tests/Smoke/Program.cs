@@ -54,6 +54,10 @@ finally
 }
 
 Equal("dock.manager", MercuryManagerView.CreateDescriptor().Id, "Manager window ID");
+Equal("Mercury", ProjectIconGenerator.ShortLabel("2026-021-HistoryMercury"),
+    "Project tile short label removes number and History prefix.");
+True(ProjectIconGenerator.FitFontSize("A very long project suffix", 44) >= 6,
+    "Project tile font remains a complete, non-ellipsis rendering path.");
 Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manager window default side");
 
 var registry = new CommandRegistry();
@@ -85,6 +89,7 @@ True(commands.Where(command => command.Name.Split('.').Length == 2)
 // 它切换的是控制台状态，不隶属任何业务类。
 True(registry.TryGet("mercury.go", out var go), "Domain-focus command must be registered.");
 True(string.IsNullOrWhiteSpace(go.CommandClass), "mercury.go must be a classless direct method.");
+True(go.RequiresUiThread, "mercury.go must execute on the UI thread.");
 True(go.Parameters.Any(parameter => parameter.Name == "domain" && !parameter.Required),
     "mercury.go must take an optional domain parameter so the bare form exits focus.");
 True(registry.TryGet("mercury.shortcut.wakeconsole", out _), "Wake-console orchestration command must be registered.");
@@ -233,7 +238,7 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
         new MercuryShortcutModule().RegisterShortcuts(owner);
         var focusConsole = shortcuts.Registrations.Single();
         Equal("focus-console", focusConsole.Id, "Mercury shortcut module registration id.");
-        Equal("mercury.shortcut.wakeconsole", focusConsole.CommandText,
+        Equal("vulcan.app.focusconsole", focusConsole.CommandText,
             "Mercury shortcut module command target.");
     }
 
@@ -293,7 +298,7 @@ var catalogue = new List<CommandCompletionDefinition>
     new("janus.proj.list", "列出项目", []),
     new("janus.proj.commit", "提交", [new ParameterSpec { Name = "name", Description = "项目名" }]),
     new("janus.gitrule.scan", "扫描规则", []),
-    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域" }]),
+    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域", Position = 0 }]),
     new("vulcan.ui.reset", "重置布局", []),
 };
 
@@ -306,11 +311,15 @@ True(Inserts(domains).SequenceEqual(["janus.", "mercury.", "vulcan."]),
     "Empty input offers every registered domain.");
 True(domains.Candidates.All(candidate => candidate.Kind == HistoryVulcan.Core.CommandSurface.ConsoleCompletionKind.Domain),
     "Domain stage yields domain candidates.");
+True(Inserts(completion.Complete("erc", 3, catalogue)).SequenceEqual(["mercury."]),
+    "Domain filtering supports case-insensitive contains matching.");
 
 // 第二段选类，同时给出该域的无类直接方法。
 var janusClasses = completion.Complete("janus.", 6, catalogue);
 True(Inserts(janusClasses).SequenceEqual(["janus.gitrule.", "janus.proj."]),
     "Second stage offers the classes of the typed domain.");
+True(Inserts(completion.Complete("janus.rule", 10, catalogue)).SequenceEqual(["janus.gitrule."]),
+    "Class filtering supports contains matching.");
 var mercuryStage = completion.Complete("mercury.", 8, catalogue);
 True(Inserts(mercuryStage).Contains("mercury.go "),
     "A domain's classless direct methods appear at the class stage with a trailing space.");
@@ -324,6 +333,39 @@ True(Inserts(methods).SequenceEqual(["janus.proj.commit ", "janus.proj.list "]),
 var parameters = completion.Complete("janus.proj.commit ", 18, catalogue);
 True(Inserts(parameters).SequenceEqual(["name="]),
     "Parameter candidates come from the registered ParameterSpec.");
+
+var positionalCatalogue = new List<CommandCompletionDefinition>
+{
+    new("janus.app.mode", "模式", [new ParameterSpec
+    {
+        Name = "mode",
+        Description = "模式",
+        Position = 0,
+        AllowedValues = ["alpha", "beta"],
+    }]),
+};
+var positional = completion.Complete("janus.app.mode ", 16, positionalCatalogue);
+True(Inserts(positional).SequenceEqual(["alpha", "beta"]),
+    "Position=0 parameters use bare values without name=.");
+var goDomains = completion.Complete("mercury.go ", 11, catalogue);
+True(Inserts(goDomains).SequenceEqual(["janus", "mercury", "vulcan"]),
+    "mercury.go dynamically offers registered domains as bare positional values.");
+var freeTextPositional = completion.Complete(
+    "janus.proj.open ",
+    16,
+    [
+        new CommandCompletionDefinition("janus.proj.open", "打开项目", [new ParameterSpec
+        {
+            Name = "project",
+            Description = "项目",
+            Position = 0,
+        }]),
+    ]);
+True(freeTextPositional.Candidates.Count == 1
+     && freeTextPositional.Candidates[0].DisplayText == "project"
+     && freeTextPositional.Candidates[0].InsertText.Length == 0
+     && freeTextPositional.Candidates[0].Kind == HistoryVulcan.Core.CommandSurface.ConsoleCompletionKind.Parameter,
+    "Free-form Position=0 parameters expose only a structure candidate and never insert name=.");
 
 // 域聚焦：省略域前缀直接补类，同时其他域的绝对名仍然补得出来（脱固入口不能消失）。
 var focused = completion.Complete("", 0, catalogue, "janus");

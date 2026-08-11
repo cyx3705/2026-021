@@ -6,6 +6,8 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using HistoryVulcan.Core.Docking;
+using HistoryVulcan.Core.CommandSurface;
+using Mercury.CommandSurface;
 
 namespace Mercury;
 
@@ -39,7 +41,11 @@ public static class MercuryManagerView
         private readonly TextBox _halfLife = new() { Width = 56 };
         private readonly SuggestBox _entryInput = new();
         private readonly TextBlock _status = new();
-        private CommandOptionTree _commandTree = CommandOptionTree.Build(MercuryCommandCatalog.FallbackCommandCatalog());
+        private readonly CommandCompletionEngine _completion = new();
+        private IReadOnlyList<CommandCompletionDefinition> _completionDefinitions =
+            MercuryCommandCatalog.FallbackCommandCatalog()
+                .Select(item => new CommandCompletionDefinition(item.Name, item.Summary, []))
+                .ToList();
         private bool _commandsLoaded;
 
         public ManagerPage()
@@ -540,7 +546,9 @@ public static class MercuryManagerView
                             MercuryCommandCatalog.ProjectOpenCommandName, StringComparison.OrdinalIgnoreCase)))
                         .ToList();
                 }
-                _commandTree = CommandOptionTree.Build(items);
+                _completionDefinitions = items
+                    .Select(item => new CommandCompletionDefinition(item.Name, item.Summary, []))
+                    .ToList();
             });
         }
 
@@ -552,12 +560,33 @@ public static class MercuryManagerView
         {
             var spaceIndex = text.IndexOf(' ');
             if (spaceIndex < 0)
-                return _commandTree.ChildrenOf(text);
+            {
+                var result = _completion.Complete(text, text.Length, _completionDefinitions);
+                return result.Candidates
+                    .Select(candidate => new SuggestOption(
+                        ApplyCompletion(text, result, candidate),
+                        candidate.DisplayText,
+                        candidate.Description,
+                        IsBranchCandidate(candidate)))
+                    .ToList();
+            }
 
             var command = text[..spaceIndex].Trim();
             var fragment = text[(spaceIndex + 1)..].Trim();
-            if (command.Length == 0 || !IsOpenProjectCommand(command))
+            if (command.Length == 0)
                 return [];
+
+            if (!IsOpenProjectCommand(command))
+            {
+                var result = _completion.Complete(text, text.Length, _completionDefinitions);
+                return result.Candidates
+                    .Select(candidate => new SuggestOption(
+                        ApplyCompletion(text, result, candidate),
+                        candidate.DisplayText,
+                        candidate.Description,
+                        IsBranchCandidate(candidate)))
+                    .ToList();
+            }
 
             var docked = MercuryState.Projects
                 .Select(item => item.Name)
@@ -580,6 +609,19 @@ public static class MercuryManagerView
                     false))
                 .ToList();
         }
+
+        private static string ApplyCompletion(
+            string text,
+            ConsoleCompletionResult result,
+            ConsoleCompletionCandidate candidate)
+            => text.Remove(result.ReplaceStart, result.ReplaceLength)
+                .Insert(result.ReplaceStart, candidate.InsertText);
+
+        private static bool IsBranchCandidate(ConsoleCompletionCandidate candidate)
+            => candidate.Kind is ConsoleCompletionKind.Domain
+                or ConsoleCompletionKind.Class
+                or ConsoleCompletionKind.Method
+                or ConsoleCompletionKind.Parameter;
 
         /// <summary>加入：指令行拆为 指令+参数；打开项目且命中工作树走 AddToDock，其余作为自定义指令常驻入坞。</summary>
         private void AddEntry()

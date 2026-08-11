@@ -62,10 +62,11 @@ internal static class MercuryCommandCatalog
         // 所以各域都不必自备「退出聚焦」指令。
         Direct("mercury.go", "聚焦到指定指令域；省略 domain 则退出聚焦。",
             context => MercuryCommands.Go(context.GetString("domain")),
+            true,
             DomainParameter()),
         Readonly("mercury.app.status", "app", "查看托管的资源管理器入口状态。",
             _ => MercuryCommands.Status()),
-        Async("mercury.shortcut.wakeconsole", "shortcut", "组合调用 Vulcan 窗口指令以唤出并聚焦控制台。",
+        Async("mercury.shortcut.wakeconsole", "shortcut", "兼容入口：调用 Vulcan 语义命令唤出并聚焦控制台。",
             async _ => await MercuryCommands.WakeConsoleAsync().ConfigureAwait(false)),
         Write("mercury.explorer.register", "explorer", "注册托管的资源管理器入口。",
             _ => MercuryCommands.RegisterExplorer()),
@@ -129,11 +130,13 @@ internal static class MercuryCommandCatalog
         string name,
         string summary,
         Func<CommandContext, string> handler,
+        bool requiresUiThread = false,
         params ParameterSpec[] parameters)
         => new()
         {
             Name = name,
             Summary = summary,
+            RequiresUiThread = requiresUiThread,
             Parameters = parameters,
             Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
         };
@@ -295,8 +298,9 @@ internal sealed class CommandOptionTree
         }
 
         return node.Children
-            .Where(pair => pair.Key.StartsWith(fragment, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Where(pair => Matches(pair.Key, fragment))
+            .OrderBy(pair => MatchRank(pair.Key, fragment))
+            .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Select(pair => new SuggestOption(
                 pair.Value.Children.Count > 0 ? prefix + pair.Key + "." : prefix + pair.Key,
                 pair.Value.Children.Count > 0 ? pair.Key + " >" : pair.Key,
@@ -310,6 +314,20 @@ internal sealed class CommandOptionTree
         if (node.Command is { Summary.Length: > 0 } command)
             return node.Children.Count > 0 ? command.Summary + "（含下级命令）" : command.Summary;
         return $"{node.Children.Count} 个下级命令";
+    }
+
+    private static bool Matches(string value, string filter)
+        => filter.Length == 0 || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+    private static int MatchRank(string value, string filter)
+    {
+        if (filter.Length == 0)
+            return 2;
+        if (value.Equals(filter, StringComparison.OrdinalIgnoreCase))
+            return 0;
+        if (value.StartsWith(filter, StringComparison.OrdinalIgnoreCase))
+            return 1;
+        return 2;
     }
 
     private sealed class Node

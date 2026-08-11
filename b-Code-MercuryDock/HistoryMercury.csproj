@@ -6,10 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;**\bin\**;**\obj\**</DefaultItemExcludes>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>4.2.1</Version>
+    <Version>4.3.0</Version>
   </PropertyGroup>
   <PropertyGroup>
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>

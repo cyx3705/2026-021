@@ -73,26 +73,13 @@ public static class MercuryCommands
         if (bus == null)
             return CommandResult.Fail("指令总线未就绪。");
 
-        // 冷启动走 Vulcan --focus-console（App 内组合窗口指令）；已连接则再组合 win/log。
-        var show = await bus.ExecuteAsync(
-                "vulcan.app.show startup=--focus-console",
-                "Mercury")
+        var result = await bus.ExecuteAsync("vulcan.app.focusconsole", "Mercury")
             .ConfigureAwait(false);
-        if (IsFrontendStarting(show))
+        if (IsFrontendStarting(result))
             return CommandResult.Ok("前端正在启动，将聚焦控制台");
-        if (!show.Success)
-            return CommandResult.Fail(string.IsNullOrWhiteSpace(show.Message) ? "唤出前端失败" : show.Message);
-
-        var showPane = await bus.ExecuteAsync("vulcan.ui.show name=console", "Mercury").ConfigureAwait(false);
-        var focus = await bus.ExecuteAsync("vulcan.log.focus", "Mercury").ConfigureAwait(false);
-        // Maximize last: vulcan.log.focus 内部 Show 可能退出最大化态。
-        var maximize = await bus.ExecuteAsync("vulcan.ui.max name=console", "Mercury").ConfigureAwait(false);
-        if (show.Success && showPane.Success && focus.Success && maximize.Success)
-            return CommandResult.Ok("已通过 Vulcan 窗口指令唤出并聚焦控制台");
-
-        var parts = new[] { show.Message, showPane.Message, focus.Message, maximize.Message }
-            .Where(static text => !string.IsNullOrWhiteSpace(text));
-        return CommandResult.Fail(string.Join("；", parts));
+        return result.Success
+            ? CommandResult.Ok("已通过 Vulcan 语义命令唤出并聚焦控制台")
+            : CommandResult.Fail(string.IsNullOrWhiteSpace(result.Message) ? "唤出前端失败" : result.Message);
     }
 
     private static bool IsFrontendStarting(CommandResult result)
