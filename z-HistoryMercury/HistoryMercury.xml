@@ -422,7 +422,7 @@
             <summary>列表只显示已入坞的条目：项目（固定+策略选中）加手动指令项。</summary>
         </member>
         <member name="M:Mercury.MercuryManagerView.ManagerPage.LoadCommandCatalogAsync">
-            <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
+            <summary>指令候选：服务侧全量清单（vulcan.command.list），失败回退本模块静态清单。</summary>
         </member>
         <member name="M:Mercury.MercuryManagerView.ManagerPage.EntryOptions(System.String)">
             <summary>

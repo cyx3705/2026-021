@@ -1,5 +1,6 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using HistoryVulcan.Core.Commands;
+using HistoryVulcan.Extensibility.Commands;
 
 namespace Mercury;
 

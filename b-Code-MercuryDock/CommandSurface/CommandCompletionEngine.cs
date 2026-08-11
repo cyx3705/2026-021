@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using HistoryVulcan.Core.Commands;
+using HistoryVulcan.Extensibility.Commands;
 using HistoryVulcan.Extensibility.CommandSurface;
 
 namespace Mercury.CommandSurface;
@@ -153,7 +154,7 @@ internal sealed class CommandCompletionEngine
             var candidates = ClassCandidates(token, definitions).ToList();
             candidates.AddRange(DirectMethodCandidates(token, definitions));
             if (IsFocused(focusedDomain))
-                candidates.AddRange(MethodCandidates($"{focusedDomain}.{token}", definitions, focusedDomain));
+                candidates.AddRange(MethodCandidates(token, definitions, focusedDomain));
             return candidates;
         }
 
