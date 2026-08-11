@@ -281,7 +281,7 @@
         <member name="M:Mercury.Input.GlobalShortcutService.Dispose">
             <inheritdoc />
         </member>
-        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},HistoryVulcan.Core.Commands.ParameterSpec[])">
+        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},System.Boolean,HistoryVulcan.Core.Commands.ParameterSpec[])">
             <summary>
             无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
             注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
