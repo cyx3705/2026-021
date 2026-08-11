@@ -107,7 +107,63 @@ internal static class MercuryCommandCatalog
         Readonly("mercury.usage.list", "usage", "列出项目使用记录。", _ => MercuryCommands.ListUsage()),
         Write("mercury.usage.forget", "usage", "清除项目使用历史。",
             context => MercuryCommands.ForgetUsage(context.GetString("name")), "确定清除所选使用历史？", OptionalNameParameter()),
+
+        // 全局快捷键改由命令暴露：调用方只需知道命令名与参数名，不引用任何 CLR 契约，
+        // 因此 Mercury 可以自由重构快捷键实现而不触动宿主公开面。
+        Readonly("mercury.hotkey.list", "hotkey", "列出当前生效的全局快捷键注册。",
+            _ => Input.HotkeyCommands.List()),
+        Write("mercury.hotkey.register", "hotkey", "注册「按键序列 → 命令」的全局快捷键。",
+            context => Input.HotkeyCommands.Register(
+                context.RequireString("id"),
+                context.RequireString("stroke"),
+                context.RequireString("command"),
+                context.GetString("owner"),
+                context.Has("interval") ? (int)context.GetDouble("interval") : null),
+            HotkeyIdParameter(), HotkeyStrokeParameter(), HotkeyCommandParameter(),
+            HotkeyOwnerParameter(), HotkeyIntervalParameter()),
+        Write("mercury.hotkey.unregister", "hotkey", "注销此前注册的全局快捷键。",
+            context => Input.HotkeyCommands.Unregister(context.RequireString("id")),
+            HotkeyIdParameter()),
     ];
+
+    private static ParameterSpec HotkeyIdParameter() => new()
+    {
+        Name = "id",
+        Description = "快捷键标识；同 id 重复注册会覆盖旧的。",
+        Required = true,
+        Position = 0,
+    };
+
+    private static ParameterSpec HotkeyStrokeParameter() => new()
+    {
+        Name = "stroke",
+        Description = "按键序列：逗号分隔多次击键，每次为「修饰键+主键」。"
+            + "例 Ctrl+Alt+M、Slash,Slash（连按两次 /）、VK:0xBF（虚拟键码）。",
+        Required = true,
+        Position = 1,
+    };
+
+    private static ParameterSpec HotkeyCommandParameter() => new()
+    {
+        Name = "command",
+        Description = "命中后要执行的指令文本。",
+        Required = true,
+        Position = 2,
+    };
+
+    private static ParameterSpec HotkeyOwnerParameter() => new()
+    {
+        Name = "owner",
+        Description = "注册方标识；省略则记为 HistoryMercury。",
+        Required = false,
+    };
+
+    private static ParameterSpec HotkeyIntervalParameter() => new()
+    {
+        Name = "interval",
+        Description = "多次击键之间的最大间隔毫秒数；省略为 350。",
+        Required = false,
+    };
 
     private static CommandDescriptor Async(
         string name,

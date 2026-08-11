@@ -1,9 +1,8 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Threading.Channels;
 using HistoryVulcan.Core.Commands;
-using HistoryVulcan.Core.Input;
 using HistoryVulcan.Core.Logging;
 
 namespace Mercury.Input;
@@ -13,7 +12,7 @@ namespace Mercury.Input;
 /// execution happens on a worker and no input data is persisted or forwarded.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class GlobalShortcutService : IGlobalShortcutHost
+internal sealed class GlobalShortcutService : IDisposable
 {
     private const int WhKeyboardLl = 13;
     private const uint WmKeyDown = 0x0100;

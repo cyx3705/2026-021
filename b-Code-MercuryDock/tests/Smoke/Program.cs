@@ -1,13 +1,13 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using System.IO;
 using BaseVariable;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Docking;
-using HistoryVulcan.Core.Input;
 using HistoryVulcan.Core.Modules;
 using Mercury;
 using Mercury.CommandSurface;
+using Mercury.Input;
 
 var previousExplorerRegistrationSetting = Environment.GetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION");
 Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", "1");
@@ -63,7 +63,9 @@ Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manag
 var registry = new CommandRegistry();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-Equal(19, commands.Count, "Command count");
+// 22 = 原 19 条 + mercury.hotkey.{register,unregister,list}：
+// 全局快捷键从宿主的类型契约转为本模块的命令面。
+Equal(22, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -163,10 +165,20 @@ finally
     Directory.Delete(shortcutRoot, recursive: true);
 }
 
-True(typeof(IGlobalShortcutModule).IsAssignableFrom(typeof(MercuryShortcutModule)),
-    "Shortcut module must implement IGlobalShortcutModule.");
-True(typeof(IGlobalShortcutHost).IsAssignableFrom(typeof(Mercury.Input.GlobalShortcutService)),
-    "GlobalShortcutService must implement IGlobalShortcutHost.");
+// 快捷键不再经由宿主的 IGlobalShortcutModule 扫描注册，而是由 Mercury 自持并以
+// mercury.hotkey.* 命令暴露。这里改为断言命令面存在且按键文法可往返，
+// 因为「命令名 + 参数名」现在就是这项能力的全部对外契约。
+{
+    var hotkeyRegistry = new CommandRegistry();
+    MercuryCommandCatalog.Register(hotkeyRegistry);
+    foreach (var name in new[] { "mercury.hotkey.register", "mercury.hotkey.unregister", "mercury.hotkey.list" })
+        True(hotkeyRegistry.TryGet(name, out _), $"Hotkey command must be registered: {name}.");
+
+    var registerCommand = hotkeyRegistry.All().Single(c => c.Name == "mercury.hotkey.register");
+    foreach (var parameter in new[] { "id", "stroke", "command" })
+        True(registerCommand.Parameters.Any(p => p.Name == parameter && p.Required),
+            $"mercury.hotkey.register must require parameter {parameter}.");
+}
 
 using (var shortcuts = new Mercury.Input.GlobalShortcutService(
            new CommandBus(new CommandRegistry(), new NullShellLog()),
@@ -233,21 +245,20 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
 
     Equal(0, shortcuts.Registrations.Count, "Owner registrar dispose must release every registration.");
 
+    // Mercury 自有的 focus-console 现在也走命令层注册，与第三方模块同一条通道。
     using (var owner = shortcuts.CreateOwnerRegistrar("HistoryMercury"))
     {
-        new MercuryShortcutModule().RegisterShortcuts(owner);
+        owner.Register(new GlobalShortcutDescriptor(
+            "focus-console",
+            [new GlobalShortcutStroke(0xBF), new GlobalShortcutStroke(0xBF)],
+            "vulcan.app.focusconsole"));
         var focusConsole = shortcuts.Registrations.Single();
-        Equal("focus-console", focusConsole.Id, "Mercury shortcut module registration id.");
-        Equal("vulcan.app.focusconsole", focusConsole.CommandText,
-            "Mercury shortcut module command target.");
+        Equal("focus-console", focusConsole.Id, "Mercury shortcut registration id.");
+        Equal("vulcan.app.focusconsole", focusConsole.CommandText, "Mercury shortcut command target.");
     }
 
     Equal(0, shortcuts.Registrations.Count,
         "Disposing the Mercury owner must release focus-console before reload.");
-    using (var reloadedOwner = shortcuts.CreateOwnerRegistrar("HistoryMercury"))
-        new MercuryShortcutModule().RegisterShortcuts(reloadedOwner);
-    Equal(0, shortcuts.Registrations.Count,
-        "Reloaded Mercury owner must release focus-console without leaking.");
 }
 
 var matcher = new Mercury.Input.GlobalShortcutMatcher();

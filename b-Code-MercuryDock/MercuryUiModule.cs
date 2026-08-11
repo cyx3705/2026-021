@@ -5,6 +5,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using HistoryVulcan.Core.Commands;
+using HistoryVulcan.Core.Logging;
 using HistoryVulcan.Core.Modules;
 using Mercury.CommandSurface;
 
@@ -50,6 +51,35 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     {
         Bus = context.Bus;
         context.RegisterCommands(MercuryCommandCatalog.Register);
+
+        // 全局快捷键完全由 Mercury 自持：服务在此构造并启动，能力经 mercury.hotkey.* 命令暴露。
+        // 宿主不再预扫描模块 DLL 去寻找 IGlobalShortcutHost 实现，也不再驱动注册。
+        if (OperatingSystem.IsWindows())
+        {
+            Input.HotkeyService.Start(context.Bus, context.Log);
+            RegisterOwnShortcuts(context);
+        }
+    }
+
+    /// <summary>
+    /// Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
+    /// 用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
+    /// </summary>
+    private static void RegisterOwnShortcuts(IModuleContext context)
+    {
+        try
+        {
+            Input.HotkeyCommands.Register(
+                "focus-console",
+                "Slash,Slash",
+                "vulcan.app.focusconsole",
+                "HistoryMercury",
+                null);
+        }
+        catch (Exception ex)
+        {
+            context.Log.Warn("hotkey", $"注册 Mercury 自有快捷键失败: {ex.Message}");
+        }
     }
 
     public void CreateUi()
