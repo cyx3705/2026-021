@@ -60,10 +60,10 @@
             <summary>
             Mercury-owned command workbench: catalog session, command-set and detail tool windows.
             Console remains in Vulcan Shell; this feature attaches the shared session via
-            <see cref="T:HistoryVulcan.Core.Modules.IShellCommandWorkbenchHost"/>.
+            <see cref="T:HistoryVulcan.Extensibility.Modules.IShellCommandWorkbenchHost"/>.
             </summary>
         </member>
-        <member name="M:Mercury.CommandSurface.CommandSurfaceFeature.TryAttach(HistoryVulcan.Core.Modules.IShellCommandWorkbenchHost,HistoryVulcan.Core.Modules.IShellUiRegistrar)">
+        <member name="M:Mercury.CommandSurface.CommandSurfaceFeature.TryAttach(HistoryVulcan.Extensibility.Modules.IShellCommandWorkbenchHost,HistoryVulcan.Core.Modules.IShellUiRegistrar)">
             <summary>
             Creates the shared catalog session, registers mcp/commanddetail windows, and attaches
             the session to the Shell console deferred proxy.
