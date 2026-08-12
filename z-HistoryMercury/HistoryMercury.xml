@@ -245,9 +245,6 @@
         <member name="T:Mercury.HistoryVulcanLauncher">
             <summary>打开或唤起 HistoryVulcan 主界面。</summary>
         </member>
-        <member name="M:Mercury.HistoryVulcanLauncher.Open(System.String)">
-            <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
-        </member>
         <member name="T:Mercury.Input.GlobalShortcutService">
             <summary>
             User-session global shortcut host. The hook only queues key metadata; command
@@ -426,8 +423,7 @@
         </member>
         <member name="M:Mercury.MercuryManagerView.ManagerPage.EntryOptions(System.String)">
             <summary>
-            单行候选：首个空格之前是指令（域→类→方法级联），空格之后是参数。
-            打开项目指令的参数候选为工作树未入坞项目（排除项标注排前），其他指令参数自由输入。
+            单行候选统一由命令目录元数据驱动，按域→类→方法→参数级联。
             </summary>
         </member>
         <member name="M:Mercury.MercuryManagerView.ManagerPage.AddEntry">
@@ -506,7 +502,7 @@
             <summary>按指令文本移除指令项；不存在时返回 false。</summary>
         </member>
         <member name="M:Mercury.MercuryState.NormalizeCommand(System.String)">
-            <summary>折叠连续空白，保证同一指令的不同写法只存一份。</summary>
+            <summary>折叠引号外的连续空白；引号、转义符和引号内文本逐字符保留。</summary>
         </member>
         <member name="M:Mercury.MercuryState.ApplyPinState(System.String)">
             <summary>调用方须已持有 <see cref="F:Mercury.MercuryState.Gate"/>。把 Pin 结果同步进两个缓存列表并保持既有排序。</summary>
@@ -643,6 +639,9 @@
         </member>
         <member name="T:Mercury.RecentFolders.IShellLinkW">
             <summary>只声明首个槽位 GetPath；本模块不调用其余方法。</summary>
+        </member>
+        <member name="T:Mercury.ShortcutFileService">
+            <summary>Resolves and opens ordinary paths and Windows shortcut files.</summary>
         </member>
         <member name="T:Mercury.SuggestOption">
             <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>
