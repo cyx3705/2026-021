@@ -115,6 +115,26 @@ public static class MercuryCommands
         return CommandResult.Ok($"已将快捷文件加入扩展坞：{label}。");
     }
 
+    public static CommandResult AddDockCommand(string? command, string? label = null)
+    {
+        var normalized = MercuryState.NormalizeCommand(command);
+        if (normalized.Length == 0)
+            return CommandResult.Fail("要加入扩展坞的指令不能为空。");
+        if (!MercuryState.AddCommand(normalized, label))
+            return CommandResult.Fail("常驻指令未加入扩展坞。");
+        return CommandResult.Ok($"已加入常驻指令：{normalized}。");
+    }
+
+    public static CommandResult RemoveDockCommand(string? command)
+    {
+        var normalized = MercuryState.NormalizeCommand(command);
+        if (normalized.Length == 0)
+            return CommandResult.Fail("要移除的指令不能为空。");
+        return MercuryState.RemoveCommand(normalized)
+            ? CommandResult.Ok($"已移除常驻指令：{normalized}。")
+            : CommandResult.Fail($"未找到常驻指令：{normalized}。");
+    }
+
     public static IReadOnlyList<DockUsageRow> ListUsage()
         => MercuryState.Projects
             .Select(item => new DockUsageRow(

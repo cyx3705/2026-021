@@ -119,6 +119,21 @@ internal static class MercuryCommandCatalog
                 context.Has("max") ? context.GetInt("max") : null,
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
             OptionalIntParameter("min"), OptionalIntParameter("max"), OptionalDoubleParameter("halflife")),
+        Result("mercury.dock.add", "dock", "把任意总线指令注册为扩展坞常驻项。",
+            context => MercuryCommands.AddDockCommand(
+                context.GetString("command"),
+                context.GetString("label")),
+            DockCommandParameter(), DockLabelParameter()),
+        new CommandDescriptor
+        {
+            Name = "mercury.dock.remove",
+            CommandClass = "dock",
+            Summary = "移除扩展坞中的常驻指令项。",
+            Parameters = [DockCommandParameter()],
+            Annotations = CompletionProvider("command", "mercury.dock.commands"),
+            Handler = context => Task.FromResult(
+                MercuryCommands.RemoveDockCommand(context.GetString("command"))),
+        },
         Async("mercury.app.open", "app", "显示或启动 HistoryVulcan 前端。",
             async _ => await MercuryCommands.ShowHostAsync().ConfigureAwait(false)),
         Readonly("mercury.usage.list", "usage", "列出项目使用记录。", _ => MercuryCommands.ListUsage()),
@@ -228,6 +243,21 @@ internal static class MercuryCommandCatalog
         Description = "快捷文件、普通文件或目录路径。",
         Required = true,
         Position = 0,
+    };
+
+    private static ParameterSpec DockCommandParameter() => new()
+    {
+        Name = "command",
+        Description = "要常驻或移除的完整总线指令文本。",
+        Required = true,
+        Position = 0,
+    };
+
+    private static ParameterSpec DockLabelParameter() => new()
+    {
+        Name = "label",
+        Description = "可选显示标签；省略时使用规范化后的指令文本。",
+        Required = false,
     };
 
     private static IReadOnlyDictionary<string, string> CompletionProvider(string parameter, string provider)

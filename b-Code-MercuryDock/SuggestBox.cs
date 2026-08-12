@@ -26,54 +26,35 @@ internal sealed class SuggestBox : UserControl
         _input = new TextBox
         {
             Height = 28,
-            // 垂直内边距过大会把文字裁掉一半，输入框专用 InputPadding（垂直 0）。
-            Padding = DockTheme.InputPadding,
-            FontFamily = DockTheme.FontFamily,
-            FontSize = DockTheme.BodyFontSize,
-            Foreground = DockTheme.Label,
-            Background = DockTheme.PanelBackground,
-            BorderBrush = DockTheme.PanelBorder,
+            Padding = new Thickness(10, 4, 10, 4),
             BorderThickness = new Thickness(1),
             VerticalContentAlignment = VerticalAlignment.Center,
         };
+        _input.SetResourceReference(Control.FontFamilyProperty, "Shell.Font.Family");
+        _input.SetResourceReference(Control.FontSizeProperty, "Shell.Font.Body");
+        _input.SetResourceReference(Control.ForegroundProperty, "Shell.Brush.TextPrimary");
+        _input.SetResourceReference(Control.BackgroundProperty, "Shell.Brush.Surface");
+        _input.SetResourceReference(Control.BorderBrushProperty, "Shell.Brush.ControlBorder");
         Content = _input;
 
         _list = new ListBox
         {
             Background = Brushes.Transparent,
-            Foreground = DockTheme.Label,
             BorderThickness = new Thickness(0),
             MaxHeight = 264,
-            FontFamily = DockTheme.FontFamily,
-            FontSize = DockTheme.BodyFontSize,
             ItemTemplate = BuildOptionTemplate(),
         };
+        _list.SetResourceReference(Control.ForegroundProperty, "Shell.Brush.TextPrimary");
+        _list.SetResourceReference(Control.FontFamilyProperty, "Shell.Font.Family");
+        _list.SetResourceReference(Control.FontSizeProperty, "Shell.Font.Body");
         _list.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
-        _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Selection;
-        _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.SelectionText;
-        _list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = DockTheme.Selection;
-        _list.Resources[SystemColors.InactiveSelectionHighlightTextBrushKey] = DockTheme.SelectionText;
-        _list.Resources[SystemColors.ControlBrushKey] = DockTheme.Selection;
-        _list.Resources[SystemColors.ControlTextBrushKey] = DockTheme.SelectionText;
-        var itemStyle = new Style(typeof(ListBoxItem));
-        itemStyle.Setters.Add(new Setter(PaddingProperty, new Thickness(8, 4, 8, 4)));
-        _list.ItemContainerStyle = itemStyle;
-
         _popup = new Popup
         {
             PlacementTarget = _input,
             Placement = PlacementMode.Bottom,
             StaysOpen = false,
             AllowsTransparency = true,
-            Child = new Border
-            {
-                Background = DockTheme.PanelBackground,
-                BorderBrush = DockTheme.PanelBorder,
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(2),
-                Child = _list,
-            },
+            Child = CreatePopupBorder(),
         };
 
         _input.TextChanged += (_, _) =>
@@ -92,6 +73,21 @@ internal sealed class SuggestBox : UserControl
         };
         // 弹窗宽度跟随输入框，长文本也不截断候选列表本身。
         _input.SizeChanged += (_, _) => _list.MinWidth = _input.ActualWidth;
+    }
+
+    private Border CreatePopupBorder()
+    {
+        var border = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(2),
+            Child = _list,
+        };
+        border.SetResourceReference(Border.BackgroundProperty, "Shell.Brush.Surface");
+        border.SetResourceReference(Border.BorderBrushProperty, "Shell.Brush.Hairline");
+        border.SetResourceReference(Border.EffectProperty, "Shell.Shadow.Flyout");
+        return border;
     }
 
     /// <summary>按当前输入给出候选；为 null 时永不弹出。</summary>
@@ -213,7 +209,7 @@ internal sealed class SuggestBox : UserControl
         stack.AppendChild(display);
         var detail = new FrameworkElementFactory(typeof(TextBlock));
         detail.SetBinding(TextBlock.TextProperty, new Binding(nameof(SuggestOption.Detail)));
-        detail.SetValue(TextBlock.FontSizeProperty, DockTheme.SmallFontSize);
+        detail.SetResourceReference(TextBlock.FontSizeProperty, "Shell.Font.Small");
         detail.SetValue(UIElement.OpacityProperty, 0.7);
         detail.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 0, 0, 0));
         detail.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);

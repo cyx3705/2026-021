@@ -16,6 +16,10 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
         new Dictionary<string, Func<IReadOnlyList<string>>>(StringComparer.OrdinalIgnoreCase)
         {
             ["mercury.projects"] = MercuryState.ListWorktreeProjects,
+            ["mercury.dock.commands"] = () => MercuryState.CommandEntries
+                .Select(entry => entry.Command)
+                .OrderBy(command => command, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
         };
 
     private readonly CommandBus _bus;

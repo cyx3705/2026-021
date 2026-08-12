@@ -63,9 +63,8 @@ Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manag
 var registry = new CommandRegistry();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-// 24 = 原 19 条 + mercury.hotkey.{register,unregister,list}
-// + mercury.shortcut.{open,add}。
-Equal(24, commands.Count, "Command count");
+// 26 = 原 24 条 + mercury.dock.add/remove。
+Equal(26, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -101,6 +100,16 @@ True(registry.TryGet("mercury.shortcut.open", out var openShortcut),
     "Shortcut-open command must be registered.");
 True(registry.TryGet("mercury.shortcut.add", out var addShortcut),
     "Shortcut-add command must be registered.");
+True(registry.TryGet("mercury.dock.add", out var dockAdd),
+    "Dock-add command must be registered.");
+True(registry.TryGet("mercury.dock.remove", out var dockRemove),
+    "Dock-remove command must be registered.");
+True(dockAdd.Parameters.Single(parameter => parameter.Name == "command") is { Required: true, Position: 0 },
+    "Dock-add command text must be the unique positional parameter.");
+True(dockRemove.Parameters.Single(parameter => parameter.Name == "command") is { Required: true, Position: 0 },
+    "Dock-remove command text must be the unique positional parameter.");
+Equal("mercury.dock.commands", dockRemove.Annotations["completion.values.command"],
+    "Dock-remove candidates must come from the Mercury-owned provider.");
 True(openShortcut.Parameters.Single() is { Name: "path", Required: true, Position: 0 },
     "Shortcut-open path must be the unique positional parameter.");
 True(addShortcut.Parameters.Single() is { Name: "path", Required: true, Position: 0 },
@@ -139,6 +148,12 @@ True(MercuryState.AddCommand("mercury.proj.list"), "Adding a dock command must s
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding the same dock command is idempotent.");
 Equal(1, MercuryState.CommandEntries.Count, "Dock command entries must deduplicate.");
 True(MercuryState.RemoveCommand("MERCURY.PROJ.LIST"), "Dock command removal must ignore case.");
+True(MercuryCommands.AddDockCommand(" mercury.proj.list ").Success,
+    "The dock-add bus handler must normalize and persist commands.");
+True(MercuryCommands.RemoveDockCommand("MERCURY.PROJ.LIST").Success,
+    "The dock-remove bus handler must remove commands case-insensitively.");
+True(!MercuryCommands.RemoveDockCommand("mercury.proj.list").Success,
+    "Removing a missing dock command must return a clear failure.");
 Equal(
     "mercury.shortcut.open \"C:\\A  B.lnk\"",
     MercuryState.NormalizeCommand("  mercury.shortcut.open   \"C:\\A  B.lnk\"  "),
