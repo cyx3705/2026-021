@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -370,10 +371,14 @@ internal static partial class MercuryState
     /// 把一条总线指令加入扩展坞：折叠多余空白后按指令文本去重，重复加入视为成功。
     /// </summary>
     public static bool AddCommand(string command)
+        => AddCommand(command, command);
+
+    public static bool AddCommand(string command, string? label)
     {
         var normalized = NormalizeCommand(command);
         if (normalized.Length == 0)
             return false;
+        var normalizedLabel = string.IsNullOrWhiteSpace(label) ? normalized : label.Trim();
 
         lock (Gate)
         {
@@ -383,7 +388,7 @@ internal static partial class MercuryState
                 return true;
             }
 
-            _preferences.Commands.Add(new DockCommandEntry(normalized, normalized, DateTimeOffset.UtcNow));
+            _preferences.Commands.Add(new DockCommandEntry(normalized, normalizedLabel, DateTimeOffset.UtcNow));
             SavePreferences();
         }
 
@@ -409,11 +414,45 @@ internal static partial class MercuryState
         return removed;
     }
 
-    /// <summary>折叠连续空白，保证同一指令的不同写法只存一份。</summary>
+    /// <summary>折叠引号外的连续空白；引号、转义符和引号内文本逐字符保留。</summary>
     internal static string NormalizeCommand(string? command)
-        => string.IsNullOrWhiteSpace(command)
-            ? string.Empty
-            : string.Join(' ', command.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    {
+        if (string.IsNullOrWhiteSpace(command))
+            return string.Empty;
+
+        var normalized = new StringBuilder(command.Length);
+        var inQuote = false;
+        var pendingSeparator = false;
+        for (var index = 0; index < command.Length; index++)
+        {
+            var character = command[index];
+            if (!inQuote && char.IsWhiteSpace(character))
+            {
+                pendingSeparator = normalized.Length > 0;
+                continue;
+            }
+
+            if (pendingSeparator)
+            {
+                normalized.Append(' ');
+                pendingSeparator = false;
+            }
+
+            normalized.Append(character);
+            if (character == '"' && !IsEscaped(command, index))
+                inQuote = !inQuote;
+        }
+
+        return normalized.ToString();
+    }
+
+    private static bool IsEscaped(string text, int index)
+    {
+        var backslashes = 0;
+        for (var previous = index - 1; previous >= 0 && text[previous] == '\\'; previous--)
+            backslashes++;
+        return backslashes % 2 == 1;
+    }
 
     public static void SetHidden(bool hidden)
     {

@@ -63,9 +63,9 @@ Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manag
 var registry = new CommandRegistry();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-// 22 = 原 19 条 + mercury.hotkey.{register,unregister,list}：
-// 全局快捷键从宿主的类型契约转为本模块的命令面。
-Equal(22, commands.Count, "Command count");
+// 24 = 原 19 条 + mercury.hotkey.{register,unregister,list}
+// + mercury.shortcut.{open,add}。
+Equal(24, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -94,7 +94,17 @@ True(string.IsNullOrWhiteSpace(go.CommandClass), "mercury.go must be a classless
 True(go.RequiresUiThread, "mercury.go must execute on the UI thread.");
 True(go.Parameters.Any(parameter => parameter.Name == "domain" && !parameter.Required),
     "mercury.go must take an optional domain parameter so the bare form exits focus.");
+Equal("registry.domains", go.Annotations["completion.values.domain"],
+    "mercury.go domain candidates must be declared by registration metadata.");
 True(registry.TryGet("mercury.shortcut.wakeconsole", out _), "Wake-console orchestration command must be registered.");
+True(registry.TryGet("mercury.shortcut.open", out var openShortcut),
+    "Shortcut-open command must be registered.");
+True(registry.TryGet("mercury.shortcut.add", out var addShortcut),
+    "Shortcut-add command must be registered.");
+True(openShortcut.Parameters.Single() is { Name: "path", Required: true, Position: 0 },
+    "Shortcut-open path must be the unique positional parameter.");
+True(addShortcut.Parameters.Single() is { Name: "path", Required: true, Position: 0 },
+    "Shortcut-add path must be the unique positional parameter.");
 True(registry.TryGet("mercury.proj.pin", out var pin) && !pin.Readonly, "Project write command must be present.");
 True(registry.TryGet("mercury.usage.forget", out var forget) && forget.IsDangerous,
     "Usage reset must require confirmation.");
@@ -129,6 +139,79 @@ True(MercuryState.AddCommand("mercury.proj.list"), "Adding a dock command must s
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding the same dock command is idempotent.");
 Equal(1, MercuryState.CommandEntries.Count, "Dock command entries must deduplicate.");
 True(MercuryState.RemoveCommand("MERCURY.PROJ.LIST"), "Dock command removal must ignore case.");
+Equal(
+    "mercury.shortcut.open \"C:\\A  B.lnk\"",
+    MercuryState.NormalizeCommand("  mercury.shortcut.open   \"C:\\A  B.lnk\"  "),
+    "Command normalization must preserve consecutive whitespace inside quoted paths.");
+Equal(
+    "mercury.shortcut.open \"C:\\A\\\"  B.lnk\"",
+    MercuryState.NormalizeCommand("mercury.shortcut.open  \"C:\\A\\\"  B.lnk\""),
+    "An escaped quote must not end the quoted argument or collapse its spaces.");
+Equal(
+    "mercury.shortcut.open \"C:\\A\\\\\" B.lnk",
+    MercuryState.NormalizeCommand("mercury.shortcut.open  \"C:\\A\\\\\"  B.lnk"),
+    "An even backslash run must leave the following quote unescaped.");
+
+var shortcutTestRoot = Path.Combine(Path.GetTempPath(), "mercury-shortcut-command-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(shortcutTestRoot);
+try
+{
+    var target = Path.Combine(shortcutTestRoot, "target file.txt");
+    File.WriteAllText(target, "test");
+    True(ShortcutFileService.TryResolve(target, out var directSource, out var directTarget, out _),
+        "Direct files must resolve.");
+    Equal(Path.GetFullPath(target), directSource, "Direct source normalization");
+    Equal(Path.GetFullPath(target), directTarget, "Direct target normalization");
+
+    var link = Path.Combine(shortcutTestRoot, "Common Tool.lnk");
+    ShortcutFileService.WriteShortcut(link, target, "Smoke shortcut");
+    True(ShortcutFileService.TryResolve(link, out var linkSource, out var linkTarget, out var linkError),
+        $"Windows shortcut must resolve: {linkError}");
+    Equal(Path.GetFullPath(link), linkSource, "Shortcut source normalization");
+    Equal(Path.GetFullPath(target), linkTarget, "Shortcut target resolution");
+
+    var added = MercuryCommands.AddShortcut(link);
+    True(added.Success, added.Message);
+    var shortcutEntry = MercuryState.CommandEntries.Single();
+    Equal("Common Tool", shortcutEntry.Label, "Shortcut dock label");
+    Equal(MercuryCommandCatalog.BuildOpenShortcutCommand(link), shortcutEntry.Command,
+        "Shortcut dock command quotes the normalized source path.");
+    True(MercuryCommands.AddShortcut(link).Success, "Adding the same shortcut remains successful.");
+    Equal(1, MercuryState.CommandEntries.Count, "Shortcut dock entries must deduplicate.");
+    True(MercuryState.RemoveCommand(shortcutEntry.Command), "Shortcut test entry cleanup");
+
+    True(!ShortcutFileService.TryResolve(Path.Combine(shortcutTestRoot, "missing.txt"),
+            out _, out _, out var missingError)
+         && missingError.Contains("不存在", StringComparison.Ordinal),
+        "Missing shortcut sources return an explicit error.");
+
+    var missingTargetLink = Path.Combine(shortcutTestRoot, "Missing Target.lnk");
+    ShortcutFileService.WriteShortcut(
+        missingTargetLink,
+        Path.Combine(shortcutTestRoot, "missing-target.txt"),
+        "Missing target");
+    True(!ShortcutFileService.TryResolve(missingTargetLink, out _, out _, out var targetError)
+         && targetError.Contains("目标不存在", StringComparison.Ordinal),
+        "Shortcuts with missing targets return an explicit error.");
+
+    var previousVulcanExecutable = Environment.GetEnvironmentVariable("MERCURY_VULCAN_EXECUTABLE");
+    var fakeVulcan = Path.Combine(shortcutTestRoot, "HistoryVulcan.exe");
+    File.WriteAllBytes(fakeVulcan, []);
+    try
+    {
+        Environment.SetEnvironmentVariable("MERCURY_VULCAN_EXECUTABLE", fakeVulcan);
+        Equal(Path.GetFullPath(fakeVulcan), HistoryVulcanLauncher.ResolveExecutable(),
+            "HV cold-start fallback accepts only an explicit HistoryVulcan.exe.");
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("MERCURY_VULCAN_EXECUTABLE", previousVulcanExecutable);
+    }
+}
+finally
+{
+    Directory.Delete(shortcutTestRoot, recursive: true);
+}
 
 Equal("HistoryVulcan", MercuryPaths.HostName, "Host data root name");
 Equal(
@@ -309,7 +392,11 @@ var catalogue = new List<CommandCompletionDefinition>
     new("janus.proj.list", "列出项目", []),
     new("janus.proj.commit", "提交", [new ParameterSpec { Name = "name", Description = "项目名" }]),
     new("janus.gitrule.scan", "扫描规则", []),
-    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域", Position = 0 }]),
+    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域", Position = 0 }],
+        DynamicValueProviders: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["domain"] = "registry.domains",
+        }),
     new("vulcan.ui.reset", "重置布局", []),
 };
 
@@ -358,9 +445,34 @@ var positionalCatalogue = new List<CommandCompletionDefinition>
 var positional = completion.Complete("janus.app.mode ", 16, positionalCatalogue);
 True(Inserts(positional).SequenceEqual(["alpha", "beta"]),
     "Position=0 parameters use bare values without name=.");
+var projectDescriptors = MercuryCommandCatalog.CreateDescriptors()
+    .Where(command => command.Name.StartsWith("mercury.proj.", StringComparison.Ordinal)
+                      && command.Parameters.Any(parameter => parameter.Name == "name"))
+    .ToList();
+True(projectDescriptors.Count > 0
+     && projectDescriptors.All(command =>
+         command.Annotations.TryGetValue("completion.values.name", out var provider)
+         && provider == "mercury.projects"),
+    "Mercury project commands declare their common values through the mercury.projects provider.");
+var projectDefinition = CommandCatalogSession.CreateCompletionDefinition(openProject);
+True(projectDefinition.DynamicValues?.TryGetValue("name", out var projectValues) == true
+     && projectValues.SequenceEqual(MercuryState.ListWorktreeProjects()),
+    "The catalog session resolves mercury.projects into runtime worktree values.");
 var goDomains = completion.Complete("mercury.go ", 11, catalogue);
 True(Inserts(goDomains).SequenceEqual(["janus", "mercury", "vulcan"]),
     "mercury.go dynamically offers registered domains as bare positional values.");
+var undeclaredDynamicValues = completion.Complete(
+    "sample.go ",
+    10,
+    [new CommandCompletionDefinition("sample.go", "聚焦", [new ParameterSpec
+    {
+        Name = "domain",
+        Description = "域",
+        Position = 0,
+    }])]);
+True(undeclaredDynamicValues.Candidates.Count == 1
+     && undeclaredDynamicValues.Candidates[0].InsertText.Length == 0,
+    "Dynamic domains must not be inferred from a command name without provider metadata.");
 var freeTextPositional = completion.Complete(
     "janus.proj.open ",
     16,
@@ -393,6 +505,63 @@ True(Inserts(focusedMethods).SequenceEqual(["proj.commit ", "proj.list "]),
 var focusedParameters = completion.Complete("proj.commit ", 12, catalogue, "janus");
 True(Inserts(focusedParameters).SequenceEqual(["name="]),
     "Focused input resolves to the full command before reading its parameters.");
+Equal("mercury.go", CommandCompletionEngine.ResolveAgainstFocus("go", catalogue, "mercury"),
+    "Focused shorthand resolves to its full command before detail lookup.");
+
+// 远程目录回归：Mercury 聚焦状态下输入 go + 空格，详情查询必须是 mercury.go，
+// 不能请求不存在的 name=go；返回的目录注解继续驱动动态域候选。
+var remoteRows = new List<HistoryVulcan.Shell.Mcp.CommandCatalogRow>
+{
+    CatalogRow("mercury.go", "mercury", "域聚焦", ""),
+    CatalogRow("vulcan.app.show", "vulcan", "显示前端", "app"),
+};
+var remoteCalls = new List<string>();
+var remoteBus = new CommandBus(new CommandRegistry(), new NullShellLog())
+{
+    RemoteExecutor = (text, _, _) =>
+    {
+        remoteCalls.Add(text);
+        if (text == "vulcan.command.list")
+            return Task.FromResult(CommandResult.Ok(data: remoteRows));
+        if (text == "vulcan.command.domains")
+        {
+            IReadOnlyList<HistoryVulcan.Shell.Mcp.CommandDomainInfo> remoteDomains =
+            [
+                new("mercury", 1),
+                new("vulcan", 1),
+            ];
+            return Task.FromResult(CommandResult.Ok(data: remoteDomains));
+        }
+        if (text == "vulcan.command.show name=mercury.go")
+        {
+            var detail = new HistoryVulcan.Shell.Mcp.CommandCatalogDetail(
+                remoteRows[0],
+                [new HistoryVulcan.Shell.Mcp.CommandParameterInfo(
+                    "domain", "string", false, null, 0, [], "域")],
+                null)
+            {
+                Annotations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["completion.values.domain"] = "registry.domains",
+                },
+            };
+            return Task.FromResult(CommandResult.Ok(data: detail));
+        }
+        return Task.FromResult(CommandResult.Fail("unexpected: " + text));
+    },
+};
+using (var remoteSession = new CommandCatalogSession(remoteBus, new CommandSelectionState()))
+{
+    True(remoteSession.RefreshAsync().GetAwaiter().GetResult(), "Remote catalog snapshot must load.");
+    True(remoteSession.TrySetDomain("mercury", out _), "Remote Mercury focus must be accepted.");
+    var remoteGo = remoteSession.CompleteAsync("go ", 3).GetAwaiter().GetResult();
+    True(Inserts(remoteGo).SequenceEqual(["mercury", "vulcan"]),
+        "Remote command annotations drive mercury.go domain values.");
+}
+True(remoteCalls.Contains("vulcan.command.show name=mercury.go"),
+    "Focused go detail lookup must resolve to mercury.go.");
+True(!remoteCalls.Any(call => call.Contains("name=go", StringComparison.Ordinal)),
+    "Focused go completion must never request a nonexistent short command.");
 
 // 活动坞磁贴：底色随使用频率由纯白线性趋近柔和强调色，不再用光晕表达频率。
 Equal(0d, DockWeight.TileTint(0, 10), "Unused project keeps a plain white tile.");
@@ -423,6 +592,34 @@ static void Equal<T>(T expected, T actual, string message)
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
         throw new InvalidOperationException($"{message}: expected={expected}, actual={actual}");
 }
+
+static HistoryVulcan.Shell.Mcp.CommandCatalogRow CatalogRow(
+    string name,
+    string domain,
+    string summary,
+    string commandClass)
+    => new(
+        name,
+        domain,
+        summary,
+        null,
+        0,
+        "test",
+        null,
+        false,
+        false,
+        null,
+        "hidden",
+        false,
+        false,
+        null,
+        0,
+        0,
+        null)
+    {
+        CommandClass = commandClass,
+        Method = name[(name.LastIndexOf('.') + 1)..],
+    };
 
 file sealed class NullShellLog : HistoryVulcan.Core.Logging.IShellLog
 {

@@ -519,6 +519,20 @@ public static class MercuryManagerView
 
             IReadOnlyList<CommandCatalogItem> items = [];
             var bus = MercuryUiModule.Bus;
+            var session = MercuryUiModule.CatalogSession;
+            if (session != null)
+            {
+                try
+                {
+                    var definitions = await session.CompletionDefinitionsAsync().ConfigureAwait(false);
+                    await Dispatcher.BeginInvoke(() => _completionDefinitions = definitions);
+                    return;
+                }
+                catch (Exception)
+                {
+                    // Fall through to the lightweight catalog and local fallback.
+                }
+            }
             if (bus != null)
             {
                 try
@@ -546,67 +560,28 @@ public static class MercuryManagerView
                             MercuryCommandCatalog.ProjectOpenCommandName, StringComparison.OrdinalIgnoreCase)))
                         .ToList();
                 }
+                var localDefinitions = MercuryCommandCatalog.CreateDescriptors()
+                    .Select(CommandCatalogSession.CreateCompletionDefinition)
+                    .ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
                 _completionDefinitions = items
-                    .Select(item => new CommandCompletionDefinition(item.Name, item.Summary, []))
+                    .Select(item => localDefinitions.GetValueOrDefault(item.Name)
+                        ?? new CommandCompletionDefinition(item.Name, item.Summary, []))
                     .ToList();
             });
         }
 
         /// <summary>
-        /// 单行候选：首个空格之前是指令（域→类→方法级联），空格之后是参数。
-        /// 打开项目指令的参数候选为工作树未入坞项目（排除项标注排前），其他指令参数自由输入。
+        /// 单行候选统一由命令目录元数据驱动，按域→类→方法→参数级联。
         /// </summary>
         private IReadOnlyList<SuggestOption> EntryOptions(string text)
         {
-            var spaceIndex = text.IndexOf(' ');
-            if (spaceIndex < 0)
-            {
-                var result = _completion.Complete(text, text.Length, _completionDefinitions);
-                return result.Candidates
-                    .Select(candidate => new SuggestOption(
-                        ApplyCompletion(text, result, candidate),
-                        candidate.DisplayText,
-                        candidate.Description,
-                        IsBranchCandidate(candidate)))
-                    .ToList();
-            }
-
-            var command = text[..spaceIndex].Trim();
-            var fragment = text[(spaceIndex + 1)..].Trim();
-            if (command.Length == 0)
-                return [];
-
-            if (!IsOpenProjectCommand(command))
-            {
-                var result = _completion.Complete(text, text.Length, _completionDefinitions);
-                return result.Candidates
-                    .Select(candidate => new SuggestOption(
-                        ApplyCompletion(text, result, candidate),
-                        candidate.DisplayText,
-                        candidate.Description,
-                        IsBranchCandidate(candidate)))
-                    .ToList();
-            }
-
-            var docked = MercuryState.Projects
-                .Select(item => item.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var excluded = MercuryState.AllProjects
-                .Where(item => item.Excluded)
-                .Select(item => item.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return MercuryState.ListWorktreeProjects()
-                .Where(name => !docked.Contains(name))
-                .Where(name => fragment.Length == 0
-                    || name.Contains(fragment, StringComparison.OrdinalIgnoreCase))
-                .Select(name => (Name: name, Excluded: excluded.Contains(name)))
-                .OrderByDescending(candidate => candidate.Excluded)
-                .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+            var result = _completion.Complete(text, text.Length, _completionDefinitions);
+            return result.Candidates
                 .Select(candidate => new SuggestOption(
-                    command + " " + HistoryVulcan.Core.Commands.CommandParser.QuoteArg(candidate.Name),
-                    candidate.Name,
-                    candidate.Excluded ? "已排除，加入即找回" : null,
-                    false))
+                    ApplyCompletion(text, result, candidate),
+                    candidate.DisplayText,
+                    candidate.Description,
+                    IsBranchCandidate(candidate)))
                 .ToList();
         }
 
@@ -640,7 +615,12 @@ public static class MercuryManagerView
             var bareArgument = argument.Length > 1 && argument.StartsWith('"') && argument.EndsWith('"')
                 ? argument[1..^1]
                 : argument;
-            if (IsOpenProjectCommand(command)
+            var definition = _completionDefinitions.FirstOrDefault(item =>
+                item.Name.Equals(command, StringComparison.OrdinalIgnoreCase));
+            var isProjectEntry = definition?.Annotations?.TryGetValue(
+                "mercury.dock.entry.kind", out var entryKind) == true
+                && entryKind.Equals("project", StringComparison.OrdinalIgnoreCase);
+            if (isProjectEntry
                 && bareArgument.Length > 0
                 && MercuryState.AddToDock(bareArgument))
             {
@@ -662,12 +642,6 @@ public static class MercuryManagerView
                 SetStatus("指令为空，未加入");
             }
         }
-
-        private static bool IsOpenProjectCommand(string? command)
-            => string.Equals(
-                command?.Trim(),
-                MercuryCommandCatalog.ProjectOpenCommandName,
-                StringComparison.OrdinalIgnoreCase);
 
         private void SetStatus(string text) => _status.Text = text;
 

@@ -1,7 +1,4 @@
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
 
 namespace Mercury;
 
@@ -115,14 +112,12 @@ public static class DockShortcutFolder
     }
 
     private static void WriteShortcut(string linkPath, DockProject project)
-    {
-        var shellLink = (IShellLinkW)new ShellLink();
-        shellLink.SetPath(project.Path);
-        shellLink.SetWorkingDirectory(project.Path);
-        shellLink.SetDescription(project.Name);
-        shellLink.SetIconLocation("%SystemRoot%\\System32\\shell32.dll", 3);
-        ((IPersistFile)shellLink).Save(linkPath, true);
-    }
+        => ShortcutFileService.WriteShortcut(
+            linkPath,
+            project.Path,
+            project.Name,
+            "%SystemRoot%\\System32\\shell32.dll",
+            3);
 
     private static void ScheduleReconcile()
     {
@@ -192,24 +187,8 @@ public static class DockShortcutFolder
             return links;
 
         foreach (var linkPath in Directory.EnumerateFiles(folder, "*.lnk", SearchOption.TopDirectoryOnly))
-            links[linkPath] = ReadShortcutTarget(linkPath);
+            links[linkPath] = ShortcutFileService.ReadShortcutTarget(linkPath);
         return links;
-    }
-
-    private static string ReadShortcutTarget(string linkPath)
-    {
-        try
-        {
-            var shellLink = (IShellLinkW)new ShellLink();
-            ((IPersistFile)shellLink).Load(linkPath, 0);
-            var target = new StringBuilder(32768);
-            shellLink.GetPath(target, target.Capacity, nint.Zero, 0);
-            return target.Length == 0 ? string.Empty : System.IO.Path.GetFullPath(target.ToString());
-        }
-        catch (Exception)
-        {
-            return string.Empty;
-        }
     }
 
     public readonly record struct ShortcutSyncResult(string Folder, int Written, int Removed);
@@ -221,34 +200,4 @@ public static class DockShortcutFolder
         public bool HasChanges => RemovedTargets.Count != 0 || AddedTargets.Count != 0;
     }
 
-    [ComImport]
-    [Guid("00021401-0000-0000-C000-000000000046")]
-    private class ShellLink
-    {
-    }
-
-    [ComImport]
-    [Guid("000214F9-0000-0000-C000-000000000046")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IShellLinkW
-    {
-        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder file, int fileLength, nint findData, uint flags);
-        void GetIDList(out nint itemIdList);
-        void SetIDList(nint itemIdList);
-        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder name, int maxPath);
-        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string name);
-        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder directory, int maxPath);
-        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string directory);
-        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder arguments, int maxPath);
-        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string arguments);
-        ushort GetHotkey();
-        void SetHotkey(ushort hotkey);
-        int GetShowCmd();
-        void SetShowCmd(int showCommand);
-        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder iconPath, int iconPathLength, out int iconIndex);
-        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string iconPath, int iconIndex);
-        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pathRelative, uint reserved);
-        void Resolve(nint hwnd, uint flags);
-        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string file);
-    }
 }

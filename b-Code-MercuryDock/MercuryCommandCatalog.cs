@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using System.Text.Json;
 using HistoryVulcan.Core.Commands;
 
@@ -7,6 +8,7 @@ namespace Mercury;
 internal static class MercuryCommandCatalog
 {
     public const string ProjectOpenCommandName = "mercury.proj.open";
+    public const string ShortcutOpenCommandName = "mercury.shortcut.open";
 
     public static void Register(CommandRegistry registry)
     {
@@ -16,6 +18,9 @@ internal static class MercuryCommandCatalog
 
     public static string BuildOpenProjectCommand(string nameOrNumber)
         => ProjectOpenCommandName + " " + CommandParser.QuoteArg(nameOrNumber.Trim());
+
+    public static string BuildOpenShortcutCommand(string path)
+        => ShortcutOpenCommandName + " " + CommandParser.QuoteArg(Path.GetFullPath(path.Trim()));
 
     public static IReadOnlyList<CommandCatalogItem> FallbackCommandCatalog()
         => CreateDescriptors()
@@ -55,37 +60,47 @@ internal static class MercuryCommandCatalog
         return [];
     }
 
-    private static IReadOnlyList<CommandDescriptor> CreateDescriptors() =>
+    internal static IReadOnlyList<CommandDescriptor> CreateDescriptors() =>
     [
         // mercury.go 是本域的无类直接方法（两段名）：它切换的是控制台的域聚焦，
         // 不隶属任何业务类。因为首段 mercury 是已注册域，聚焦到任何域时都能直接输入，
         // 所以各域都不必自备「退出聚焦」指令。
-        Direct("mercury.go", "聚焦到指定指令域；省略 domain 则退出聚焦。",
-            context => MercuryCommands.Go(context.GetString("domain")),
-            true,
-            DomainParameter()),
+        new CommandDescriptor
+        {
+            Name = "mercury.go",
+            Summary = "聚焦到指定指令域；省略 domain 则退出聚焦。",
+            RequiresUiThread = true,
+            Parameters = [DomainParameter()],
+            Annotations = CompletionProvider("domain", "registry.domains"),
+            Handler = CommandDescriptor.Sync(context =>
+                CommandResult.Ok(MercuryCommands.Go(context.GetString("domain")))),
+        },
         Readonly("mercury.app.status", "app", "查看托管的资源管理器入口状态。",
             _ => MercuryCommands.Status()),
         Async("mercury.shortcut.wakeconsole", "shortcut", "兼容入口：调用 Vulcan 语义命令唤出并聚焦控制台。",
             async _ => await MercuryCommands.WakeConsoleAsync().ConfigureAwait(false)),
+        Result("mercury.shortcut.open", "shortcut", "打开快捷文件、普通文件或目录。",
+            context => MercuryCommands.OpenShortcut(context.GetString("path")), ShortcutPathParameter()),
+        Result("mercury.shortcut.add", "shortcut", "把快捷文件注册为扩展坞常驻项。",
+            context => MercuryCommands.AddShortcut(context.GetString("path")), ShortcutPathParameter()),
         Write("mercury.explorer.register", "explorer", "注册托管的资源管理器入口。",
             _ => MercuryCommands.RegisterExplorer()),
         Write("mercury.explorer.remove", "explorer", "移除托管的资源管理器入口。",
             _ => MercuryCommands.RemoveExplorer(), "确定移除托管的资源管理器入口？"),
         Readonly("mercury.proj.list", "proj", "列出活动项目。",
             _ => MercuryCommands.ListProjects()),
-        Write("mercury.proj.pin", "proj", "置顶活动项目。",
-            context => MercuryCommands.PinProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.unpin", "proj", "取消置顶活动项目。",
-            context => MercuryCommands.UnpinProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.add", "proj", "添加并置顶项目。",
-            context => MercuryCommands.AddProject(context.RequireString("name")), NameParameter()),
+        ProjectWrite("mercury.proj.pin", "置顶活动项目。",
+            context => MercuryCommands.PinProject(context.RequireString("name"))),
+        ProjectWrite("mercury.proj.unpin", "取消置顶活动项目。",
+            context => MercuryCommands.UnpinProject(context.RequireString("name"))),
+        ProjectWrite("mercury.proj.add", "添加并置顶项目。",
+            context => MercuryCommands.AddProject(context.RequireString("name"))),
         Async("mercury.proj.refresh", "proj", "重新扫描活动项目。",
             async _ => await MercuryCommands.RefreshProjectsAsync().ConfigureAwait(false)),
-        Write("mercury.proj.exclude", "proj", "从项目坞排除项目。",
-            context => MercuryCommands.ExcludeProject(context.RequireString("name")), NameParameter()),
-        Write("mercury.proj.include", "proj", "将项目重新纳入项目坞。",
-            context => MercuryCommands.IncludeProject(context.RequireString("name")), NameParameter()),
+        ProjectWrite("mercury.proj.exclude", "从项目坞排除项目。",
+            context => MercuryCommands.ExcludeProject(context.RequireString("name"))),
+        ProjectWrite("mercury.proj.include", "将项目重新纳入项目坞。",
+            context => MercuryCommands.IncludeProject(context.RequireString("name"))),
         new CommandDescriptor
         {
             Name = ProjectOpenCommandName,
@@ -93,6 +108,7 @@ internal static class MercuryCommandCatalog
             Summary = "打开项目目录。",
             Example = "mercury.proj.open 2026-021-HistoryMercury",
             Parameters = [NameParameter()],
+            Annotations = ProjectCompletionProvider(includeDockEntryKind: true),
             Handler = CommandDescriptor.Sync(context => MercuryCommands.OpenProject(context.GetString("name"))),
         },
         Write("mercury.dock.hide", "dock", "隐藏项目坞。", _ => MercuryCommands.HideDock()),
@@ -103,7 +119,8 @@ internal static class MercuryCommandCatalog
                 context.Has("max") ? context.GetInt("max") : null,
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
             OptionalIntParameter("min"), OptionalIntParameter("max"), OptionalDoubleParameter("halflife")),
-        Write("mercury.app.open", "app", "打开 HistoryVulcan。", _ => MercuryCommands.OpenHost()),
+        Async("mercury.app.open", "app", "显示或启动 HistoryVulcan 前端。",
+            async _ => await MercuryCommands.ShowHostAsync().ConfigureAwait(false)),
         Readonly("mercury.usage.list", "usage", "列出项目使用记录。", _ => MercuryCommands.ListUsage()),
         Write("mercury.usage.forget", "usage", "清除项目使用历史。",
             context => MercuryCommands.ForgetUsage(context.GetString("name")), "确定清除所选使用历史？", OptionalNameParameter()),
@@ -205,6 +222,45 @@ internal static class MercuryCommandCatalog
         Position = 0,
     };
 
+    private static ParameterSpec ShortcutPathParameter() => new()
+    {
+        Name = "path",
+        Description = "快捷文件、普通文件或目录路径。",
+        Required = true,
+        Position = 0,
+    };
+
+    private static IReadOnlyDictionary<string, string> CompletionProvider(string parameter, string provider)
+        => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [$"completion.values.{parameter}"] = provider,
+        };
+
+    private static IReadOnlyDictionary<string, string> ProjectCompletionProvider(bool includeDockEntryKind = false)
+    {
+        var annotations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["completion.values.name"] = "mercury.projects",
+        };
+        if (includeDockEntryKind)
+            annotations["mercury.dock.entry.kind"] = "project";
+        return annotations;
+    }
+
+    private static CommandDescriptor ProjectWrite(
+        string name,
+        string summary,
+        Func<CommandContext, string> handler)
+        => new()
+        {
+            Name = name,
+            CommandClass = "proj",
+            Summary = summary,
+            Parameters = [NameParameter()],
+            Annotations = ProjectCompletionProvider(),
+            Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
+        };
+
     private static CommandDescriptor Readonly(string name, string commandClass, string summary, Func<CommandContext, object?> handler)
         => new()
         {
@@ -239,6 +295,21 @@ internal static class MercuryCommandCatalog
             ConfirmPrompt = confirm == null ? null : _ => confirm,
             Dangerous = confirm != null,
             Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
+        };
+
+    private static CommandDescriptor Result(
+        string name,
+        string commandClass,
+        string summary,
+        Func<CommandContext, CommandResult> handler,
+        params ParameterSpec[] parameters)
+        => new()
+        {
+            Name = name,
+            CommandClass = commandClass,
+            Summary = summary,
+            Parameters = parameters,
+            Handler = context => Task.FromResult(handler(context)),
         };
 
     private static CommandDescriptor Async(string name, string commandClass, string summary, Func<CommandContext, Task<object?>> handler)

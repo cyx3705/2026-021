@@ -12,6 +12,12 @@ namespace Mercury.CommandSurface;
 /// </summary>
 public sealed class CommandCatalogSession : ICommandCatalogSession
 {
+    private static readonly IReadOnlyDictionary<string, Func<IReadOnlyList<string>>> DynamicProviders =
+        new Dictionary<string, Func<IReadOnlyList<string>>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["mercury.projects"] = MercuryState.ListWorktreeProjects,
+        };
+
     private readonly CommandBus _bus;
     private readonly CommandSelectionState _selection;
     private readonly CommandCompletionEngine _completion = new();
@@ -223,7 +229,25 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
 
         var commandName = CommandCompletionEngine.CommandNameBeforeCurrentToken(text, caretIndex);
         if (commandName != null)
-            await EnsureDetailAsync(commandName, cancellationToken).ConfigureAwait(false);
+        {
+            string? lookupFocusedDomain;
+            IReadOnlyList<CommandCompletionDefinition> lookupDefinitions;
+            lock (_gate)
+            {
+                lookupFocusedDomain = _filter.Domain;
+                lookupDefinitions = _allRows.Select(row =>
+                {
+                    if (_details.TryGetValue(row.CommandName, out var detail))
+                        return Definition(detail);
+                    if (_bus.Registry.TryGet(row.CommandName, out var localDescriptor))
+                        return CreateCompletionDefinition(localDescriptor);
+                    return new CommandCompletionDefinition(row.CommandName, row.Summary, []);
+                }).ToList();
+            }
+            var resolved = CommandCompletionEngine.ResolveAgainstFocus(
+                commandName, lookupDefinitions, lookupFocusedDomain);
+            await EnsureDetailAsync(resolved, cancellationToken).ConfigureAwait(false);
+        }
 
         IReadOnlyList<CommandCompletionDefinition> definitions;
         string focusedDomain;
@@ -235,9 +259,12 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
             definitions = _allRows.Select(row =>
             {
                 if (_details.TryGetValue(row.CommandName, out var detail))
-                    return Definition(detail);
-                if (_bus.Registry.TryGet(row.CommandName, out var local))
-                    return Definition(local);
+                {
+                    _bus.Registry.TryGet(row.CommandName, out var localDescriptor);
+                    return Definition(detail, localDescriptor);
+                }
+                if (_bus.Registry.TryGet(row.CommandName, out var localOnly))
+                    return CreateCompletionDefinition(localOnly);
                 return new CommandCompletionDefinition(row.CommandName, row.Summary, []);
             }).ToList();
             focusedDomain = _filter.Domain;
@@ -253,6 +280,33 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
         await EnsureDetailAsync(commandName, cancellationToken).ConfigureAwait(false);
         lock (_gate)
             return _details.GetValueOrDefault(commandName);
+    }
+
+    internal async Task<IReadOnlyList<CommandCompletionDefinition>> CompletionDefinitionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await RefreshAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        List<string> names;
+        lock (_gate)
+            names = _allRows.Select(row => row.CommandName).ToList();
+
+        foreach (var name in names)
+            await EnsureDetailAsync(name, cancellationToken).ConfigureAwait(false);
+
+        lock (_gate)
+        {
+            return _allRows.Select(row =>
+            {
+                if (_details.TryGetValue(row.CommandName, out var detail))
+                {
+                    _bus.Registry.TryGet(row.CommandName, out var local);
+                    return Definition(detail, local);
+                }
+                if (_bus.Registry.TryGet(row.CommandName, out var localOnly))
+                    return CreateCompletionDefinition(localOnly);
+                return new CommandCompletionDefinition(row.CommandName, row.Summary, []);
+            }).ToList();
+        }
     }
 
     private async Task EnsureDetailAsync(string commandName, CancellationToken cancellationToken)
@@ -439,11 +493,25 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
         RaiseChanged(CommandCatalogChangeKind.Invalidated);
     }
 
-    private static CommandCompletionDefinition Definition(CommandDescriptor descriptor)
-        => new(descriptor.Name, descriptor.Summary, descriptor.Parameters);
+    internal static CommandCompletionDefinition CreateCompletionDefinition(CommandDescriptor descriptor)
+    {
+        var providers = DynamicValueProviders(descriptor.Annotations);
+        return new(
+            descriptor.Name,
+            descriptor.Summary,
+            descriptor.Parameters,
+            DynamicValues: DynamicValues(providers),
+            DynamicValueProviders: providers,
+            Annotations: descriptor.Annotations);
+    }
 
-    private static CommandCompletionDefinition Definition(CommandCatalogDetail detail)
-        => new(
+    private static CommandCompletionDefinition Definition(
+        CommandCatalogDetail detail,
+        CommandDescriptor? local = null)
+    {
+        var annotations = MergeAnnotations(detail.Annotations, local?.Annotations);
+        var providers = DynamicValueProviders(annotations);
+        return new(
             detail.Command.CommandName,
             detail.Command.Summary,
             detail.Parameters.Select(parameter => new ParameterSpec
@@ -457,7 +525,52 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
                 Default = parameter.Default,
                 Position = parameter.Position,
                 AllowedValues = parameter.AllowedValues.ToArray(),
-            }).ToList());
+            }).ToList(),
+            DynamicValues: DynamicValues(providers),
+            DynamicValueProviders: providers,
+            Annotations: annotations);
+    }
+
+    private static IReadOnlyDictionary<string, string> MergeAnnotations(
+        IReadOnlyDictionary<string, string>? catalog,
+        IReadOnlyDictionary<string, string>? local)
+    {
+        var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (catalog != null)
+        {
+            foreach (var item in catalog)
+                merged[item.Key] = item.Value;
+        }
+        if (local != null)
+        {
+            foreach (var item in local)
+                merged[item.Key] = item.Value;
+        }
+        return merged;
+    }
+
+    private static IReadOnlyDictionary<string, string> DynamicValueProviders(
+        IReadOnlyDictionary<string, string>? annotations)
+        => annotations == null
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : annotations
+                .Where(item => item.Key.StartsWith("completion.values.", StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(
+                    item => item.Key["completion.values.".Length..],
+                    item => item.Value,
+                    StringComparer.OrdinalIgnoreCase);
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> DynamicValues(
+        IReadOnlyDictionary<string, string> providers)
+    {
+        var values = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in providers)
+        {
+            if (DynamicProviders.TryGetValue(item.Value, out var provide))
+                values[item.Key] = provide();
+        }
+        return values;
+    }
 
     private CommandCatalogDetail Detail(CommandDescriptor descriptor)
         => new(
@@ -491,7 +604,10 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
                 parameter.Position,
                 parameter.AllowedValues ?? [],
                 parameter.Description)).ToList(),
-            null);
+            null)
+        {
+            Annotations = descriptor.Annotations,
+        };
 
     private void RaiseChanged(CommandCatalogChangeKind kind)
     {

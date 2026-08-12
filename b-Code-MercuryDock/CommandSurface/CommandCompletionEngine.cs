@@ -9,7 +9,9 @@ internal sealed record CommandCompletionDefinition(
     string Name,
     string Summary,
     IReadOnlyList<ParameterSpec> Parameters,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? DynamicValues = null);
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? DynamicValues = null,
+    IReadOnlyDictionary<string, string>? DynamicValueProviders = null,
+    IReadOnlyDictionary<string, string>? Annotations = null);
 
 /// <summary>为控制台输入提供命令、参数名和允许值候选；不执行命令也不改变注册表。</summary>
 internal sealed class CommandCompletionEngine
@@ -276,7 +278,7 @@ internal sealed class CommandCompletionEngine
     /// 把用户输入的命令名按域聚焦规则还原成完整名：首段命中已注册域则原样，否则补聚焦域前缀。
     /// 与宿主 <c>DomainFocus.Resolve</c> 同一条规则，此处只对单个命令名生效。
     /// </summary>
-    private static string ResolveAgainstFocus(
+    internal static string ResolveAgainstFocus(
         string commandName,
         IReadOnlyList<CommandCompletionDefinition> definitions,
         string? focusedDomain)
@@ -341,9 +343,8 @@ internal sealed class CommandCompletionEngine
         if (parameter.AllowedValues is { Length: > 0 } values)
             return values;
 
-        // mercury.go is the one semantic parameter whose values are the live command domains.
-        if (command.Name.Equals("mercury.go", StringComparison.OrdinalIgnoreCase)
-            && parameter.Name.Equals("domain", StringComparison.OrdinalIgnoreCase))
+        if (command.DynamicValueProviders?.TryGetValue(parameter.Name, out var provider) == true
+            && provider.Equals("registry.domains", StringComparison.OrdinalIgnoreCase))
         {
             return definitions
                 .Select(item => Segment(item.Name, 0))
@@ -356,7 +357,10 @@ internal sealed class CommandCompletionEngine
     }
 
     private static bool Matches(string value, string filter)
-        => filter.Length == 0 || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
+        => filter.Length == 0
+           || value.Equals(filter, StringComparison.OrdinalIgnoreCase)
+           || value.StartsWith(filter, StringComparison.OrdinalIgnoreCase)
+           || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
 
     private static int MatchRank(string value, string filter)
     {

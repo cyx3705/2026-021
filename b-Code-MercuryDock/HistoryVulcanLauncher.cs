@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
+using HistoryVulcan.Core.Commands;
 
 namespace Mercury;
 
@@ -7,15 +9,14 @@ namespace Mercury;
 internal static class HistoryVulcanLauncher
 {
     private const int ShowRestore = 9;
+    private const string ExecutableName = "HistoryVulcan.exe";
 
-    /// <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
-    public static bool Open(string? arguments = null)
+    public static CommandResult Open(string arguments = "--show")
     {
-        var current = Process.GetCurrentProcess();
         Process[] peers;
         try
         {
-            peers = Process.GetProcessesByName(current.ProcessName);
+            peers = Process.GetProcessesByName("HistoryVulcan");
         }
         catch (Exception)
         {
@@ -26,7 +27,7 @@ internal static class HistoryVulcanLauncher
         {
             try
             {
-                if (peer.Id == current.Id)
+                if (peer.Id == Environment.ProcessId)
                     continue;
                 var window = peer.MainWindowHandle;
                 if (window == IntPtr.Zero)
@@ -34,7 +35,7 @@ internal static class HistoryVulcanLauncher
                 if (IsIconic(window))
                     ShowWindow(window, ShowRestore);
                 SetForegroundWindow(window);
-                return true;
+                return CommandResult.Ok("已激活正在运行的 HistoryVulcan 前端。");
             }
             catch (Exception)
             {
@@ -42,24 +43,76 @@ internal static class HistoryVulcanLauncher
             }
         }
 
-        var executable = Environment.ProcessPath;
-        if (string.IsNullOrWhiteSpace(executable))
-            return false;
+        var executable = ResolveExecutable();
+        if (executable == null)
+            return CommandResult.Fail("找不到正式 HistoryVulcan.exe，无法启动前端。");
 
         try
         {
             Process.Start(new ProcessStartInfo(executable)
             {
                 UseShellExecute = true,
-                Arguments = arguments ?? string.Empty,
+                Arguments = arguments,
             });
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return CommandResult.Fail($"启动 HistoryVulcan 前端失败：{ex.Message}");
+        }
+
+        return CommandResult.Ok("HistoryVulcan 前端正在启动。");
+    }
+
+    internal static string? ResolveExecutable()
+    {
+        var candidates = new List<string?>
+        {
+            Environment.GetEnvironmentVariable("MERCURY_VULCAN_EXECUTABLE"),
+            Path.Combine(AppContext.BaseDirectory, ExecutableName),
+            Environment.ProcessPath,
+        };
+
+        var assemblyDirectory = Path.GetDirectoryName(typeof(HistoryVulcanLauncher).Assembly.Location);
+        if (!string.IsNullOrWhiteSpace(assemblyDirectory))
+            candidates.Add(Path.Combine(assemblyDirectory, ExecutableName));
+
+        foreach (var root in Ancestors(Environment.CurrentDirectory)
+                     .Concat(Ancestors(assemblyDirectory)))
+        {
+            candidates.Add(Path.Combine(
+                root,
+                "2026-023-HistoryVulcan",
+                "z-HistoryVulcan",
+                "host",
+                ExecutableName));
+        }
+
+        return candidates
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.GetFullPath(path!))
+            .FirstOrDefault(path =>
+                Path.GetFileName(path).Equals(ExecutableName, StringComparison.OrdinalIgnoreCase)
+                && File.Exists(path));
+    }
+
+    private static IEnumerable<string> Ancestors(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            yield break;
+        DirectoryInfo? current;
+        try
+        {
+            current = new DirectoryInfo(Path.GetFullPath(path));
         }
         catch (Exception)
         {
-            return false;
+            yield break;
         }
-
-        return false;
+        while (current != null)
+        {
+            yield return current.FullName;
+            current = current.Parent;
+        }
     }
 
     [DllImport("user32.dll")]

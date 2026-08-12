@@ -356,7 +356,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 HorizontalAlignment = HorizontalAlignment.Center,
             });
             var button = NakedButton(stack, "打开 HistoryVulcan 主界面");
-            button.Click += (_, _) => HistoryVulcanLauncher.Open();
+            button.Click += async (_, _) => await MercuryCommands.ShowHostAsync();
             return button;
         }
 
@@ -442,7 +442,8 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Label,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextTrimming = TextTrimming.None,
+                TextWrapping = TextWrapping.NoWrap,
             });
             var button = NakedButton(stack, entry.Command);
             button.Click += (_, _) =>

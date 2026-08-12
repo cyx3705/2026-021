@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.IO;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Extensibility.Commands;
 
@@ -65,8 +66,20 @@ public static class MercuryCommands
         return "项目坞已显示。";
     }
 
-    public static string OpenHost()
-        => HistoryVulcanLauncher.Open() ? "已激活正在运行的 HistoryVulcan 窗口。" : "已启动 HistoryVulcan。";
+    public static async Task<CommandResult> ShowHostAsync()
+    {
+        var bus = MercuryUiModule.Bus;
+        if (bus != null)
+        {
+            var result = await bus.ExecuteAsync("vulcan.app.show", "Mercury").ConfigureAwait(false);
+            if (result.Success)
+                return CommandResult.Ok(IsFrontendStarting(result)
+                    ? "HistoryVulcan 前端正在启动。"
+                    : "已显示 HistoryVulcan 前端。");
+        }
+
+        return HistoryVulcanLauncher.Open();
+    }
 
     public static async Task<CommandResult> WakeConsoleAsync()
     {
@@ -86,6 +99,21 @@ public static class MercuryCommands
     private static bool IsFrontendStarting(CommandResult result)
         => result.Success
            && result.Message.Contains("前端正在启动", StringComparison.Ordinal);
+
+    public static CommandResult OpenShortcut(string? path)
+        => ShortcutFileService.Open(path);
+
+    public static CommandResult AddShortcut(string? path)
+    {
+        if (!ShortcutFileService.TryResolve(path, out var source, out _, out var error))
+            return CommandResult.Fail(error);
+
+        var command = MercuryCommandCatalog.BuildOpenShortcutCommand(source);
+        var label = Path.GetFileNameWithoutExtension(source);
+        if (!MercuryState.AddCommand(command, label))
+            return CommandResult.Fail("快捷文件路径为空，未加入扩展坞。");
+        return CommandResult.Ok($"已将快捷文件加入扩展坞：{label}。");
+    }
 
     public static IReadOnlyList<DockUsageRow> ListUsage()
         => MercuryState.Projects
