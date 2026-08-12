@@ -2,6 +2,8 @@
 
 HistoryMercury owns the HistoryVulcan desktop project dock and Explorer entry for the `HistoryVesta` project library.
 
+Current source and formal snapshot: `4.3.1`. The patch fixes focused-domain class completion so a short class token continues to registered methods and their declared parameter candidates.
+
 The module is developed in `b-Code-MercuryDock`. Its code namespace and command domain are `Mercury`; its module identity, assembly and consumer snapshot are `HistoryMercury`, `HistoryMercury.dll` and `z-HistoryMercury`.
 
 ## Commands

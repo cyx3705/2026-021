@@ -385,6 +385,10 @@ True(Inserts(focused).Take(2).SequenceEqual(["gitrule.", "proj."]),
 True(Inserts(focused).Contains("mercury."),
     "Other registered domains stay reachable while focused, so focus can always be left.");
 
+var focusedMethods = completion.Complete("proj.", 5, catalogue, "janus");
+True(Inserts(focusedMethods).SequenceEqual(["proj.commit ", "proj.list "]),
+    "Focused class input advances to methods without duplicating the domain prefix.");
+
 // 聚焦时省略域前缀后，参数段仍要能解析到正确的命令。
 var focusedParameters = completion.Complete("proj.commit ", 12, catalogue, "janus");
 True(Inserts(focusedParameters).SequenceEqual(["name="]),

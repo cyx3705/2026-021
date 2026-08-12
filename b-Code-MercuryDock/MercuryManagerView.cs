@@ -510,7 +510,7 @@ public static class MercuryManagerView
             }
         }
 
-        /// <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
+        /// <summary>指令候选：服务侧全量清单（vulcan.command.list），失败回退本模块静态清单。</summary>
         private async Task LoadCommandCatalogAsync()
         {
             if (_commandsLoaded)
@@ -523,7 +523,7 @@ public static class MercuryManagerView
             {
                 try
                 {
-                    var result = await bus.ExecuteAsync("command.list", "UI").ConfigureAwait(false);
+                    var result = await bus.ExecuteAsync("vulcan.command.list", "UI").ConfigureAwait(false);
                     if (result.Success)
                         items = MercuryCommandCatalog.ParseCommandCatalog(result.Data);
                 }
