@@ -3,7 +3,7 @@
   "type": "HistoryVulcan.Module",
   "name": "HistoryMercury",
   "version": "4.3.1",
-  "description": "HistoryVesta 活动项目坞与资源管理器项目入口。",
+  "description": "活动项目坞、快捷键与命令工作台",
   "artifact": "HistoryMercury.dll",
   "docs": "HistoryMercury.xml",
   "mcpExposure": "standard",

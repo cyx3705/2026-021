@@ -7,7 +7,7 @@ public sealed class ModuleInfo : ModuleInfoBase
 {
     public override string ModuleName => "HistoryMercury";
     public string CommandPrefix => "mercury";
-    public override string Description => "活动项目坞与资源管理器 HistoryVesta 项目入口";
+    public override string Description => "活动项目坞、快捷键与命令工作台";
     public override string Author => "OneHistory";
 
     /// <summary>
