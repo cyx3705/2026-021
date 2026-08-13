@@ -393,47 +393,18 @@
             </summary>
             <param name="domain">要聚焦的域；空表示退出聚焦。</param>
         </member>
+        <member name="T:Mercury.MercuryManagerPage">
+            <summary>
+            MercuryManagerPage
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerPage.InitializeComponent">
+            <summary>
+            InitializeComponent
+            </summary>
+        </member>
         <member name="T:Mercury.MercuryManagerView">
-            <summary>
-            扩展坞管理页面，默认注册为中央主文档区页签。
-            </summary>
-            <remarks>
-            管理页与桌面坞都运行在桌面 Shell 进程；mercury 三段式指令注册在服务进程，
-            经总线远程转发透明执行。所有状态写操作落到 state.json，由
-            <see cref="M:Mercury.MercuryState.StartWatching"/> 的文件监视完成跨进程同步。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildRowStyle">
-            <summary>
-            表格正文字号 Small、行距 Padding(4,1)，比命令集默认 Body/(8,4) 更紧；
-            自绘选中模板保留淡黄底深字。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildHeaderStyle">
-            <summary>紧凑表头：Small 字号、高 20。</summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildPinTemplate">
-            <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.Reload">
-            <summary>列表只显示已入坞的条目：项目（固定+策略选中）加手动指令项。</summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.LoadCommandCatalogAsync">
-            <summary>指令候选：服务侧全量清单（vulcan.command.list），失败回退本模块静态清单。</summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.EntryOptions(System.String)">
-            <summary>
-            单行候选统一由命令目录元数据驱动，按域→类→方法→参数级联。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.AddEntry">
-            <summary>加入：指令行拆为 指令+参数；打开项目且命中工作树走 AddToDock，其余作为自定义指令常驻入坞。</summary>
-        </member>
-        <member name="T:Mercury.MercuryManagerView.ManagerPage.DockRow">
-            <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerView.ManagerPage.DockRow.#ctor(System.String,System.String,System.Boolean,System.Boolean,System.Double,System.Double,System.Nullable{System.DateTimeOffset})">
-            <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
+            <summary>扩展坞管理页面注册入口。</summary>
         </member>
         <member name="T:Mercury.MercuryPaths">
             <summary>HistoryMercury runtime locations and read-only migration sources.</summary>
@@ -663,6 +634,36 @@
         </member>
         <member name="E:Mercury.SuggestBox.Edited">
             <summary>输入框文本发生任何变化（含确认回填）时触发。</summary>
+        </member>
+        <member name="T:XamlGeneratedNamespace.GeneratedInternalTypeHelper">
+            <summary>
+            GeneratedInternalTypeHelper
+            </summary>
+        </member>
+        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.CreateInstance(System.Type,System.Globalization.CultureInfo)">
+            <summary>
+            CreateInstance
+            </summary>
+        </member>
+        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.GetPropertyValue(System.Reflection.PropertyInfo,System.Object,System.Globalization.CultureInfo)">
+            <summary>
+            GetPropertyValue
+            </summary>
+        </member>
+        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.SetPropertyValue(System.Reflection.PropertyInfo,System.Object,System.Object,System.Globalization.CultureInfo)">
+            <summary>
+            SetPropertyValue
+            </summary>
+        </member>
+        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.CreateDelegate(System.Type,System.Object,System.String)">
+            <summary>
+            CreateDelegate
+            </summary>
+        </member>
+        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.AddEventHandler(System.Reflection.EventInfo,System.Object,System.Delegate)">
+            <summary>
+            AddEventHandler
+            </summary>
         </member>
         <member name="T:System.Text.RegularExpressions.Generated.ProjectNumber_0">
             <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ProjectNumber method.</summary>
