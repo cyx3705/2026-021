@@ -1,4 +1,4 @@
-# OneHistoryStudio baseline begin
+# HistoryJanus baseline begin
 *.bak
 *.buildwithskipanalyzers
 *.cache
@@ -23,7 +23,7 @@
 *.user
 *.vsidx
 *.xlk
-# OneHistoryStudio baseline end
+# HistoryJanus baseline end
 
 # IDE and editor state
 .vs/
