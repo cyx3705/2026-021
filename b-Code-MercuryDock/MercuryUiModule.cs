@@ -31,6 +31,9 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
     internal static CommandBus? Bus { get; private set; }
 
+    /// <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
+    private static IShellLog? Log { get; set; }
+
     /// <summary>
     /// 共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
     /// <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
@@ -51,6 +54,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     public void Attach(IModuleContext context)
     {
         Bus = context.Bus;
+        Log = context.Log;
         context.RegisterCommands(MercuryCommandCatalog.Register);
 
         // 服务进程也必须跟随 state.json。它执行绝大多数写状态的指令，若只在建界面时才开监视，
@@ -88,6 +92,14 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         }
     }
 
+    /// <summary>
+    /// 建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
+    /// </summary>
+    /// <remarks>
+    /// 4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
+    /// 宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
+    /// 唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
+    /// </remarks>
     public void CreateUi()
     {
         MercuryState.StartWatching();
@@ -99,23 +111,60 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
 
         _ = MercuryState.RefreshAsync();
 
-        if (_shellUi != null)
-            _managerWindow ??= _shellUi.RegisterToolWindow(MercuryManagerView.CreateDescriptor(), "HistoryMercury");
+        CreateDesktopDock();
+        RegisterManagerWindow();
+        AttachCommandSurface();
+    }
 
-        _commandSurface ??= CommandSurfaceFeature.TryAttach(_commandWorkbench, _shellUi);
-        CatalogSession = _commandSurface?.Session;
+    /// <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
+    private static void CreateDesktopDock()
+    {
+        if (_window != null || Application.Current == null)
+            return;
 
-        if (_window != null)
+        try
+        {
+            _window = new DockWindow();
+            _window.Show();
+            if (MercuryState.Hidden)
+                _window.Hide();
+        }
+        catch (Exception ex)
+        {
+            _window = null;
+            Log?.Warn("dock", $"桌面坞创建失败: {ex.Message}");
+        }
+    }
+
+    private void RegisterManagerWindow()
+    {
+        if (_shellUi == null || _managerWindow != null)
             return;
-        // Shell hosts need both the manager page and the desktop dock. A
-        // headless Smoke caller can still verify registrar behavior without
-        // creating a WPF window on an MTA thread.
-        if (Application.Current == null)
+
+        try
+        {
+            _managerWindow = _shellUi.RegisterToolWindow(MercuryManagerView.CreateDescriptor(), "HistoryMercury");
+        }
+        catch (Exception ex)
+        {
+            Log?.Warn("dock", $"管理页注册失败，桌面坞不受影响: {ex.Message}");
+        }
+    }
+
+    private void AttachCommandSurface()
+    {
+        if (_commandSurface != null)
             return;
-        _window = new DockWindow();
-        _window.Show();
-        if (MercuryState.Hidden)
-            _window.Hide();
+
+        try
+        {
+            _commandSurface = CommandSurfaceFeature.TryAttach(_commandWorkbench, _shellUi);
+            CatalogSession = _commandSurface?.Session;
+        }
+        catch (Exception ex)
+        {
+            Log?.Warn("dock", $"命令工作台挂载失败，桌面坞不受影响: {ex.Message}");
+        }
     }
 
     public void DestroyUi()

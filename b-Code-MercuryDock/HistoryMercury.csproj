@@ -9,7 +9,7 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;**\bin\**;**\obj\**</DefaultItemExcludes>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>4.5.1</Version>
+    <Version>4.5.2</Version>
   </PropertyGroup>
   <PropertyGroup>
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
@@ -17,7 +17,15 @@
     <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
     <!-- 演进层：CommandSurface 与命令工作台契约的家；不受宿主冻结门禁约束，随交互形态迭代。 -->
     <HistoryVulcanExtensibilityProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Extensibility\HistoryVulcan.Extensibility.csproj</HistoryVulcanExtensibilityProj>
-    <HistoryVulcanSourceAvailable Condition="Exists('$(HistoryVulcanCoreProj)') and Exists('$(HistoryVulcanShellProj)') and Exists('$(HistoryVulcanServicesProj)')">true</HistoryVulcanSourceAvailable>
+    <!--
+      模块对宿主的依赖面是 z 快照，和 project.manifest.json 的 externalDependencies 一致：
+      默认永远编译到 z-HistoryVulcan/host 里那份"正在跑的"宿主二进制。
+
+      4.5.1 的事故就出在这里：这里原本写的是"只要 Vulcan 源码树存在就用 ProjectReference"，
+      于是宿主工作区一有未发布的在途改动，模块就会链接到根本没在运行的宿主，装载时在 WPF
+      视图构造处抛 connectionId 异常，桌面坞被静默吞掉。源码联调必须显式表态。
+    -->
+    <HistoryVulcanSourceAvailable Condition="'$(HistoryVulcanSourceAvailable)' == ''">false</HistoryVulcanSourceAvailable>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
     <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
@@ -55,4 +63,14 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+  <!--
+    两条引用路径各自把自己的前提检查掉，免得缺文件时报成一堆"找不到类型"。
+    源码联调是显式选择，选了就必须真的有源码树；默认路径则必须先有已发布的 z 宿主。
+  -->
+  <Target Name="AssertHistoryVulcanReference" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(HistoryVulcanSourceAvailable)' == 'true' and !Exists('$(HistoryVulcanCoreProj)')"
+           Text="HistoryVulcanSourceAvailable=true 但找不到宿主源码工程：$(HistoryVulcanCoreProj)" />
+    <Error Condition="'$(HistoryVulcanSourceAvailable)' != 'true' and !Exists('$(HistoryVulcanCoreDll)')"
+           Text="找不到已发布的宿主快照：$(HistoryVulcanCoreDll)。先发布 HistoryVulcan，或显式传 -p:HistoryVulcanSourceAvailable=true 对源码树联调。" />
+  </Target>
 </Project>

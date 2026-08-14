@@ -620,6 +620,9 @@
         <member name="P:Mercury.MercuryUiModule.Bus">
             <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
         </member>
+        <member name="P:Mercury.MercuryUiModule.Log">
+            <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
+        </member>
         <member name="P:Mercury.MercuryUiModule.CatalogSession">
             <summary>
             共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
@@ -632,6 +635,19 @@
             Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
             用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
             </summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.CreateUi">
+            <summary>
+            建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
+            </summary>
+            <remarks>
+            4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
+            宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
+            唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
+            </remarks>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.CreateDesktopDock">
+            <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
