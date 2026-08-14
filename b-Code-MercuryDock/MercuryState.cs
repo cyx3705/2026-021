@@ -221,31 +221,61 @@ internal static partial class MercuryState
             _allProjects = scan.All;
         }
         if (!DockShortcutFolder.IsExplorerRegistrationDisabled)
-        {
-            DockShortcutFolder.Synchronize(scan.Selected);
-            _ = ExplorerNamespaceRegistration.RegisterOrUpdate(DockShortcutFolder.Path);
-        }
+            SynchronizeExplorerEntry(scan.Selected);
         Changed?.Invoke();
         return scan.Selected;
     }
 
+    /// <summary>
+    /// 把快捷方式文件夹和资源管理器入口对齐，并且只在真的改过东西时通知外壳。
+    /// </summary>
+    /// <remarks>
+    /// 刷新是高频动作（每次打开项目、每次跨进程状态同步都会走到这里），而外壳通知是全局广播。
+    /// 因此这里的判断顺序是：注册项变了就已经广播过一次，无需再补；注册项没变而目录内容动过，
+    /// 只定点通知那一个目录；两者都没动则一个通知都不发。
+    /// </remarks>
+    private static void SynchronizeExplorerEntry(IReadOnlyList<DockProject> selected)
+    {
+        var sync = DockShortcutFolder.Synchronize(selected);
+        var registration = ExplorerNamespaceRegistration.RegisterOrUpdate(DockShortcutFolder.Path);
+        if (!registration.Changed && sync.Changed)
+            ExplorerNamespaceRegistration.NotifyFolderChanged(sync.Folder);
+    }
+
+    /// <summary>
+    /// 把用户在快捷方式文件夹里的手动增删翻译成收录意图。
+    /// </summary>
+    /// <remarks>
+    /// 这个文件夹可能被本进程、另一进程和用户三方写入，所以不能把看到的任何增删都当成用户意图：
+    /// <list type="number">
+    /// <item>先把磁盘上的偏好读回来。服务进程与界面进程各有一份内存副本，用旧副本判断会把
+    /// 对方刚写下的状态又改回去。</item>
+    /// <item>同一轮里既消失又出现的项目是一次重写，不是意图，直接跳过。</item>
+    /// <item>已经处于目标状态的项目不再重复写入，避免"排除→写盘→再触发"的自激。</item>
+    /// </list>
+    /// 历史上缺这三条，结果是同一个项目会被同时写进 Pins 和 Excluded。
+    /// </remarks>
     internal static void ApplyShortcutFolderChanges(DockShortcutFolder.ShortcutFolderDelta changes)
     {
+        var reloaded = LoadPreferences();
         var preferencesChanged = false;
         lock (Gate)
         {
-            foreach (var target in changes.RemovedTargets)
+            _preferences = reloaded;
+            var intent = ResolveShortcutIntent(
+                ProjectNames(changes.RemovedTargets),
+                ProjectNames(changes.AddedTargets),
+                _preferences.Excluded,
+                _preferences.Pins);
+
+            foreach (var name in intent.Exclude)
             {
-                if (!TryGetWorktreeProjectName(target, out var name))
-                    continue;
                 preferencesChanged |= _preferences.Excluded.Add(name);
                 preferencesChanged |= _preferences.Pins.Remove(name);
             }
 
-            foreach (var target in changes.AddedTargets)
+            foreach (var name in intent.Include)
             {
-                if (!TryGetWorktreeProjectName(target, out var name))
-                    continue;
                 preferencesChanged |= _preferences.Excluded.Remove(name);
                 preferencesChanged |= _preferences.Pins.Add(name);
             }
@@ -257,6 +287,67 @@ internal static partial class MercuryState
         // Invalid, stale, or renamed links must also be reconciled away even when they
         // did not produce a preference change.
         _ = RefreshAsync();
+    }
+
+    /// <summary>
+    /// 把"文件夹里少了/多了哪些链接"翻译成"要排除/要收录哪些项目"。纯函数，不读写磁盘。
+    /// </summary>
+    /// <remarks>
+    /// 三条规则：同一轮里既少又多的项目是一次重写，不产生意图；已经是排除状态的项目再"少一条链接"
+    /// 不产生意图；已经固定且未被排除的项目再"多一条链接"也不产生意图。前两条挡住程序自己的写入
+    /// 被读成用户操作，第三条挡住重复写盘。任一名字不会同时出现在两个结果里。
+    /// </remarks>
+    internal static ShortcutIntent ResolveShortcutIntent(
+        IReadOnlySet<string> removedNames,
+        IReadOnlySet<string> addedNames,
+        IReadOnlySet<string> currentlyExcluded,
+        IReadOnlySet<string> currentlyPinned)
+    {
+        var exclude = new List<string>();
+        var include = new List<string>();
+        foreach (var name in removedNames)
+        {
+            if (addedNames.Contains(name) || currentlyExcluded.Contains(name))
+                continue;
+            exclude.Add(name);
+        }
+
+        foreach (var name in addedNames)
+        {
+            if (removedNames.Contains(name))
+                continue;
+            if (currentlyPinned.Contains(name) && !currentlyExcluded.Contains(name))
+                continue;
+            include.Add(name);
+        }
+
+        return new ShortcutIntent(exclude, include);
+    }
+
+    /// <summary>排除优先：同时出现在两个集合里的项目从固定集合中剔除。</summary>
+    internal static HashSet<string> SanitizePins(IEnumerable<string> pins, IReadOnlySet<string> excluded)
+    {
+        var sanitized = new HashSet<string>(pins, StringComparer.OrdinalIgnoreCase);
+        sanitized.RemoveWhere(excluded.Contains);
+        return sanitized;
+    }
+
+    /// <summary>一轮快捷方式增删翻译出的收录意图。</summary>
+    internal readonly record struct ShortcutIntent(
+        IReadOnlyList<string> Exclude,
+        IReadOnlyList<string> Include);
+
+    /// <summary>把快捷方式目标路径映射为工作树项目名；不属于工作树的目标整条丢弃。</summary>
+    private static IReadOnlySet<string> ProjectNames(IReadOnlyList<string> targets)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var target in targets)
+        {
+            if (TryGetWorktreeProjectName(target, out var name))
+                names.Add(name);
+        }
+
+        return names;
     }
 
     public static bool Pin(string name, bool pinned)
@@ -277,7 +368,7 @@ internal static partial class MercuryState
         }
 
         if (!DockShortcutFolder.IsExplorerRegistrationDisabled)
-            DockShortcutFolder.Synchronize(Projects);
+            SynchronizeExplorerEntry(Projects);
         Changed?.Invoke();
         return true;
     }
@@ -680,6 +771,9 @@ internal static partial class MercuryState
                     state.Excluded = new HashSet<string>(state.Excluded, StringComparer.OrdinalIgnoreCase);
                     state.Usage = new Dictionary<string, UsageEntry>(state.Usage, StringComparer.OrdinalIgnoreCase);
                     state.Policy = state.Policy.Normalized();
+                    // 4.5.1 之前的快捷方式回环会把同一个项目同时写进两个集合。排除是更强的意图，
+                    // 固定让位；否则那条固定项永远不显示却一直参与排序判断。
+                    state.Pins = SanitizePins(state.Pins, state.Excluded);
                     return state;
                 }
             }

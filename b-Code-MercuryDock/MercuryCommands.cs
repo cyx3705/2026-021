@@ -33,8 +33,12 @@ public static class MercuryCommands
 
     public static string RegisterExplorer()
     {
-        DockShortcutFolder.Synchronize(MercuryState.Projects);
-        return ExplorerNamespaceRegistration.RegisterOrUpdate(DockShortcutFolder.Path).Message;
+        var sync = DockShortcutFolder.Synchronize(MercuryState.Projects);
+        var registration = ExplorerNamespaceRegistration.RegisterOrUpdate(DockShortcutFolder.Path);
+        // 用户显式发起的修复动作：注册项本来就对时也定点刷新一次那个目录，让入口立刻可见。
+        if (!registration.Changed)
+            ExplorerNamespaceRegistration.NotifyFolderChanged(sync.Folder);
+        return registration.Message;
     }
 
     public static string RemoveExplorer()

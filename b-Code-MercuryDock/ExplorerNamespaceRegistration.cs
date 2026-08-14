@@ -20,8 +20,15 @@ public static class ExplorerNamespaceRegistration
     private const string PreviousManagedValue = "MercuryDock.Managed";
     private const string LegacyManagedValue = "ActiveDock.Managed";
     private const int ShellFolderAttributes = unchecked((int)0xF080004D);
+    private const string IconValue = "%SystemRoot%\\System32\\shell32.dll,-4";
+    private const string InProcServerValue = "%SystemRoot%\\System32\\shell32.dll";
+    private const string ThreadingModelValue = "Apartment";
+    private const int PinnedValue = 1;
+    private const int SortOrderIndexValue = 0x42;
     private const uint ShcneAssocChanged = 0x08000000;
+    private const uint ShcneUpdateDir = 0x00001000;
     private const uint ShcnfIdList = 0x0000;
+    private const uint ShcnfPathW = 0x0005;
     private static readonly string BackupPath = Path.Combine(
         MercuryPaths.DataRoot, "explorer-registration-backup.json");
     private static readonly string PreviousBackupPath = Path.Combine(
@@ -55,6 +62,12 @@ public static class ExplorerNamespaceRegistration
             if (!Directory.Exists(fullPath))
                 return RegistrationResult.Failed($"项目根路径不存在：{fullPath}");
 
+            // 注册内容与目标完全一致时直接返回：不写注册表，也不发外壳通知。
+            // 这一条是关键——刷新一次活动坞过去都会重写十几个注册表值并广播一次
+            // SHCNE_ASSOCCHANGED，而绝大多数刷新其实什么都没变。
+            if (IsCurrent(fullPath))
+                return RegistrationResult.Unchanged(fullPath);
+
             using var root = Registry.CurrentUser.CreateSubKey(
                 ClassesClsid + EntryClsid,
                 RegistryKeyPermissionCheck.ReadWriteSubTree);
@@ -64,17 +77,17 @@ public static class ExplorerNamespaceRegistration
             MigrateLegacyBackup();
             CapturePreviousRegistration(root);
             root.SetValue(null, DisplayName, RegistryValueKind.String);
-            root.SetValue("System.IsPinnedToNameSpaceTree", 1, RegistryValueKind.DWord);
-            root.SetValue("SortOrderIndex", 0x42, RegistryValueKind.DWord);
+            root.SetValue("System.IsPinnedToNameSpaceTree", PinnedValue, RegistryValueKind.DWord);
+            root.SetValue("SortOrderIndex", SortOrderIndexValue, RegistryValueKind.DWord);
             root.SetValue(ManagedValue, 1, RegistryValueKind.DWord);
 
             using (var icon = root.CreateSubKey("DefaultIcon"))
-                icon?.SetValue(null, "%SystemRoot%\\System32\\shell32.dll,-4", RegistryValueKind.ExpandString);
+                icon?.SetValue(null, IconValue, RegistryValueKind.ExpandString);
 
             using (var inproc = root.CreateSubKey("InProcServer32"))
             {
-                inproc?.SetValue(null, "%SystemRoot%\\System32\\shell32.dll", RegistryValueKind.ExpandString);
-                inproc?.SetValue("ThreadingModel", "Apartment", RegistryValueKind.String);
+                inproc?.SetValue(null, InProcServerValue, RegistryValueKind.ExpandString);
+                inproc?.SetValue("ThreadingModel", ThreadingModelValue, RegistryValueKind.String);
             }
 
             using (var instance = root.CreateSubKey("Instance"))
@@ -115,8 +128,105 @@ public static class ExplorerNamespaceRegistration
         }
     }
 
+    /// <summary>
+    /// 命名空间项本身增删改后的全局通知。
+    /// </summary>
+    /// <remarks>
+    /// SHCNE_ASSOCCHANGED 会让每一个外壳进程丢弃图标缓存并重读文件关联；开启
+    /// "在单独的进程中打开文件夹窗口"时，代价按打开的窗口进程数翻倍。它只在导航窗格需要
+    /// 重新发现这个命名空间子项时才有必要，因此仅由 <see cref="RegisterOrUpdate"/> 与
+    /// <see cref="RemoveRegistration"/> 在注册项真的变化时调用。目录内容变化请用
+    /// <see cref="NotifyFolderChanged"/>。
+    /// </remarks>
     public static void RefreshExplorerNamespace()
         => SHChangeNotify(ShcneAssocChanged, ShcnfIdList, nint.Zero, nint.Zero);
+
+    /// <summary>只通知某一个目录的内容变了，不碰图标缓存与文件关联。</summary>
+    public static void NotifyFolderChanged(string folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+            return;
+
+        var buffer = Marshal.StringToCoTaskMemUni(folder);
+        try
+        {
+            SHChangeNotify(ShcneUpdateDir, ShcnfPathW, buffer, nint.Zero);
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(buffer);
+        }
+    }
+
+    /// <summary>
+    /// 逐项核对本模块写入的每一个注册值。任一项缺失或不符就返回 false，
+    /// 这样半写坏的注册仍会被下一次调用修复。
+    /// </summary>
+    private static bool IsCurrent(string fullPath)
+    {
+        try
+        {
+            using var root = Registry.CurrentUser.OpenSubKey(ClassesClsid + EntryClsid);
+            if (root == null
+                || root.GetValue(null) as string != DisplayName
+                || root.GetValue("System.IsPinnedToNameSpaceTree") is not int pinned || pinned != PinnedValue
+                || root.GetValue("SortOrderIndex") is not int sortOrder || sortOrder != SortOrderIndexValue
+                || root.GetValue(ManagedValue) is not int managed || managed != 1)
+            {
+                return false;
+            }
+
+            using var icon = root.OpenSubKey("DefaultIcon");
+            if (!string.Equals(Raw(icon, null), IconValue, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            using var inproc = root.OpenSubKey("InProcServer32");
+            if (!string.Equals(Raw(inproc, null), InProcServerValue, StringComparison.OrdinalIgnoreCase)
+                || inproc?.GetValue("ThreadingModel") as string != ThreadingModelValue)
+            {
+                return false;
+            }
+
+            // GUID 与路径按大小写无关比较：否则历史写入的另一种大小写会让这里永远判不相等，
+            // 反而变成"每次刷新都重写一遍"。
+            using var instance = root.OpenSubKey("Instance");
+            if (instance == null
+                || !string.Equals(
+                    instance.GetValue("CLSID") as string, FolderShortcutClsid, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            using var props = instance.OpenSubKey("InitPropertyBag");
+            if (!string.Equals(
+                    props?.GetValue("TargetFolderPath") as string, fullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            using var shellFolder = root.OpenSubKey("ShellFolder");
+            if (shellFolder?.GetValue("Attributes") is not int attributes
+                || attributes != ShellFolderAttributes)
+            {
+                return false;
+            }
+
+            using var namespaceKey = Registry.CurrentUser.OpenSubKey(MyComputerNamespace + EntryClsid);
+            return namespaceKey?.GetValue(null) as string == DisplayName;
+        }
+        catch (SecurityException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>取未展开的原始字符串，否则 ExpandString 会被展开成实际路径而永远比不相等。</summary>
+    private static string? Raw(RegistryKey? key, string? name)
+        => key?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
 
     private static void CapturePreviousRegistration(RegistryKey root)
     {
@@ -181,10 +291,21 @@ public static class ExplorerNamespaceRegistration
         }
     }
 
-    public readonly record struct RegistrationResult(bool Success, string Message, string? Path)
+    /// <summary>
+    /// <paramref name="Changed"/> 区分"写入并通知过"和"本来就是这样"，调用方据此决定是否
+    /// 还需要额外的外壳通知。
+    /// </summary>
+    public readonly record struct RegistrationResult(
+        bool Success,
+        string Message,
+        string? Path,
+        bool Changed = false)
     {
         public static RegistrationResult Succeeded(string? path)
-            => new(true, path == null ? "已移除 HistoryVesta 项目入口。" : $"HistoryVesta 项目入口指向 {path}。", path);
+            => new(true, path == null ? "已移除 HistoryVesta 项目入口。" : $"HistoryVesta 项目入口指向 {path}。", path, true);
+
+        public static RegistrationResult Unchanged(string path)
+            => new(true, $"HistoryVesta 项目入口已指向 {path}，无需改动。", path, false);
 
         public static RegistrationResult Failed(string message)
             => new(false, message, null);

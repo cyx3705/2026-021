@@ -255,12 +255,59 @@ try
     var second = new DockProject("2026-002-Second", "2026-002", secondProject, now, false);
     var initial = DockShortcutFolder.Synchronize([first, second], shortcutRoot);
     Equal(2, initial.Written, "Each dock project must receive one shortcut.");
+    True(initial.Changed, "Creating shortcuts must report a change.");
     var reconciled = DockShortcutFolder.Synchronize([second], shortcutRoot);
     Equal(1, reconciled.Removed, "Removed dock projects must lose their shortcuts.");
+
+    // 内容一致时必须一个字节都不写：这个文件夹是"此电脑"下的命名空间扩展，每次写入都会让
+    // 所有资源管理器窗口进程刷新该节点，过去每次刷新都全量重写才是外壳变卡的直接来源。
+    var idempotent = DockShortcutFolder.Synchronize([second], shortcutRoot);
+    Equal(0, idempotent.Written, "Unchanged shortcuts must not be rewritten.");
+    Equal(0, idempotent.Removed, "Unchanged sync must not delete shortcuts.");
+    Equal(1, idempotent.Unchanged, "Matching shortcuts must be reported as unchanged.");
+    True(!idempotent.Changed, "Unchanged sync must not report a change.");
+
+    // 受管字段变了仍必须重写，幂等不能退化成"永不更新"。
+    var rewritten = DockShortcutFolder.Synchronize(
+        [second with { Name = "2026-002-Renamed" }], shortcutRoot);
+    Equal(1, rewritten.Written, "A changed managed field must rewrite the shortcut.");
+    Equal(0, rewritten.Removed, "Rewriting in place must not delete the shortcut.");
 }
 finally
 {
     Directory.Delete(shortcutRoot, recursive: true);
+}
+
+// 快捷方式增删 → 收录意图。这个文件夹会被界面进程、服务进程和用户三方写入，把对方的写入
+// 读成用户操作过去会让同一个项目同时进入 Pins 和 Excluded，并触发刷新自激。
+{
+    static IReadOnlySet<string> Names(params string[] names)
+        => new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+    var none = Names();
+
+    var rewrite = MercuryState.ResolveShortcutIntent(Names("2026-001-A"), Names("2026-001-A"), none, none);
+    Equal(0, rewrite.Exclude.Count, "A link rewritten in one round must not be read as removal.");
+    Equal(0, rewrite.Include.Count, "A link rewritten in one round must not be read as an addition.");
+
+    var removal = MercuryState.ResolveShortcutIntent(Names("2026-001-A"), none, none, Names("2026-001-A"));
+    Equal("2026-001-A", removal.Exclude.Single(), "Deleting a link must exclude the project.");
+    Equal(0, removal.Include.Count, "Deleting a link must not also include the project.");
+
+    var alreadyExcluded = MercuryState.ResolveShortcutIntent(
+        Names("2026-001-A"), none, Names("2026-001-A"), none);
+    Equal(0, alreadyExcluded.Exclude.Count, "An already excluded project must not be excluded again.");
+
+    var addition = MercuryState.ResolveShortcutIntent(none, Names("2026-002-B"), Names("2026-002-B"), none);
+    Equal("2026-002-B", addition.Include.Single(), "Adding a link must include the project.");
+    Equal(0, addition.Exclude.Count, "Adding a link must not also exclude the project.");
+
+    var alreadyPinned = MercuryState.ResolveShortcutIntent(none, Names("2026-002-B"), none, Names("2026-002-B"));
+    Equal(0, alreadyPinned.Include.Count, "An already pinned project must not be pinned again.");
+
+    var sanitized = MercuryState.SanitizePins(
+        ["2026-001-A", "2026-002-B"], Names("2026-001-A"));
+    Equal(1, sanitized.Count, "Excluded projects must not remain pinned.");
+    True(sanitized.Contains("2026-002-B"), "Sanitising pins must keep unrelated pins.");
 }
 
 // 快捷键不再经由宿主的 IGlobalShortcutModule 扫描注册，而是由 Mercury 自持并以

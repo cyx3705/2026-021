@@ -16,6 +16,9 @@ public static class DockShortcutFolder
     public const string FolderName = "\u5feb\u6377\u65b9\u5f0f";
     public const string ModuleSlotName = "HistoryMercury";
 
+    private const string IconSource = "%SystemRoot%\\System32\\shell32.dll";
+    private const int IconIndex = 3;
+
     public static string Path => ResolvePath();
 
     public static bool IsExplorerRegistrationDisabled
@@ -27,6 +30,11 @@ public static class DockShortcutFolder
     /// <summary>
     /// Reconciles only .lnk files owned by the dock. Non-shortcut files are intentionally untouched.
     /// </summary>
+    /// <remarks>
+    /// 只写真正不一致的快捷方式。这个文件夹是钉在"此电脑"下的命名空间扩展，任何一次写入都会
+    /// 让所有打开的资源管理器窗口（SeparateProcess 下是多个进程）刷新该节点，因此"内容没变也
+    /// 全量重写"的代价是外部可见的，不只是几次磁盘 IO。
+    /// </remarks>
     public static ShortcutSyncResult Synchronize(
         IReadOnlyList<DockProject> projects,
         string? folderOverride = null)
@@ -42,26 +50,44 @@ public static class DockShortcutFolder
             desired[LinkPath(folder, project)] = project;
         }
 
-        var removed = 0;
-        foreach (var existing in Directory.EnumerateFiles(folder, "*.lnk", SearchOption.TopDirectoryOnly))
+        // 自己的写入不能再被自己的监视器读成"用户手动增删"，写期间先停掉事件，
+        // 写完以现状为新基线再恢复。
+        var suspended = folderOverride == null && SuspendWatching();
+        try
         {
-            if (desired.ContainsKey(existing))
-                continue;
-            File.Delete(existing);
-            removed++;
-        }
+            var removed = 0;
+            foreach (var existing in Directory.EnumerateFiles(folder, "*.lnk", SearchOption.TopDirectoryOnly))
+            {
+                if (desired.ContainsKey(existing))
+                    continue;
+                File.Delete(existing);
+                removed++;
+            }
 
-        var written = 0;
-        foreach (var (linkPath, project) in desired)
+            var written = 0;
+            var unchanged = 0;
+            foreach (var (linkPath, project) in desired)
+            {
+                if (IsShortcutCurrent(linkPath, project))
+                {
+                    unchanged++;
+                    continue;
+                }
+
+                WriteShortcut(linkPath, project);
+                written++;
+            }
+
+            if (folderOverride == null)
+                RememberSnapshot(ReadShortcuts(folder));
+
+            return new ShortcutSyncResult(folder, written, removed, unchanged);
+        }
+        finally
         {
-            WriteShortcut(linkPath, project);
-            written++;
+            if (suspended)
+                ResumeWatching();
         }
-
-        if (folderOverride == null)
-            RememberSnapshot(ReadShortcuts(folder));
-
-        return new ShortcutSyncResult(folder, written, removed);
     }
 
     /// <summary>
@@ -116,8 +142,45 @@ public static class DockShortcutFolder
             linkPath,
             project.Path,
             project.Name,
-            "%SystemRoot%\\System32\\shell32.dll",
-            3);
+            IconSource,
+            IconIndex);
+
+    /// <summary>受管字段逐项相等才算最新；读不出来一律按需要重写处理。</summary>
+    private static bool IsShortcutCurrent(string linkPath, DockProject project)
+    {
+        if (!ShortcutFileService.TryReadShortcut(linkPath, out var content))
+            return false;
+        return SamePath(content.Target, project.Path)
+            && string.Equals(content.Description, project.Name, StringComparison.Ordinal)
+            && string.Equals(content.IconPath, IconSource, StringComparison.OrdinalIgnoreCase)
+            && content.IconIndex == IconIndex;
+    }
+
+    private static bool SamePath(string left, string right)
+        => string.Equals(
+            left.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar),
+            right.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool SuspendWatching()
+    {
+        lock (WatchGate)
+        {
+            if (_watcher is not { EnableRaisingEvents: true })
+                return false;
+            _watcher.EnableRaisingEvents = false;
+            return true;
+        }
+    }
+
+    private static void ResumeWatching()
+    {
+        lock (WatchGate)
+        {
+            if (_watcher != null)
+                _watcher.EnableRaisingEvents = true;
+        }
+    }
 
     private static void ScheduleReconcile()
     {
@@ -191,7 +254,15 @@ public static class DockShortcutFolder
         return links;
     }
 
-    public readonly record struct ShortcutSyncResult(string Folder, int Written, int Removed);
+    public readonly record struct ShortcutSyncResult(
+        string Folder,
+        int Written,
+        int Removed,
+        int Unchanged = 0)
+    {
+        /// <summary>本次是否真的动过磁盘。只有动过才值得通知外壳。</summary>
+        public bool Changed => Written != 0 || Removed != 0;
+    }
 
     public sealed record ShortcutFolderDelta(
         IReadOnlyList<string> RemovedTargets,

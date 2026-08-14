@@ -53,6 +53,11 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         Bus = context.Bus;
         context.RegisterCommands(MercuryCommandCatalog.Register);
 
+        // 服务进程也必须跟随 state.json。它执行绝大多数写状态的指令，若只在建界面时才开监视，
+        // 服务侧的偏好副本会永远停在进程启动那一刻，下一次保存就用旧值盖掉界面侧的改动，
+        // 两侧算出的收录列表也会不一致，进而互相把对方写的快捷方式当成用户增删。
+        MercuryState.StartWatching();
+
         // 全局快捷键完全由 Mercury 自持：服务在此构造并启动，能力经 mercury.hotkey.* 命令暴露。
         // 宿主不再预扫描模块 DLL 去寻找 IGlobalShortcutHost 实现，也不再驱动注册。
         if (OperatingSystem.IsWindows())

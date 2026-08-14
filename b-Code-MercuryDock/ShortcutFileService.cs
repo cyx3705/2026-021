@@ -81,17 +81,61 @@ internal static class ShortcutFileService
 
     public static string ReadShortcutTarget(string linkPath)
     {
+        object? shellLink = null;
         try
         {
-            var shellLink = (IShellLinkW)new ShellLink();
+            shellLink = new ShellLink();
             ((IPersistFile)shellLink).Load(linkPath, 0);
             var target = new StringBuilder(32768);
-            shellLink.GetPath(target, target.Capacity, nint.Zero, 0);
+            ((IShellLinkW)shellLink).GetPath(target, target.Capacity, nint.Zero, 0);
             return target.Length == 0 ? string.Empty : Path.GetFullPath(target.ToString());
         }
         catch (Exception)
         {
             return string.Empty;
+        }
+        finally
+        {
+            Release(shellLink);
+        }
+    }
+
+    /// <summary>
+    /// 读回快捷方式的全部受管字段，供写入前比对。取原始路径（不解析、不探测网络），
+    /// 因为这里只需要判断"和我们要写的内容是否一致"。
+    /// </summary>
+    public static bool TryReadShortcut(string linkPath, out ShortcutContent content)
+    {
+        const uint RawPath = 0x4;
+        content = default;
+        if (!File.Exists(linkPath))
+            return false;
+
+        object? shellLink = null;
+        try
+        {
+            shellLink = new ShellLink();
+            ((IPersistFile)shellLink).Load(linkPath, 0);
+            var link = (IShellLinkW)shellLink;
+            var target = new StringBuilder(32768);
+            link.GetPath(target, target.Capacity, nint.Zero, RawPath);
+            if (target.Length == 0)
+                return false;
+            var description = new StringBuilder(1024);
+            link.GetDescription(description, description.Capacity);
+            var icon = new StringBuilder(32768);
+            link.GetIconLocation(icon, icon.Capacity, out var iconIndex);
+            content = new ShortcutContent(
+                target.ToString(), description.ToString(), icon.ToString(), iconIndex);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            Release(shellLink);
         }
     }
 
@@ -102,16 +146,42 @@ internal static class ShortcutFileService
         string? iconPath = null,
         int iconIndex = 0)
     {
-        var shellLink = (IShellLinkW)new ShellLink();
-        shellLink.SetPath(targetPath);
-        shellLink.SetWorkingDirectory(Directory.Exists(targetPath)
-            ? targetPath
-            : Path.GetDirectoryName(targetPath) ?? Environment.CurrentDirectory);
-        shellLink.SetDescription(description);
-        if (!string.IsNullOrWhiteSpace(iconPath))
-            shellLink.SetIconLocation(iconPath, iconIndex);
-        ((IPersistFile)shellLink).Save(linkPath, true);
+        object? shellLink = null;
+        try
+        {
+            shellLink = new ShellLink();
+            var link = (IShellLinkW)shellLink;
+            link.SetPath(targetPath);
+            link.SetWorkingDirectory(Directory.Exists(targetPath)
+                ? targetPath
+                : Path.GetDirectoryName(targetPath) ?? Environment.CurrentDirectory);
+            link.SetDescription(description);
+            if (!string.IsNullOrWhiteSpace(iconPath))
+                link.SetIconLocation(iconPath, iconIndex);
+            ((IPersistFile)shellLink).Save(linkPath, true);
+        }
+        finally
+        {
+            Release(shellLink);
+        }
     }
+
+    /// <summary>
+    /// 每次刷新都会创建若干 ShellLink，交给 GC 终结器回收会让 COM 引用在进程里堆积，
+    /// 因此用完立刻释放 RCW。
+    /// </summary>
+    private static void Release(object? comObject)
+    {
+        if (comObject != null && Marshal.IsComObject(comObject))
+            Marshal.FinalReleaseComObject(comObject);
+    }
+
+    /// <summary>快捷方式里由活动坞管理的字段。</summary>
+    public readonly record struct ShortcutContent(
+        string Target,
+        string Description,
+        string IconPath,
+        int IconIndex);
 
     [ComImport]
     [Guid("00021401-0000-0000-C000-000000000046")]
