@@ -379,7 +379,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
             }
         }
 
-        /// <summary>HistoryVulcan 入口：不参与排序、不发光、不可取消。</summary>
+        /// <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
         private static Button HistoryVulcanButton()
         {
             var glyph = new Border
@@ -390,7 +390,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 Background = DockTheme.Accent,
                 Child = new TextBlock
                 {
-                    Text = "HV",
+                    Text = "HC",
                     FontFamily = DockTheme.FontFamily,
                     FontSize = DockTheme.BodyFontSize,
                     FontWeight = FontWeights.SemiBold,
@@ -409,7 +409,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 Foreground = DockTheme.Label,
                 HorizontalAlignment = HorizontalAlignment.Center,
             });
-            var button = NakedButton(stack, "打开 HistoryVulcan 主界面");
+            var button = NakedButton(stack, "打开 HistoryClio 主界面");
             button.Click += async (_, _) => await MercuryCommands.ShowHostAsync();
             return button;
         }

@@ -38,8 +38,8 @@ internal static partial class MercuryState
     private static readonly string SettingsPath = MercuryPaths.SettingsPath;
     private static readonly string LegacySettingsPath = MercuryPaths.LegacySettingsPath;
 
-    /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到这里。</summary>
-    private const string DefaultWorktreeRoot = @"C:\OneHistory\HistoryVesta";
+    /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
+    private const string DefaultWorktreeRoot = MercuryLibraryRoot.Default;
 
     private static DockPreferences _preferences = LoadPreferences();
     private static IReadOnlyList<DockProject> _projects = [];
@@ -681,14 +681,12 @@ internal static partial class MercuryState
                 if (!File.Exists(settingsPath))
                     continue;
                 using var doc = JsonDocument.Parse(File.ReadAllText(settingsPath));
-                // 整库改名后配置值可能指向已不存在的目录，必须校验存在性再采用，
-                // 否则扫描结果恒空、活动坞只剩"暂无活动项目"。
-                if (doc.RootElement.TryGetProperty("proj.worktreeroot", out var value)
-                    && value.GetString() is { Length: > 0 } configured
-                    && Directory.Exists(configured))
-                {
-                    return configured;
-                }
+                // 优先 proj.libraryroot；旧 proj.worktreeroot 若仍指向 Vesta 会改写到 Clio。
+                // 配置值必须真实存在，否则扫描结果恒空、活动坞只剩"暂无活动项目"。
+                var library = ReadSetting(doc, "proj.libraryroot");
+                var worktree = ReadSetting(doc, "proj.worktreeroot");
+                if (library != null || worktree != null)
+                    return MercuryLibraryRoot.Resolve(library, worktree);
             }
             catch (JsonException)
             {
@@ -697,6 +695,12 @@ internal static partial class MercuryState
 
         return DefaultWorktreeRoot;
     }
+
+    private static string? ReadSetting(JsonDocument doc, string name)
+        => doc.RootElement.TryGetProperty(name, out var value)
+           && value.GetString() is { Length: > 0 } text
+            ? text
+            : null;
 
     private static bool TryGetWorktreeProjectName(string target, out string name)
     {

@@ -235,7 +235,10 @@ Equal(
         "HistoryVulcan", "Modules", "HistoryMercury", DockShortcutFolder.FolderName),
     DockShortcutFolder.Path,
     "Shortcut folder must use the module identity slot.");
-Equal("HistoryVesta 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
+Equal("HistoryClio 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
+Equal(@"C:\OneHistory\HistoryClio", MercuryLibraryRoot.Default, "Default project library is HistoryClio");
+Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Coerce(MercuryLibraryRoot.LegacyVesta),
+    "Configured HistoryVesta roots coerce to HistoryClio when that library exists.");
 True(Guid.TryParse(ExplorerNamespaceRegistration.EntryClsid, out _), "Explorer CLSID must be valid.");
 
 var work = new System.Windows.Rect(0, 0, 1920, 1040);

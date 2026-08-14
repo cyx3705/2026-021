@@ -440,6 +440,23 @@
             </summary>
             <param name="domain">要聚焦的域；空表示退出聚焦。</param>
         </member>
+        <member name="T:Mercury.MercuryLibraryRoot">
+            <summary>
+            活动坞扫描的项目库根。当前库是 HistoryClio；配置里若仍指向 HistoryVesta 则改写过来。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryLibraryRoot.Coerce(System.String)">
+            <summary>
+            已退役的 Vesta 路径改写到 <see cref="F:Mercury.MercuryLibraryRoot.Default"/>（该库存在时）。
+            其它现存路径原样返回。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryLibraryRoot.Resolve(System.String,System.String)">
+            <summary>
+            优先 <c>proj.libraryroot</c>，其次仍存在的 <c>proj.worktreeroot</c>，最后缺省 Clio。
+            命中的路径都经过 <see cref="M:Mercury.MercuryLibraryRoot.Coerce(System.String)"/>。
+            </summary>
+        </member>
         <member name="T:Mercury.MercuryManagerPage">
             <summary>
             MercuryManagerPage
@@ -468,7 +485,7 @@
             </summary>
         </member>
         <member name="F:Mercury.MercuryState.DefaultWorktreeRoot">
-            <summary>项目库缺省根；配置值失效（如整库改名后）时回退到这里。</summary>
+            <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
         </member>
         <member name="P:Mercury.MercuryState.Projects">
             <summary>桌面坞显示的收录结果：固定项加按策略截取的加权项，不含被排除项。</summary>
@@ -653,7 +670,7 @@
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.HistoryVulcanButton">
-            <summary>HistoryVulcan 入口：不参与排序、不发光、不可取消。</summary>
+            <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.CommandButton(Mercury.DockCommandEntry)">
             <summary>手动指令项按钮：指令字形无光圈，点击经总线执行，右键可移除。</summary>

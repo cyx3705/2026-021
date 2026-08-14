@@ -9,7 +9,7 @@ namespace Mercury;
 /// <summary>Registers the dock-generated shortcut folder in the current user's Explorer namespace.</summary>
 public static class ExplorerNamespaceRegistration
 {
-    public const string DisplayName = "HistoryVesta \u9879\u76ee";
+    public const string DisplayName = "HistoryClio \u9879\u76ee";
     public const string EntryClsid = "{B5E3B5AA-5F92-4A2A-9D4E-6A0B6A8E5C21}";
 
     private const string FolderShortcutClsid = "{0E5AAE11-A475-4c5b-AB00-C66DE400274E}";
@@ -302,10 +302,10 @@ public static class ExplorerNamespaceRegistration
         bool Changed = false)
     {
         public static RegistrationResult Succeeded(string? path)
-            => new(true, path == null ? "已移除 HistoryVesta 项目入口。" : $"HistoryVesta 项目入口指向 {path}。", path, true);
+            => new(true, path == null ? $"已移除 {DisplayName}入口。" : $"{DisplayName}入口指向 {path}。", path, true);
 
         public static RegistrationResult Unchanged(string path)
-            => new(true, $"HistoryVesta 项目入口已指向 {path}，无需改动。", path, false);
+            => new(true, $"{DisplayName}入口已指向 {path}，无需改动。", path, false);
 
         public static RegistrationResult Failed(string message)
             => new(false, message, null);
