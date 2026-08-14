@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "template": {
+    "isTemplate": false,
+    "source": "0000-000-Template",
+    "strictValidationArgument": "-Instantiation"
+  },
+  "project": {
+    "id": "2026-021",
+    "name": "HistoryMercury",
+    "title": "HistoryMercury / MercuryDock",
+    "kind": [
+      "software",
+      "tooling"
+    ],
+    "status": "active",
+    "version": "4.6.0"
+  },
+  "paths": {
+    "activeRoots": [
+      "b-Office/current",
+      "b-Office/package",
+      "b-Code",
+      "b-Code-MercuryDock"
+    ],
+    "sourceRoots": [
+      "b-Code",
+      "b-Code-MercuryDock"
+    ],
+    "generatedRoots": [
+      "b-Code-MercuryDock/bin",
+      "b-Code-MercuryDock/obj",
+      "b-Publish/current"
+    ],
+    "archiveRoots": [
+      "b-Office/history"
+    ],
+    "allowedRootDirectoryPrefixes": [
+      "a-",
+      "b-",
+      "z-"
+    ]
+  },
+  "documents": {
+    "center": "b-Office/文档中心.md",
+    "package": "b-Office/package/复用说明.md",
+    "structure": "b-Office/文档中心.md",
+    "overview": "b-Office/current/项目概览.md",
+    "technicalContract": "b-Office/current/技术合同.md",
+    "decisions": "b-Office/current/有效决策.md",
+    "verification": "b-Office/current/验证合同.md",
+    "historyBoundary": "b-Office/history/历史资料说明.md"
+  },
+  "commands": {
+    "setup": null,
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1",
+    "test": "dotnet run --project .\\b-Code-MercuryDock\\tests\\Smoke\\Smoke.csproj -c Release -p:NuGetAudit=false",
+    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1 -Instantiation",
+    "run": null,
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"
+  },
+  "externalDependencies": [
+    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-HistoryVulcan/host"
+  ],
+  "contextExclusions": [
+    "b-Office/history/**",
+    "b-Publish/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/node_modules/**",
+    "**/.vs/**",
+    "artifacts/**"
+  ]
+}
