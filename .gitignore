@@ -58,3 +58,6 @@ b-Publish/
 *.lck
 *.slk
 *.xlk
+
+# 本机覆盖点：AI 工作树里指回来源仓的宿主快照，不入库
+Directory.Build.user.props
