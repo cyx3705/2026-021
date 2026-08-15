@@ -26,10 +26,14 @@
       视图构造处抛 connectionId 异常，桌面坞被静默吞掉。源码联调必须显式表态。
     -->
     <HistoryVulcanSourceAvailable Condition="'$(HistoryVulcanSourceAvailable)' == ''">false</HistoryVulcanSourceAvailable>
-    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
-    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
-    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
-    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
+    <!-- AI 工作树落在库根之外，相对路径必然指空；diana.worktree.create 生成的
+         Directory.Build.user.props 会设定 HistoryVulcanPackageRoot，这里据此推导。 -->
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan</HistoryVulcanPackageRoot>
+    <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
+    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
+    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
+    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
     <ProjectReference Include="$(HistoryVulcanCoreProj)">
