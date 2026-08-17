@@ -136,6 +136,19 @@ True(MercuryCommandCatalog.FallbackCommandCatalog().Select(item => item.Name)
     .SequenceEqual(commands.Select(command => command.Name).OrderBy(name => name, StringComparer.Ordinal)),
     "Fallback catalog must come from the registration source.");
 
+// 配置值来自用户设置文件，非字符串值必须按缺失处理，不能让活动坞扫描路径抛异常。
+using (var malformedSettings = JsonDocument.Parse("""
+{"proj.libraryroot": 42, "proj.worktreeroot": true, "proj.other": null}
+"""))
+{
+    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.libraryroot"),
+        "Non-string library roots must be ignored.");
+    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.worktreeroot"),
+        "Non-string worktree roots must be ignored.");
+    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.other"),
+        "Null settings must be ignored.");
+}
+
 var tree = CommandOptionTree.Build(MercuryCommandCatalog.FallbackCommandCatalog());
 var roots = tree.ChildrenOf("");
 Equal(1, roots.Count, "Only mercury may appear as a module root.");

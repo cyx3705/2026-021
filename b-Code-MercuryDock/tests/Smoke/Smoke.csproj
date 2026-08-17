@@ -13,7 +13,8 @@
     联调时用 -p:HistoryVulcanCoreDll=... 逐个显式改写。
   -->
   <PropertyGroup>
-    <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan\host</HistoryVulcanHostDir>
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan</HistoryVulcanPackageRoot>
+    <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
     <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>

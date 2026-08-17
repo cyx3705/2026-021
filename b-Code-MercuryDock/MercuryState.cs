@@ -696,11 +696,17 @@ internal static partial class MercuryState
         return DefaultWorktreeRoot;
     }
 
-    private static string? ReadSetting(JsonDocument doc, string name)
-        => doc.RootElement.TryGetProperty(name, out var value)
-           && value.GetString() is { Length: > 0 } text
-            ? text
-            : null;
+    internal static string? ReadSetting(JsonDocument doc, string name)
+    {
+        if (!doc.RootElement.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        var text = value.GetString();
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
 
     private static bool TryGetWorktreeProjectName(string target, out string name)
     {

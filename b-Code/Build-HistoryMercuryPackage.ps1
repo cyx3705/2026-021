@@ -2,7 +2,8 @@
 param(
     [ValidateSet('Release')]
     [string]$Configuration = 'Release',
-    [string]$OutputRoot
+    [string]$OutputRoot,
+    [string]$HistoryVulcanPackageRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,7 +79,11 @@ if ($version -notmatch '^\d+\.\d+\.\d+$' -or
 }
 
 New-Item -ItemType Directory -Force -Path $workRoot, (Split-Path -Parent $OutputRoot) | Out-Null
-& dotnet build $projectPath -c $Configuration -p:NuGetAudit=false
+$buildProperties = @('-p:NuGetAudit=false')
+if (-not [string]::IsNullOrWhiteSpace($HistoryVulcanPackageRoot)) {
+    $buildProperties += "-p:HistoryVulcanPackageRoot=$HistoryVulcanPackageRoot"
+}
+& dotnet build $projectPath -c $Configuration @buildProperties
 if ($LASTEXITCODE -ne 0) {
     throw "HistoryMercury $Configuration build failed with exit code $LASTEXITCODE"
 }
