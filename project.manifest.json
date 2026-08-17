@@ -30,10 +30,13 @@
     "generatedRoots": [
       "b-Code-MercuryDock/bin",
       "b-Code-MercuryDock/obj",
-      "z-Publish/current"
+      "z-Publish"
     ],
     "archiveRoots": [
       "b-Office/history",
+      "z-Publish/history"
+    ],
+    "releaseRoots": [
       "z-Publish"
     ],
     "allowedRootDirectoryPrefixes": [
@@ -61,7 +64,7 @@
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"
   },
   "externalDependencies": [
-    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-HistoryVulcan/host"
+    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-Publish/host"
   ],
   "contextExclusions": [
     "b-Office/history/**",

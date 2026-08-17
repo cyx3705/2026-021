@@ -12,7 +12,7 @@ Set-StrictMode -Version Latest
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $publishRoot = Join-Path $repoRoot 'z-Publish'
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
-    $OutputRoot = Join-Path $publishRoot 'current\HistoryMercury'
+    $OutputRoot = $publishRoot
 }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $repoPrefix = $repoRoot.TrimEnd('\') + '\'
@@ -22,18 +22,28 @@ if (-not $OutputRoot.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCa
 
 $projectPath = Join-Path $repoRoot 'b-Code-MercuryDock\HistoryMercury.csproj'
 $manifestSource = Join-Path $repoRoot 'b-Code-MercuryDock\module.manifest.json'
+$packageDocuments = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'b-Office\package') -Filter '*.md' -File)
+if ($packageDocuments.Count -eq 0) {
+    throw 'b-Office/package must contain at least one Markdown document'
+}
 $releaseRoot = Join-Path $repoRoot "b-Code-MercuryDock\bin\$Configuration\net8.0-windows"
-$workRoot = Join-Path $publishRoot 'work'
 $transactionId = [Guid]::NewGuid().ToString('N')
-$stage = Join-Path $workRoot "HistoryMercury-candidate-$transactionId"
-$backup = Join-Path $workRoot "HistoryMercury-previous-$transactionId"
-$failed = Join-Path $workRoot "HistoryMercury-failed-$transactionId"
+$transactionRoot = Join-Path ([IO.Path]::GetTempPath()) "HistoryMercury.Package.$transactionId"
+$stage = Join-Path $transactionRoot 'candidate'
+$backup = Join-Path $transactionRoot 'previous'
 
 function Assert-ModulePackage {
     param([string]$Root, [string]$ExpectedVersion)
 
-    $expectedFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json', 'SHA256SUMS') | Sort-Object
-    $actualFiles = @(Get-ChildItem -LiteralPath $Root -File | Select-Object -ExpandProperty Name | Sort-Object)
+    $expectedFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json', 'SHA256SUMS') +
+        @($packageDocuments | ForEach-Object { "docs/$($_.Name)" }) | Sort-Object
+    $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+    $historyPrefix = $rootPrefix + 'history\'
+    $actualFiles = @(Get-ChildItem -LiteralPath $Root -File -Recurse |
+        Where-Object { -not $_.FullName.StartsWith($historyPrefix, [StringComparison]::OrdinalIgnoreCase) } |
+        ForEach-Object {
+        $_.FullName.Substring($rootPrefix.Length).Replace('\', '/')
+    } | Sort-Object)
     if (($actualFiles -join "`n") -ne ($expectedFiles -join "`n")) {
         throw "HistoryMercury package file set is invalid: $($actualFiles -join ', ')"
     }
@@ -46,18 +56,19 @@ function Assert-ModulePackage {
     }
     $hashes = @{}
     foreach ($line in [IO.File]::ReadAllLines((Join-Path $Root 'SHA256SUMS'), [Text.UTF8Encoding]::new($false))) {
-        if ($line -notmatch '^(?<hash>[0-9A-Fa-f]{64})  (?<file>[^\\/]+)$') {
+        if ($line -notmatch '^(?<hash>[0-9A-Fa-f]{64})  (?<file>.+)$') {
             throw "Invalid HistoryMercury checksum line: $line"
         }
         $hashes[$Matches.file] = $Matches.hash.ToUpperInvariant()
     }
-    foreach ($file in @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json')) {
-        $actual = (Get-FileHash -LiteralPath (Join-Path $Root $file) -Algorithm SHA256).Hash.ToUpperInvariant()
+    $hashTargets = @($expectedFiles | Where-Object { $_ -ne 'SHA256SUMS' })
+    foreach ($file in $hashTargets) {
+        $actual = (Get-FileHash -LiteralPath (Join-Path $Root $file.Replace('/', '\')) -Algorithm SHA256).Hash.ToUpperInvariant()
         if (-not $hashes.ContainsKey($file) -or $hashes[$file] -ne $actual) {
             throw "HistoryMercury checksum mismatch: $file"
         }
     }
-    if ($hashes.Count -ne 3) {
+    if ($hashes.Count -ne $hashTargets.Count) {
         throw 'HistoryMercury checksum does not cover the complete package'
     }
 }
@@ -78,7 +89,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+$' -or
     throw 'HistoryMercury project version and source manifest are not aligned'
 }
 
-New-Item -ItemType Directory -Force -Path $workRoot, (Split-Path -Parent $OutputRoot) | Out-Null
+New-Item -ItemType Directory -Force -Path $transactionRoot, $backup, $OutputRoot | Out-Null
 $buildProperties = @('-p:NuGetAudit=false')
 if (-not [string]::IsNullOrWhiteSpace($HistoryVulcanPackageRoot)) {
     $buildProperties += "-p:HistoryVulcanPackageRoot=$HistoryVulcanPackageRoot"
@@ -88,15 +99,20 @@ if ($LASTEXITCODE -ne 0) {
     throw "HistoryMercury $Configuration build failed with exit code $LASTEXITCODE"
 }
 
-$promoted = $false
-$backedUp = $false
 try {
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     Copy-Item -LiteralPath (Join-Path $releaseRoot 'HistoryMercury.dll') -Destination $stage
     Copy-Item -LiteralPath (Join-Path $releaseRoot 'HistoryMercury.xml') -Destination $stage
     Copy-Item -LiteralPath $manifestSource -Destination (Join-Path $stage 'module.manifest.json')
-    $checksumLines = foreach ($file in @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json')) {
-        "$((Get-FileHash -LiteralPath (Join-Path $stage $file) -Algorithm SHA256).Hash)  $file"
+    $docsRoot = Join-Path $stage 'docs'
+    New-Item -ItemType Directory -Force -Path $docsRoot | Out-Null
+    foreach ($document in $packageDocuments) {
+        Copy-Item -LiteralPath $document.FullName -Destination (Join-Path $docsRoot $document.Name)
+    }
+    $relativeFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json') +
+        @($packageDocuments | ForEach-Object { "docs/$($_.Name)" })
+    $checksumLines = foreach ($file in $relativeFiles) {
+        "$((Get-FileHash -LiteralPath (Join-Path $stage $file.Replace('/', '\')) -Algorithm SHA256).Hash)  $file"
     }
     [IO.File]::WriteAllLines(
         (Join-Path $stage 'SHA256SUMS'),
@@ -104,34 +120,39 @@ try {
         [Text.UTF8Encoding]::new($false))
     Assert-ModulePackage $stage $version
 
+    $movedPrevious = [Collections.Generic.List[string]]::new()
+    $movedCandidate = [Collections.Generic.List[string]]::new()
     try {
-        if (Test-Path -LiteralPath $OutputRoot) {
-            Move-Item -LiteralPath $OutputRoot -Destination $backup
-            $backedUp = $true
+        foreach ($item in @(Get-ChildItem -LiteralPath $OutputRoot -Force |
+                Where-Object { $_.Name -ne 'history' })) {
+            Move-Item -LiteralPath $item.FullName -Destination $backup
+            $movedPrevious.Add($item.Name)
         }
-        Move-Item -LiteralPath $stage -Destination $OutputRoot
-        $promoted = $true
+        foreach ($item in @(Get-ChildItem -LiteralPath $stage -Force)) {
+            Move-Item -LiteralPath $item.FullName -Destination $OutputRoot
+            $movedCandidate.Add($item.Name)
+        }
         Assert-ModulePackage $OutputRoot $version
-        if ($backedUp) {
-            Remove-Item -LiteralPath $backup -Recurse -Force
-            $backedUp = $false
-        }
     }
     catch {
-        if ($promoted -and (Test-Path -LiteralPath $OutputRoot)) {
-            Move-Item -LiteralPath $OutputRoot -Destination $failed
+        foreach ($name in $movedCandidate) {
+            $path = Join-Path $OutputRoot $name
+            if (Test-Path -LiteralPath $path) {
+                Remove-Item -LiteralPath $path -Recurse -Force
+            }
         }
-        if ($backedUp -and (Test-Path -LiteralPath $backup)) {
-            Move-Item -LiteralPath $backup -Destination $OutputRoot
+        foreach ($name in $movedPrevious) {
+            $path = Join-Path $backup $name
+            if (Test-Path -LiteralPath $path) {
+                Move-Item -LiteralPath $path -Destination $OutputRoot
+            }
         }
         throw
     }
     Write-Host "HistoryMercury $version candidate package created: $OutputRoot"
 }
 finally {
-    foreach ($path in @($stage, $backup, $failed)) {
-        if (Test-Path -LiteralPath $path) {
-            Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
-        }
+    if (Test-Path -LiteralPath $transactionRoot) {
+        Remove-Item -LiteralPath $transactionRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
