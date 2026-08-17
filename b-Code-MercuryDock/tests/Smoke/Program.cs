@@ -43,10 +43,16 @@ try
     shellHosted.CreateUi();
     Equal(1, registrar.Registered.Count, "The manager page must register once.");
     Equal("dock.manager", registrar.Registered[0], "Manager page ID");
+    True(MercuryState.IsWatching, "CreateUi must start the state watcher.");
     shellHosted.CreateUi();
     Equal(1, registrar.Registered.Count, "Repeated CreateUi must not register twice.");
     shellHosted.DestroyUi();
     Equal(1, registrar.Disposed, "DestroyUi must release the manager registration.");
+    True(!MercuryState.IsWatching, "DestroyUi must release the state watcher.");
+    shellHosted.CreateUi();
+    True(MercuryState.IsWatching, "The state watcher must restart after a UI reload.");
+    shellHosted.DestroyUi();
+    Equal(2, registrar.Disposed, "A reloaded UI must release its manager registration again.");
 }
 finally
 {
@@ -245,9 +251,16 @@ Equal("HistoryVulcan", MercuryPaths.HostName, "Host data root name");
 Equal(
     Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "HistoryVulcan", "Modules", "HistoryMercury", DockShortcutFolder.FolderName),
+        "HistoryVulcan", "HistoryMercury", DockShortcutFolder.FolderName),
     DockShortcutFolder.Path,
-    "Shortcut folder must use the module identity slot.");
+    "Shortcut folder must use the mutable module data root outside the package slot.");
+True(
+    !DockShortcutFolder.Path.StartsWith(
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "HistoryVulcan", "Modules") + Path.DirectorySeparatorChar,
+        StringComparison.OrdinalIgnoreCase),
+    "Shortcut files must never mutate the manifest-verified runtime package.");
 Equal("HistoryClio 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
 Equal(@"C:\OneHistory\HistoryClio", MercuryLibraryRoot.Default, "Default project library is HistoryClio");
 Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Coerce(MercuryLibraryRoot.LegacyVesta),
@@ -266,6 +279,14 @@ Directory.CreateDirectory(firstProject);
 Directory.CreateDirectory(secondProject);
 try
 {
+    DockShortcutFolder.StartWatching(_ => { }, shortcutRoot);
+    True(DockShortcutFolder.IsWatching, "The shortcut watcher must start for a module lifecycle.");
+    DockShortcutFolder.StopWatching();
+    True(!DockShortcutFolder.IsWatching, "Stopping must release the shortcut watcher handle.");
+    DockShortcutFolder.StartWatching(_ => { }, shortcutRoot);
+    True(DockShortcutFolder.IsWatching, "The shortcut watcher must restart after an unload.");
+    DockShortcutFolder.StopWatching();
+
     var now = DateTimeOffset.UtcNow;
     var first = new DockProject("2026-001-First", "2026-001", firstProject, now, false);
     var second = new DockProject("2026-002-Second", "2026-002", secondProject, now, false);
@@ -657,7 +678,7 @@ True(DockTheme.TileBackground(0.5).Color.B < coldTile.Color.B
 True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 0x12),
     "Tile text uses the documented deep-yellow accent.");
 
-Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, HistoryMercury identity slot, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
+Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
 
 static void True(bool condition, string message)
 {

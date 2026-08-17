@@ -10,11 +10,11 @@ public static class DockShortcutFolder
     private static FileSystemWatcher? _watcher;
     private static Timer? _debounceTimer;
     private static Action<ShortcutFolderDelta>? _changed;
+    private static string? _watchFolder;
     private static IReadOnlyDictionary<string, string> _expected =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public const string FolderName = "\u5feb\u6377\u65b9\u5f0f";
-    public const string ModuleSlotName = "HistoryMercury";
 
     private const string IconSource = "%SystemRoot%\\System32\\shell32.dll";
     private const int IconIndex = 3;
@@ -95,8 +95,11 @@ public static class DockShortcutFolder
     /// corresponding dock item was removed; a new link is a request to add its target.
     /// </summary>
     public static void StartWatching(Action<ShortcutFolderDelta> changed)
+        => StartWatching(changed, null);
+
+    internal static void StartWatching(Action<ShortcutFolderDelta> changed, string? folderOverride)
     {
-        if (IsExplorerRegistrationDisabled)
+        if (folderOverride == null && IsExplorerRegistrationDisabled)
             return;
 
         lock (WatchGate)
@@ -105,9 +108,11 @@ public static class DockShortcutFolder
             if (_watcher != null)
                 return;
 
-            Directory.CreateDirectory(Path);
-            _expected = ReadShortcuts(Path);
-            _watcher = new FileSystemWatcher(Path, "*.lnk")
+            var folder = folderOverride ?? Path;
+            Directory.CreateDirectory(folder);
+            _watchFolder = folder;
+            _expected = ReadShortcuts(folder);
+            _watcher = new FileSystemWatcher(folder, "*.lnk")
             {
                 IncludeSubdirectories = false,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
@@ -120,11 +125,40 @@ public static class DockShortcutFolder
         }
     }
 
+    /// <summary>Stops watching and releases every handle held by this module lifecycle.</summary>
+    public static void StopWatching()
+    {
+        lock (WatchGate)
+        {
+            if (_watcher != null)
+            {
+                _watcher.EnableRaisingEvents = false;
+                _watcher.Dispose();
+                _watcher = null;
+            }
+
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+            _changed = null;
+            _watchFolder = null;
+            _expected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    internal static bool IsWatching
+    {
+        get
+        {
+            lock (WatchGate)
+                return _watcher != null;
+        }
+    }
+
     private static string ResolvePath()
     {
-        // HistoryVulcan can shadow-copy a module into a transient load directory. Explorer must
-        // always target the durable module slot instead of that transient location.
-        return System.IO.Path.Combine(MercuryPaths.ModuleSlotRoot, FolderName);
+        // Runtime module slots are immutable manifest packages. Explorer-facing files are mutable
+        // user data and must stay outside the host's package discovery root.
+        return System.IO.Path.Combine(MercuryPaths.DataRoot, FolderName);
     }
 
     private static string LinkPath(string folder, DockProject project)
@@ -201,7 +235,9 @@ public static class DockShortcutFolder
         Action<ShortcutFolderDelta>? changed;
         lock (WatchGate)
         {
-            var actual = ReadShortcuts(Path);
+            if (_watchFolder == null)
+                return;
+            var actual = ReadShortcuts(_watchFolder);
             changes = Compare(_expected, actual);
             _expected = actual;
             changed = _changed;

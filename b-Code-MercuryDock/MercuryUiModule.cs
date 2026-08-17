@@ -169,6 +169,8 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
 
     public void DestroyUi()
     {
+        DockShortcutFolder.StopWatching();
+        MercuryState.StopWatching();
         _commandSurface?.Dispose();
         _commandSurface = null;
         _managerWindow?.Dispose();
