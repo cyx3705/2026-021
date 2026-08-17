@@ -13,37 +13,10 @@
         <member name="T:Mercury.CommandSurface.CommandCompletionEngine">
             <summary>为控制台输入提供命令、参数名和允许值候选；不执行命令也不改变注册表。</summary>
         </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.CompleteCommandName(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
+        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.MatchesCommandPrefix(System.String,System.String)">
             <summary>
-            命令名按 域 → 类 → 方法 分段推进补全（DEC-025）。
+            Matches full names (`vulcan.win.reset`) and shorter typed prefixes (`win.` / `win.re`).
             </summary>
-            <remarks>
-            已输入的点号数量决定当前处在哪一段：0 个点选域、1 个点选类、2 个点选方法。
-            域聚焦时首段可以省略，此时同一个 token 既可能是域也可能是聚焦域下的类，
-            两种解释都给出候选，由用户选（REQ-CMD-012 第 4 条）。
-            域清单不来自任何常量表，而是从传入的已注册命令定义现算。
-            </remarks>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.DomainCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition})">
-            <summary>已注册域的候选。域集合从命令定义现算，不硬编码。</summary>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.ClassCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
-            <summary>`域.类前缀` → 该域下匹配的类。</summary>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.DirectMethodCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
-            <summary>该域的无类直接方法（两段名）。补全后带尾随空格，直接进入参数段。</summary>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.MethodCandidates(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
-            <summary>`域.类.方法前缀` → 匹配的方法。补全后带尾随空格。</summary>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.ResolveAgainstFocus(System.String,System.Collections.Generic.IReadOnlyList{Mercury.CommandSurface.CommandCompletionDefinition},System.String)">
-            <summary>
-            把用户输入的命令名按域聚焦规则还原成完整名：首段命中已注册域则原样，否则补聚焦域前缀。
-            与宿主 <c>DomainFocus.Resolve</c> 同一条规则，此处只对单个命令名生效。
-            </summary>
-        </member>
-        <member name="M:Mercury.CommandSurface.CommandCompletionEngine.Segment(System.String,System.Int32)">
-            <summary>取第 <paramref name="index"/> 段；越界返回空串（尾随点号即空末段）。</summary>
         </member>
         <member name="T:Mercury.CommandSurface.CommandDetailView">
             <summary>所选指令的 Help、MCP 映射与提示词治理详情。</summary>
@@ -60,10 +33,10 @@
             <summary>
             Mercury-owned command workbench: catalog session, command-set and detail tool windows.
             Console remains in Vulcan Shell; this feature attaches the shared session via
-            <see cref="T:HistoryVulcan.Extensibility.Modules.IShellCommandWorkbenchHost"/>.
+            <see cref="T:HistoryVulcan.Core.Modules.IShellCommandWorkbenchHost"/>.
             </summary>
         </member>
-        <member name="M:Mercury.CommandSurface.CommandSurfaceFeature.TryAttach(HistoryVulcan.Extensibility.Modules.IShellCommandWorkbenchHost,HistoryVulcan.Core.Modules.IShellUiRegistrar)">
+        <member name="M:Mercury.CommandSurface.CommandSurfaceFeature.TryAttach(HistoryVulcan.Core.Modules.IShellCommandWorkbenchHost,HistoryVulcan.Core.Modules.IShellUiRegistrar)">
             <summary>
             Creates the shared catalog session, registers mcp/commanddetail windows, and attaches
             the session to the Shell console deferred proxy.
@@ -166,26 +139,12 @@
             <summary>
             Reconciles only .lnk files owned by the dock. Non-shortcut files are intentionally untouched.
             </summary>
-            <remarks>
-            只写真正不一致的快捷方式。这个文件夹是钉在"此电脑"下的命名空间扩展，任何一次写入都会
-            让所有打开的资源管理器窗口（SeparateProcess 下是多个进程）刷新该节点，因此"内容没变也
-            全量重写"的代价是外部可见的，不只是几次磁盘 IO。
-            </remarks>
         </member>
         <member name="M:Mercury.DockShortcutFolder.StartWatching(System.Action{Mercury.DockShortcutFolder.ShortcutFolderDelta})">
             <summary>
             Watches user edits to the managed folder. A missing existing link means the
             corresponding dock item was removed; a new link is a request to add its target.
             </summary>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.StopWatching">
-            <summary>Stops watching and releases every handle held by this module lifecycle.</summary>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.IsShortcutCurrent(System.String,Mercury.DockProject)">
-            <summary>受管字段逐项相等才算最新；读不出来一律按需要重写处理。</summary>
-        </member>
-        <member name="P:Mercury.DockShortcutFolder.ShortcutSyncResult.Changed">
-            <summary>本次是否真的动过磁盘。只有动过才值得通知外壳。</summary>
         </member>
         <member name="T:Mercury.DockTheme">
             <summary>
@@ -196,20 +155,6 @@
         <member name="P:Mercury.DockTheme.Selection">
             <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
         </member>
-        <member name="P:Mercury.DockTheme.TileBase">
-            <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
-            <c>Shell.Brush.Surface</c>(#FFFFFF) 与 <c>Shell.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
-        </member>
-        <member name="P:Mercury.DockTheme.TileTintTarget">
-            <summary>磁贴底色偏黄端。</summary>
-        </member>
-        <member name="P:Mercury.DockTheme.TileText">
-            <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Shell.Brush.Accent</c>(#A87A12)。
-            白底与 #FAF0D8 底上对比度都足够。</summary>
-        </member>
-        <member name="M:Mercury.DockTheme.TileBackground(System.Double)">
-            <summary>按偏黄程度插值出磁贴底色画刷；<paramref name="tint"/> 取 [0,1]。</summary>
-        </member>
         <member name="P:Mercury.DockTheme.InputPadding">
             <summary>
             输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
@@ -218,7 +163,7 @@
         </member>
         <member name="T:Mercury.DockWeight">
             <summary>
-            收录权重的纯计算：指数衰减计数、信号合并与磁贴底色偏黄程度映射。
+            收录权重的纯计算：指数衰减计数、信号合并与光圈亮度映射。
             不触碰文件与界面，便于 Smoke 直接断言。
             </summary>
             <remarks>
@@ -231,6 +176,12 @@
         </member>
         <member name="F:Mercury.DockWeight.RecentWeight">
             <summary>资源管理器打开一次的计权。</summary>
+        </member>
+        <member name="F:Mercury.DockWeight.MaxGlowOpacity">
+            <summary>光圈最大不透明度。</summary>
+        </member>
+        <member name="F:Mercury.DockWeight.MaxGlowBlur">
+            <summary>光圈最大模糊半径。</summary>
         </member>
         <member name="M:Mercury.DockWeight.Decay(System.Double,System.DateTimeOffset,System.DateTimeOffset,System.Double)">
             <summary>把分数从 <paramref name="updated"/> 衰减到 <paramref name="now"/>。</summary>
@@ -247,53 +198,20 @@
         <member name="M:Mercury.DockWeight.Normalize(System.Double,System.Double)">
             <summary>权重归一化到 [0,1]，基准取当前列表最大值。</summary>
         </member>
-        <member name="M:Mercury.DockWeight.TileTint(System.Double,System.Double)">
-            <summary>
-            磁贴底色的偏黄程度，0 为纯白、1 为最黄。权重归一化后直接作为插值系数：
-            打开越频繁的项目底色越偏黄。
-            </summary>
+        <member name="M:Mercury.DockWeight.GlowOpacity(System.Double,System.Double)">
+            <summary>白色光圈的不透明度；零权重不发光。</summary>
+        </member>
+        <member name="M:Mercury.DockWeight.GlowBlur(System.Double,System.Double)">
+            <summary>白色光圈的模糊半径。</summary>
         </member>
         <member name="T:Mercury.ExplorerNamespaceRegistration">
             <summary>Registers the dock-generated shortcut folder in the current user's Explorer namespace.</summary>
         </member>
-        <member name="M:Mercury.ExplorerNamespaceRegistration.RefreshExplorerNamespace">
-            <summary>
-            命名空间项本身增删改后的全局通知。
-            </summary>
-            <remarks>
-            SHCNE_ASSOCCHANGED 会让每一个外壳进程丢弃图标缓存并重读文件关联；开启
-            "在单独的进程中打开文件夹窗口"时，代价按打开的窗口进程数翻倍。它只在导航窗格需要
-            重新发现这个命名空间子项时才有必要，因此仅由 <see cref="M:Mercury.ExplorerNamespaceRegistration.RegisterOrUpdate(System.String)"/> 与
-            <see cref="M:Mercury.ExplorerNamespaceRegistration.RemoveRegistration"/> 在注册项真的变化时调用。目录内容变化请用
-            <see cref="M:Mercury.ExplorerNamespaceRegistration.NotifyFolderChanged(System.String)"/>。
-            </remarks>
-        </member>
-        <member name="M:Mercury.ExplorerNamespaceRegistration.NotifyFolderChanged(System.String)">
-            <summary>只通知某一个目录的内容变了，不碰图标缓存与文件关联。</summary>
-        </member>
-        <member name="M:Mercury.ExplorerNamespaceRegistration.IsCurrent(System.String)">
-            <summary>
-            逐项核对本模块写入的每一个注册值。任一项缺失或不符就返回 false，
-            这样半写坏的注册仍会被下一次调用修复。
-            </summary>
-        </member>
-        <member name="M:Mercury.ExplorerNamespaceRegistration.Raw(Microsoft.Win32.RegistryKey,System.String)">
-            <summary>取未展开的原始字符串，否则 ExpandString 会被展开成实际路径而永远比不相等。</summary>
-        </member>
-        <member name="T:Mercury.ExplorerNamespaceRegistration.RegistrationResult">
-            <summary>
-            <paramref name="Changed"/> 区分"写入并通知过"和"本来就是这样"，调用方据此决定是否
-            还需要额外的外壳通知。
-            </summary>
-        </member>
-        <member name="M:Mercury.ExplorerNamespaceRegistration.RegistrationResult.#ctor(System.Boolean,System.String,System.String,System.Boolean)">
-            <summary>
-            <paramref name="Changed"/> 区分"写入并通知过"和"本来就是这样"，调用方据此决定是否
-            还需要额外的外壳通知。
-            </summary>
-        </member>
         <member name="T:Mercury.HistoryVulcanLauncher">
             <summary>打开或唤起 HistoryVulcan 主界面。</summary>
+        </member>
+        <member name="M:Mercury.HistoryVulcanLauncher.Open">
+            <summary>返回是否唤起了已存在的前端；false 表示启动了新的前端。</summary>
         </member>
         <member name="T:Mercury.Input.GlobalShortcutService">
             <summary>
@@ -316,7 +234,7 @@
         <member name="M:Mercury.Input.GlobalShortcutService.Stop">
             <inheritdoc />
         </member>
-        <member name="M:Mercury.Input.GlobalShortcutService.Register(Mercury.Input.GlobalShortcutDescriptor,System.String)">
+        <member name="M:Mercury.Input.GlobalShortcutService.Register(HistoryVulcan.Core.Input.GlobalShortcutDescriptor,System.String)">
             <inheritdoc />
         </member>
         <member name="M:Mercury.Input.GlobalShortcutService.CreateOwnerRegistrar(System.String)">
@@ -328,153 +246,59 @@
         <member name="M:Mercury.Input.GlobalShortcutService.Dispose">
             <inheritdoc />
         </member>
-        <member name="T:Mercury.Input.GlobalShortcutModifiers">
-             <summary>
-             全局快捷键的数据模型。
-            
-             这些类型此前住在 HistoryVulcan.Core.Input，是宿主公开面的一部分（46 行 API）。
-             但快捷键的实现、派发和生命周期从来都在 Mercury 这边，宿主只是持有契约并驱动注册——
-             结果是「改快捷键必须动宿主」。契约随实现走之后，宿主不再需要知道快捷键这个概念存在，
-             能力经 mercury.hotkey.* 命令暴露，调用方只依赖命令名与参数名。
-            
-             命名空间刻意用 Mercury.Input 而非沿用 HistoryVulcan.Core.Input：所有权已经转移，
-             名字应当说实话；顺带也避免与宿主尚未清理干净的旧类型撞名。
-             </summary>
-        </member>
-        <member name="T:Mercury.Input.GlobalShortcutStroke">
-            <summary>一次击键：虚拟键码 + 修饰键。</summary>
-        </member>
-        <member name="M:Mercury.Input.GlobalShortcutStroke.#ctor(System.Int32,Mercury.Input.GlobalShortcutModifiers)">
-            <summary>一次击键：虚拟键码 + 修饰键。</summary>
-        </member>
-        <member name="T:Mercury.Input.GlobalShortcutDescriptor">
-            <summary>
-            一个不吞按键的全局快捷键。击键按顺序求值；重复与前缀冲突的注册会被拒绝。
-            CommandText 即命中后要执行的指令文本——快捷键本质就是「按键序列 → 命令名」。
-            </summary>
-        </member>
-        <member name="M:Mercury.Input.GlobalShortcutDescriptor.#ctor(System.String,System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke},System.String,System.Int32)">
-            <summary>
-            一个不吞按键的全局快捷键。击键按顺序求值；重复与前缀冲突的注册会被拒绝。
-            CommandText 即命中后要执行的指令文本——快捷键本质就是「按键序列 → 命令名」。
-            </summary>
-        </member>
-        <member name="T:Mercury.Input.GlobalShortcutRegistrationInfo">
-            <summary>对外可见的注册快照，供 mercury.hotkey.list 呈现。</summary>
-        </member>
-        <member name="M:Mercury.Input.GlobalShortcutRegistrationInfo.#ctor(System.String,System.String,System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke},System.String,System.Int32)">
-            <summary>对外可见的注册快照，供 mercury.hotkey.list 呈现。</summary>
-        </member>
-        <member name="T:Mercury.Input.IGlobalShortcutRegistrar">
-            <summary>按 owner 隔离的注册面；释放时一并注销该 owner 的全部注册。</summary>
-        </member>
-        <member name="T:Mercury.Input.HotkeyCommands">
-             <summary>
-             <c>mercury.hotkey.*</c> 的业务实现。
-            
-             这是「命令即暴露面」的落点:快捷键能力不再经由任何 CLR 契约暴露,调用方只需要知道
-             命令名和参数名。因此 Mercury 可以任意重构快捷键实现,而宿主与其他模块一行不动。
-             </summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyCommands.Register(System.String,System.String,System.String,System.String,System.Nullable{System.Int32})">
-            <summary>注册一个「按键序列 → 命令」的全局快捷键。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyCommands.Unregister(System.String)">
-            <summary>注销此前注册的快捷键。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyCommands.List">
-            <summary>列出当前生效的快捷键注册。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyCommands.ParseStrokes(System.String)">
-            <summary>
-            按键序列文法:逗号分隔多次击键,每次击键为「修饰键+主键」。
-            例:<c>Ctrl+Alt+M</c>、<c>Slash,Slash</c>(连按两次 /)、<c>VK:0xBF</c>(直接给虚拟键码)。
-            修饰键:Ctrl/Control、Alt、Shift、Win/Windows。
-            </summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyCommands.Describe(System.Collections.Generic.IReadOnlyList{Mercury.Input.GlobalShortcutStroke})">
-            <summary>把按键序列还原成文法文本，使 list 的输出可以直接回填给 register。</summary>
-        </member>
-        <member name="T:Mercury.Input.HotkeyService">
-             <summary>
-             HistoryMercury 自持的全局快捷键服务。
-            
-             此前的装配路径是:Vulcan 的 App 在模块系统之外用 <c>Assembly.LoadFrom</c> 全盘预扫描模块
-             DLL,按约定构造签名反射构造出 <c>IGlobalShortcutHost</c> 实现,再交给 ModuleHost;ModuleHost
-             又扫描各模块的 <c>IGlobalShortcutModule</c> 驱动注册。为一个「按键 → 命令名」的功能,宿主
-             付出了 46 行公开类型契约 + 一次不可卸载的预扫描 + 一套扫描驱动逻辑。
-            
-             现在改为:快捷键完全是 Mercury 的私事。Mercury 在自己的模块生命周期里构造并启动服务,
-             并以 <c>mercury.hotkey.*</c> 命令对外提供能力。任何模块(或人、或 AI)要注册快捷键,
-             走命令总线即可,不需要引用任何类型。宿主不再需要知道「快捷键」这个概念存在。
-            
-             注册项本身就是「按键序列 → 命令文本」,所以命令化没有任何信息损失——
-             <see cref="T:Mercury.Input.GlobalShortcutDescriptor"/> 从一开始就带着 CommandText。
-             </summary>
-        </member>
-        <member name="P:Mercury.Input.HotkeyService.Current">
-            <summary>当前实例;未启动时为 null。命令层据此给出明确的失败信息而不是空引用。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyService.Start(HistoryVulcan.Core.Commands.CommandBus,HistoryVulcan.Core.Logging.IShellLog)">
-            <summary>
-            在模块上下文接入时构造并启动。重复调用是幂等的:热重载会重新 Attach,
-            但键盘钩子必须唯一,否则同一组按键会触发两次。
-            </summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyService.Register(Mercury.Input.GlobalShortcutDescriptor,System.String)">
-            <summary>注册一个快捷键；同 id 重复注册会先注销旧的，使热重载可重入。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyService.Unregister(System.String)">
-            <summary>按 id 注销；返回是否确有该注册。</summary>
-        </member>
-        <member name="M:Mercury.Input.HotkeyService.Stop">
-            <summary>模块卸载时停止并释放钩子。</summary>
-        </member>
-        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},System.Boolean,HistoryVulcan.Core.Commands.ParameterSpec[])">
-            <summary>
-            无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
-            注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryCommands.Go(System.String)">
-            <summary>
-            切换控制台的域聚焦。聚焦状态存放在共享的命令目录会话里，与控制台域筛选下拉同源，
-            因此这里只写会话，下拉会自己跟上。
-            </summary>
-            <param name="domain">要聚焦的域；空表示退出聚焦。</param>
-        </member>
-        <member name="T:Mercury.MercuryLibraryRoot">
-            <summary>
-            活动坞扫描的项目库根。当前库是 HistoryClio；配置里若仍指向 HistoryVesta 则改写过来。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryLibraryRoot.Coerce(System.String)">
-            <summary>
-            已退役的 Vesta 路径改写到 <see cref="F:Mercury.MercuryLibraryRoot.Default"/>（该库存在时）。
-            其它现存路径原样返回。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryLibraryRoot.Resolve(System.String,System.String)">
-            <summary>
-            优先 <c>proj.libraryroot</c>，其次仍存在的 <c>proj.worktreeroot</c>，最后缺省 Clio。
-            命中的路径都经过 <see cref="M:Mercury.MercuryLibraryRoot.Coerce(System.String)"/>。
-            </summary>
-        </member>
-        <member name="T:Mercury.MercuryManagerPage">
-            <summary>
-            MercuryManagerPage
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerPage.InitializeComponent">
-            <summary>
-            InitializeComponent
-            </summary>
-        </member>
         <member name="T:Mercury.MercuryManagerView">
-            <summary>扩展坞管理页面注册入口。</summary>
+            <summary>
+            扩展坞管理页面，默认注册为中央主文档区页签。
+            </summary>
+            <remarks>
+            管理页与桌面坞都运行在桌面 Shell 进程；mercury 三段式指令注册在服务进程，
+            经总线远程转发透明执行。所有状态写操作落到 state.json，由
+            <see cref="M:Mercury.MercuryState.StartWatching"/> 的文件监视完成跨进程同步。
+            </remarks>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildRowStyle">
+            <summary>
+            表格正文字号 Small、行距 Padding(4,1)，比命令集默认 Body/(8,4) 更紧；
+            自绘选中模板保留淡黄底深字。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildHeaderStyle">
+            <summary>紧凑表头：Small 字号、高 20。</summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.BuildPinTemplate">
+            <summary>图钉开关：项目行点击切换；指令行常驻，点击仅提示。</summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.Reload">
+            <summary>列表只显示已入坞的条目：项目（固定+策略选中）加手动指令项。</summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.LoadCommandCatalogAsync">
+            <summary>指令候选：服务侧全量清单（command.list 经远程转发），失败回退本模块静态清单。</summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.EntryOptions(System.String)">
+            <summary>
+            单行候选：首个空格之前是指令（域→类→方法级联），空格之后是参数。
+            打开项目指令的参数候选为工作树未入坞项目（排除项标注排前），其他指令参数自由输入。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.AddEntry">
+            <summary>加入：指令行拆为 指令+参数；打开项目且命中工作树走 AddToDock，其余作为自定义指令常驻入坞。</summary>
+        </member>
+        <member name="T:Mercury.MercuryManagerView.ManagerPage.DockRow">
+            <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
+        </member>
+        <member name="M:Mercury.MercuryManagerView.ManagerPage.DockRow.#ctor(System.String,System.String,System.Boolean,System.Boolean,System.Double,System.Double,System.Nullable{System.DateTimeOffset})">
+            <summary>入坞列表行：项目行与指令行共用。Key 为选中恢复的标识。</summary>
         </member>
         <member name="T:Mercury.MercuryPaths">
             <summary>HistoryMercury runtime locations and read-only migration sources.</summary>
+        </member>
+        <member name="T:Mercury.MercuryShortcutModule">
+            <summary>
+            Registers HistoryMercury-owned global shortcuts with the Vulcan module host.
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryShortcutModule.RegisterShortcuts(HistoryVulcan.Core.Input.IGlobalShortcutRegistrar)">
+            <inheritdoc />
         </member>
         <member name="T:Mercury.DockCommandEntry">
             <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
@@ -488,7 +312,7 @@
             </summary>
         </member>
         <member name="F:Mercury.MercuryState.DefaultWorktreeRoot">
-            <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
+            <summary>项目库缺省根；配置值失效（如整库改名后）时回退到这里。</summary>
         </member>
         <member name="P:Mercury.MercuryState.Projects">
             <summary>桌面坞显示的收录结果：固定项加按策略截取的加权项，不含被排除项。</summary>
@@ -517,53 +341,6 @@
         <member name="M:Mercury.MercuryState.Forget(System.String)">
             <summary>清除使用记录；name 为空表示全部。</summary>
         </member>
-        <member name="M:Mercury.MercuryState.SynchronizeExplorerEntry(System.Collections.Generic.IReadOnlyList{Mercury.DockProject})">
-            <summary>
-            把快捷方式文件夹和资源管理器入口对齐，并且只在真的改过东西时通知外壳。
-            </summary>
-            <remarks>
-            刷新是高频动作（每次打开项目、每次跨进程状态同步都会走到这里），而外壳通知是全局广播。
-            因此这里的判断顺序是：注册项变了就已经广播过一次，无需再补；注册项没变而目录内容动过，
-            只定点通知那一个目录；两者都没动则一个通知都不发。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryState.ApplyShortcutFolderChanges(Mercury.DockShortcutFolder.ShortcutFolderDelta)">
-            <summary>
-            把用户在快捷方式文件夹里的手动增删翻译成收录意图。
-            </summary>
-            <remarks>
-            这个文件夹可能被本进程、另一进程和用户三方写入，所以不能把看到的任何增删都当成用户意图：
-            <list type="number">
-            <item>先把磁盘上的偏好读回来。服务进程与界面进程各有一份内存副本，用旧副本判断会把
-            对方刚写下的状态又改回去。</item>
-            <item>同一轮里既消失又出现的项目是一次重写，不是意图，直接跳过。</item>
-            <item>已经处于目标状态的项目不再重复写入，避免"排除→写盘→再触发"的自激。</item>
-            </list>
-            历史上缺这三条，结果是同一个项目会被同时写进 Pins 和 Excluded。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryState.ResolveShortcutIntent(System.Collections.Generic.IReadOnlySet{System.String},System.Collections.Generic.IReadOnlySet{System.String},System.Collections.Generic.IReadOnlySet{System.String},System.Collections.Generic.IReadOnlySet{System.String})">
-            <summary>
-            把"文件夹里少了/多了哪些链接"翻译成"要排除/要收录哪些项目"。纯函数，不读写磁盘。
-            </summary>
-            <remarks>
-            三条规则：同一轮里既少又多的项目是一次重写，不产生意图；已经是排除状态的项目再"少一条链接"
-            不产生意图；已经固定且未被排除的项目再"多一条链接"也不产生意图。前两条挡住程序自己的写入
-            被读成用户操作，第三条挡住重复写盘。任一名字不会同时出现在两个结果里。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryState.SanitizePins(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IReadOnlySet{System.String})">
-            <summary>排除优先：同时出现在两个集合里的项目从固定集合中剔除。</summary>
-        </member>
-        <member name="T:Mercury.MercuryState.ShortcutIntent">
-            <summary>一轮快捷方式增删翻译出的收录意图。</summary>
-        </member>
-        <member name="M:Mercury.MercuryState.ShortcutIntent.#ctor(System.Collections.Generic.IReadOnlyList{System.String},System.Collections.Generic.IReadOnlyList{System.String})">
-            <summary>一轮快捷方式增删翻译出的收录意图。</summary>
-        </member>
-        <member name="M:Mercury.MercuryState.ProjectNames(System.Collections.Generic.IReadOnlyList{System.String})">
-            <summary>把快捷方式目标路径映射为工作树项目名；不属于工作树的目标整条丢弃。</summary>
-        </member>
         <member name="M:Mercury.MercuryState.AddToDock(System.String)">
             <summary>
             手动把项目加入扩展坞：解除排除并固定。接受工作树根下真实存在的项目名或编号。
@@ -587,7 +364,7 @@
             <summary>按指令文本移除指令项；不存在时返回 false。</summary>
         </member>
         <member name="M:Mercury.MercuryState.NormalizeCommand(System.String)">
-            <summary>折叠引号外的连续空白；引号、转义符和引号内文本逐字符保留。</summary>
+            <summary>折叠连续空白，保证同一指令的不同写法只存一份。</summary>
         </member>
         <member name="M:Mercury.MercuryState.ApplyPinState(System.String)">
             <summary>调用方须已持有 <see cref="F:Mercury.MercuryState.Gate"/>。把 Pin 结果同步进两个缓存列表并保持既有排序。</summary>
@@ -640,40 +417,11 @@
         <member name="P:Mercury.MercuryUiModule.Bus">
             <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
         </member>
-        <member name="P:Mercury.MercuryUiModule.Log">
-            <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
-        </member>
-        <member name="P:Mercury.MercuryUiModule.CatalogSession">
-            <summary>
-            共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
-            <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
-            无 UI 宿主（服务进程、烟测）下为 null。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.RegisterOwnShortcuts(HistoryVulcan.Core.Modules.IModuleContext)">
-            <summary>
-            Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
-            用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.CreateUi">
-            <summary>
-            建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
-            </summary>
-            <remarks>
-            4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
-            宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
-            唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.CreateDesktopDock">
-            <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
-        </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.HistoryVulcanButton">
-            <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
+            <summary>HistoryVulcan 入口：不参与排序、不发光、不可取消。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.CommandButton(Mercury.DockCommandEntry)">
             <summary>手动指令项按钮：指令字形无光圈，点击经总线执行，右键可移除。</summary>
@@ -683,25 +431,6 @@
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.NakedButton(System.Object,System.String)">
             <summary>无边框透明按钮，悬停时叠一层浅色半透明，深底上不会闪出白块。</summary>
-        </member>
-        <member name="P:Mercury.ModuleInfo.Version">
-            <summary>
-            版本取自程序集，不写字面量。宿主装载时比对 manifest 与本类的版本，两者不一致会
-            **静默跳过整个模块**——只在服务进程日志留一行 module.discovery 警告，界面上表现为
-            活动坞与命令集页一起消失。4.2.0 就因为漏改这里的字面量复现过一次，故收敛为单一来源。
-            </summary>
-        </member>
-        <member name="M:Mercury.ModuleInfo.ReadAssemblyVersion">
-            <summary>
-            取 InformationalVersion 并去掉 <c>+源码修订号</c> 后缀；缺失时回退到程序集版本的三段形式。
-            manifest 里写的是 <c>4.2.0</c> 这种三段语义版本，两边必须能逐字符相等。
-            </summary>
-        </member>
-        <member name="M:Mercury.ProjectIconGenerator.ShortLabel(System.String)">
-            <summary>磁贴上显示的项目后缀：去掉编号前缀及品牌前缀，不添加省略号。</summary>
-        </member>
-        <member name="M:Mercury.ProjectIconGenerator.FitFontSize(System.String,System.Double,System.Double)">
-            <summary>按像素宽度选择完整标签可用的字号，保证 UI 不以省略号牺牲项目特征。</summary>
         </member>
         <member name="T:Mercury.RecentFolders">
              <summary>
@@ -741,27 +470,6 @@
         <member name="T:Mercury.RecentFolders.IShellLinkW">
             <summary>只声明首个槽位 GetPath；本模块不调用其余方法。</summary>
         </member>
-        <member name="T:Mercury.ShortcutFileService">
-            <summary>Resolves and opens ordinary paths and Windows shortcut files.</summary>
-        </member>
-        <member name="M:Mercury.ShortcutFileService.TryReadShortcut(System.String,Mercury.ShortcutFileService.ShortcutContent@)">
-            <summary>
-            读回快捷方式的全部受管字段，供写入前比对。取原始路径（不解析、不探测网络），
-            因为这里只需要判断"和我们要写的内容是否一致"。
-            </summary>
-        </member>
-        <member name="M:Mercury.ShortcutFileService.Release(System.Object)">
-            <summary>
-            每次刷新都会创建若干 ShellLink，交给 GC 终结器回收会让 COM 引用在进程里堆积，
-            因此用完立刻释放 RCW。
-            </summary>
-        </member>
-        <member name="T:Mercury.ShortcutFileService.ShortcutContent">
-            <summary>快捷方式里由活动坞管理的字段。</summary>
-        </member>
-        <member name="M:Mercury.ShortcutFileService.ShortcutContent.#ctor(System.String,System.String,System.String,System.Int32)">
-            <summary>快捷方式里由活动坞管理的字段。</summary>
-        </member>
         <member name="T:Mercury.SuggestOption">
             <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>
         </member>
@@ -783,35 +491,8 @@
         <member name="E:Mercury.SuggestBox.Edited">
             <summary>输入框文本发生任何变化（含确认回填）时触发。</summary>
         </member>
-        <member name="T:XamlGeneratedNamespace.GeneratedInternalTypeHelper">
-            <summary>
-            GeneratedInternalTypeHelper
-            </summary>
-        </member>
-        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.CreateInstance(System.Type,System.Globalization.CultureInfo)">
-            <summary>
-            CreateInstance
-            </summary>
-        </member>
-        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.GetPropertyValue(System.Reflection.PropertyInfo,System.Object,System.Globalization.CultureInfo)">
-            <summary>
-            GetPropertyValue
-            </summary>
-        </member>
-        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.SetPropertyValue(System.Reflection.PropertyInfo,System.Object,System.Object,System.Globalization.CultureInfo)">
-            <summary>
-            SetPropertyValue
-            </summary>
-        </member>
-        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.CreateDelegate(System.Type,System.Object,System.String)">
-            <summary>
-            CreateDelegate
-            </summary>
-        </member>
-        <member name="M:XamlGeneratedNamespace.GeneratedInternalTypeHelper.AddEventHandler(System.Reflection.EventInfo,System.Object,System.Delegate)">
-            <summary>
-            AddEventHandler
-            </summary>
+        <member name="T:BaseVariable.ModuleInfoBase">
+            <summary>HistoryVulcan 模块识别合同的兼容副本。</summary>
         </member>
         <member name="T:System.Text.RegularExpressions.Generated.ProjectNumber_0">
             <summary>Custom <see cref="T:System.Text.RegularExpressions.Regex"/>-derived type for the ProjectNumber method.</summary>
