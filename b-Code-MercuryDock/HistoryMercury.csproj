@@ -6,7 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;**\bin\**;**\obj\**</DefaultItemExcludes>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
     <Version>4.6.1</Version>

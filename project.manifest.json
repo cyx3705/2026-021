@@ -21,15 +21,19 @@
       "b-Office/current",
       "b-Office/package",
       "b-Code",
-      "b-Code-MercuryDock"
+      "b-Code-MercuryDock",
+      "b-Code-Tests"
     ],
     "sourceRoots": [
       "b-Code",
-      "b-Code-MercuryDock"
+      "b-Code-MercuryDock",
+      "b-Code-Tests"
     ],
     "generatedRoots": [
       "b-Code-MercuryDock/bin",
       "b-Code-MercuryDock/obj",
+      "b-Code-Tests/HistoryMercury.Smoke/bin",
+      "b-Code-Tests/HistoryMercury.Smoke/obj",
       "z-Publish"
     ],
     "archiveRoots": [
@@ -58,7 +62,7 @@
   "commands": {
     "setup": null,
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1",
-    "test": "dotnet run --project .\\b-Code-MercuryDock\\tests\\Smoke\\Smoke.csproj -c Release -p:NuGetAudit=false",
+    "test": "dotnet run --project .\\b-Code-Tests\\HistoryMercury.Smoke\\HistoryMercury.Smoke.csproj -c Release -p:NuGetAudit=false",
     "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1 -Instantiation",
     "run": null,
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"

@@ -15,10 +15,8 @@ if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = $publishRoot
 }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
-$repoPrefix = $repoRoot.TrimEnd('\') + '\'
-if (-not $OutputRoot.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-    throw "OutputRoot must remain inside the HistoryMercury project: $OutputRoot"
-}
+# Diana 的发布器把候选先写到临时 OutputRoot，再提升为 z-Publish/HistoryMercury-vX.Y.Z。
+# 省略参数时仍默认项目内 z-Publish；显式传入时允许库外路径。
 
 $projectPath = Join-Path $repoRoot 'b-Code-MercuryDock\HistoryMercury.csproj'
 $manifestSource = Join-Path $repoRoot 'b-Code-MercuryDock\module.manifest.json'

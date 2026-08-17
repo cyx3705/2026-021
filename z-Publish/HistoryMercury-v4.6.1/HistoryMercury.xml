@@ -80,6 +80,22 @@
             InitializeComponent
             </summary>
         </member>
+        <member name="T:Mercury.HistoryVulcanLauncher">
+            <summary>打开或唤起 HistoryVulcan 主界面。</summary>
+        </member>
+        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},System.Boolean,HistoryVulcan.Core.Commands.ParameterSpec[])">
+            <summary>
+            无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
+            注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
+            </summary>
+        </member>
+        <member name="M:Mercury.MercuryCommands.Go(System.String)">
+            <summary>
+            切换控制台的域聚焦。聚焦状态存放在共享的命令目录会话里，与控制台域筛选下拉同源，
+            因此这里只写会话，下拉会自己跟上。
+            </summary>
+            <param name="domain">要聚焦的域；空表示退出聚焦。</param>
+        </member>
         <member name="T:Mercury.DesktopLayer">
              <summary>
              让活动坞永不遮挡其他窗口：保持普通顶层窗口，但把 z-order 钉死在最底。
@@ -159,34 +175,6 @@
         <member name="M:Mercury.DockPolicy.Normalized">
             <summary>把越界或互相矛盾的取值收敛到合法范围。</summary>
         </member>
-        <member name="T:Mercury.DockShortcutFolder">
-            <summary>Keeps the Explorer-facing shortcut folder identical to the current dock list.</summary>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.Synchronize(System.Collections.Generic.IReadOnlyList{Mercury.DockProject},System.String)">
-            <summary>
-            Reconciles only .lnk files owned by the dock. Non-shortcut files are intentionally untouched.
-            </summary>
-            <remarks>
-            只写真正不一致的快捷方式。这个文件夹是钉在"此电脑"下的命名空间扩展，任何一次写入都会
-            让所有打开的资源管理器窗口（SeparateProcess 下是多个进程）刷新该节点，因此"内容没变也
-            全量重写"的代价是外部可见的，不只是几次磁盘 IO。
-            </remarks>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.StartWatching(System.Action{Mercury.DockShortcutFolder.ShortcutFolderDelta})">
-            <summary>
-            Watches user edits to the managed folder. A missing existing link means the
-            corresponding dock item was removed; a new link is a request to add its target.
-            </summary>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.StopWatching">
-            <summary>Stops watching and releases every handle held by this module lifecycle.</summary>
-        </member>
-        <member name="M:Mercury.DockShortcutFolder.IsShortcutCurrent(System.String,Mercury.DockProject)">
-            <summary>受管字段逐项相等才算最新；读不出来一律按需要重写处理。</summary>
-        </member>
-        <member name="P:Mercury.DockShortcutFolder.ShortcutSyncResult.Changed">
-            <summary>本次是否真的动过磁盘。只有动过才值得通知外壳。</summary>
-        </member>
         <member name="T:Mercury.DockTheme">
             <summary>
             HistoryMercury 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
@@ -253,6 +241,40 @@
             打开越频繁的项目底色越偏黄。
             </summary>
         </member>
+        <member name="M:Mercury.ProjectIconGenerator.ShortLabel(System.String)">
+            <summary>磁贴上显示的项目后缀：去掉编号前缀及品牌前缀，不添加省略号。</summary>
+        </member>
+        <member name="M:Mercury.ProjectIconGenerator.FitFontSize(System.String,System.Double,System.Double)">
+            <summary>按像素宽度选择完整标签可用的字号，保证 UI 不以省略号牺牲项目特征。</summary>
+        </member>
+        <member name="T:Mercury.DockShortcutFolder">
+            <summary>Keeps the Explorer-facing shortcut folder identical to the current dock list.</summary>
+        </member>
+        <member name="M:Mercury.DockShortcutFolder.Synchronize(System.Collections.Generic.IReadOnlyList{Mercury.DockProject},System.String)">
+            <summary>
+            Reconciles only .lnk files owned by the dock. Non-shortcut files are intentionally untouched.
+            </summary>
+            <remarks>
+            只写真正不一致的快捷方式。这个文件夹是钉在"此电脑"下的命名空间扩展，任何一次写入都会
+            让所有打开的资源管理器窗口（SeparateProcess 下是多个进程）刷新该节点，因此"内容没变也
+            全量重写"的代价是外部可见的，不只是几次磁盘 IO。
+            </remarks>
+        </member>
+        <member name="M:Mercury.DockShortcutFolder.StartWatching(System.Action{Mercury.DockShortcutFolder.ShortcutFolderDelta})">
+            <summary>
+            Watches user edits to the managed folder. A missing existing link means the
+            corresponding dock item was removed; a new link is a request to add its target.
+            </summary>
+        </member>
+        <member name="M:Mercury.DockShortcutFolder.StopWatching">
+            <summary>Stops watching and releases every handle held by this module lifecycle.</summary>
+        </member>
+        <member name="M:Mercury.DockShortcutFolder.IsShortcutCurrent(System.String,Mercury.DockProject)">
+            <summary>受管字段逐项相等才算最新；读不出来一律按需要重写处理。</summary>
+        </member>
+        <member name="P:Mercury.DockShortcutFolder.ShortcutSyncResult.Changed">
+            <summary>本次是否真的动过磁盘。只有动过才值得通知外壳。</summary>
+        </member>
         <member name="T:Mercury.ExplorerNamespaceRegistration">
             <summary>Registers the dock-generated shortcut folder in the current user's Explorer namespace.</summary>
         </member>
@@ -292,8 +314,26 @@
             还需要额外的外壳通知。
             </summary>
         </member>
-        <member name="T:Mercury.HistoryVulcanLauncher">
-            <summary>打开或唤起 HistoryVulcan 主界面。</summary>
+        <member name="T:Mercury.ShortcutFileService">
+            <summary>Resolves and opens ordinary paths and Windows shortcut files.</summary>
+        </member>
+        <member name="M:Mercury.ShortcutFileService.TryReadShortcut(System.String,Mercury.ShortcutFileService.ShortcutContent@)">
+            <summary>
+            读回快捷方式的全部受管字段，供写入前比对。取原始路径（不解析、不探测网络），
+            因为这里只需要判断"和我们要写的内容是否一致"。
+            </summary>
+        </member>
+        <member name="M:Mercury.ShortcutFileService.Release(System.Object)">
+            <summary>
+            每次刷新都会创建若干 ShellLink，交给 GC 终结器回收会让 COM 引用在进程里堆积，
+            因此用完立刻释放 RCW。
+            </summary>
+        </member>
+        <member name="T:Mercury.ShortcutFileService.ShortcutContent">
+            <summary>快捷方式里由活动坞管理的字段。</summary>
+        </member>
+        <member name="M:Mercury.ShortcutFileService.ShortcutContent.#ctor(System.String,System.String,System.String,System.Int32)">
+            <summary>快捷方式里由活动坞管理的字段。</summary>
         </member>
         <member name="T:Mercury.Input.GlobalShortcutService">
             <summary>
@@ -430,18 +470,75 @@
         <member name="M:Mercury.Input.HotkeyService.Stop">
             <summary>模块卸载时停止并释放钩子。</summary>
         </member>
-        <member name="M:Mercury.MercuryCommandCatalog.Direct(System.String,System.String,System.Func{HistoryVulcan.Core.Commands.CommandContext,System.String},System.Boolean,HistoryVulcan.Core.Commands.ParameterSpec[])">
+        <member name="T:Mercury.MercuryUiModule">
             <summary>
-            无类直接方法：只有 <c>&lt;域&gt;.&lt;方法&gt;</c> 两段，不声明 CommandClass。
-            注册表据段数判为无类（DEC-025），命令集里归入「无类」分组。
+            活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在有 WPF Application 的宿主中建窗。
+            </summary>
+            <remarks>
+            当前 HistoryVulcan 组合下只有桌面 Shell 进程会实例化 UI 模块（服务进程 EnableUiModules=false），
+            因此管理页与桌面坞都运行在 Shell 进程；模块指令由 mercury 三段式目录注册在服务进程，
+            Shell 侧经 <see cref="T:HistoryVulcan.Core.Commands.CommandBus"/> 的远程执行器透明转发，模块代码无需关心进程边界。
+            </remarks>
+        </member>
+        <member name="P:Mercury.MercuryUiModule.Bus">
+            <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
+        </member>
+        <member name="P:Mercury.MercuryUiModule.Log">
+            <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
+        </member>
+        <member name="P:Mercury.MercuryUiModule.CatalogSession">
+            <summary>
+            共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
+            <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
+            无 UI 宿主（服务进程、烟测）下为 null。
             </summary>
         </member>
-        <member name="M:Mercury.MercuryCommands.Go(System.String)">
+        <member name="M:Mercury.MercuryUiModule.RegisterOwnShortcuts(HistoryVulcan.Core.Modules.IModuleContext)">
             <summary>
-            切换控制台的域聚焦。聚焦状态存放在共享的命令目录会话里，与控制台域筛选下拉同源，
-            因此这里只写会话，下拉会自己跟上。
+            Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
+            用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
             </summary>
-            <param name="domain">要聚焦的域；空表示退出聚焦。</param>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.CreateUi">
+            <summary>
+            建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
+            </summary>
+            <remarks>
+            4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
+            宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
+            唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
+            </remarks>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.CreateDesktopDock">
+            <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
+            <summary>把窗口吸附到主显示器工作区右下角。</summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.DockWindow.HistoryVulcanButton">
+            <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.DockWindow.CommandButton(Mercury.DockCommandEntry)">
+            <summary>手动指令项按钮：指令字形无光圈，点击经总线执行，右键可移除。</summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.DockWindow.OpenProject(Mercury.DockProject)">
+            <summary>项目条目优先经总线执行别名指令，让打开动作与其他指令项同一条链路。</summary>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.DockWindow.NakedButton(System.Object,System.String)">
+            <summary>无边框透明按钮，悬停时叠一层浅色半透明，深底上不会闪出白块。</summary>
+        </member>
+        <member name="P:Mercury.ModuleInfo.Version">
+            <summary>
+            版本取自程序集，不写字面量。宿主装载时比对 manifest 与本类的版本，两者不一致会
+            **静默跳过整个模块**——只在服务进程日志留一行 module.discovery 警告，界面上表现为
+            活动坞与命令集页一起消失。4.2.0 就因为漏改这里的字面量复现过一次，故收敛为单一来源。
+            </summary>
+        </member>
+        <member name="M:Mercury.ModuleInfo.ReadAssemblyVersion">
+            <summary>
+            取 InformationalVersion 并去掉 <c>+源码修订号</c> 后缀；缺失时回退到程序集版本的三段形式。
+            manifest 里写的是 <c>4.2.0</c> 这种三段语义版本，两边必须能逐字符相等。
+            </summary>
         </member>
         <member name="T:Mercury.MercuryLibraryRoot">
             <summary>
@@ -459,19 +556,6 @@
             优先 <c>proj.libraryroot</c>，其次仍存在的 <c>proj.worktreeroot</c>，最后缺省 Clio。
             命中的路径都经过 <see cref="M:Mercury.MercuryLibraryRoot.Coerce(System.String)"/>。
             </summary>
-        </member>
-        <member name="T:Mercury.MercuryManagerPage">
-            <summary>
-            MercuryManagerPage
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryManagerPage.InitializeComponent">
-            <summary>
-            InitializeComponent
-            </summary>
-        </member>
-        <member name="T:Mercury.MercuryManagerView">
-            <summary>扩展坞管理页面注册入口。</summary>
         </member>
         <member name="T:Mercury.MercuryPaths">
             <summary>HistoryMercury runtime locations and read-only migration sources.</summary>
@@ -627,82 +711,6 @@
         <member name="T:Mercury.MercuryState.UsageEntry">
             <summary>已衰减到 <see cref="P:Mercury.MercuryState.UsageEntry.Updated"/> 时刻的点击分数，而不是原始次数。</summary>
         </member>
-        <member name="T:Mercury.MercuryUiModule">
-            <summary>
-            活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在有 WPF Application 的宿主中建窗。
-            </summary>
-            <remarks>
-            当前 HistoryVulcan 组合下只有桌面 Shell 进程会实例化 UI 模块（服务进程 EnableUiModules=false），
-            因此管理页与桌面坞都运行在 Shell 进程；模块指令由 mercury 三段式目录注册在服务进程，
-            Shell 侧经 <see cref="T:HistoryVulcan.Core.Commands.CommandBus"/> 的远程执行器透明转发，模块代码无需关心进程边界。
-            </remarks>
-        </member>
-        <member name="P:Mercury.MercuryUiModule.Bus">
-            <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
-        </member>
-        <member name="P:Mercury.MercuryUiModule.Log">
-            <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
-        </member>
-        <member name="P:Mercury.MercuryUiModule.CatalogSession">
-            <summary>
-            共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
-            <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
-            无 UI 宿主（服务进程、烟测）下为 null。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.RegisterOwnShortcuts(HistoryVulcan.Core.Modules.IModuleContext)">
-            <summary>
-            Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
-            用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
-            </summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.CreateUi">
-            <summary>
-            建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
-            </summary>
-            <remarks>
-            4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
-            宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
-            唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
-            </remarks>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.CreateDesktopDock">
-            <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
-            <summary>把窗口吸附到主显示器工作区右下角。</summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.DockWindow.HistoryVulcanButton">
-            <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.DockWindow.CommandButton(Mercury.DockCommandEntry)">
-            <summary>手动指令项按钮：指令字形无光圈，点击经总线执行，右键可移除。</summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.DockWindow.OpenProject(Mercury.DockProject)">
-            <summary>项目条目优先经总线执行别名指令，让打开动作与其他指令项同一条链路。</summary>
-        </member>
-        <member name="M:Mercury.MercuryUiModule.DockWindow.NakedButton(System.Object,System.String)">
-            <summary>无边框透明按钮，悬停时叠一层浅色半透明，深底上不会闪出白块。</summary>
-        </member>
-        <member name="P:Mercury.ModuleInfo.Version">
-            <summary>
-            版本取自程序集，不写字面量。宿主装载时比对 manifest 与本类的版本，两者不一致会
-            **静默跳过整个模块**——只在服务进程日志留一行 module.discovery 警告，界面上表现为
-            活动坞与命令集页一起消失。4.2.0 就因为漏改这里的字面量复现过一次，故收敛为单一来源。
-            </summary>
-        </member>
-        <member name="M:Mercury.ModuleInfo.ReadAssemblyVersion">
-            <summary>
-            取 InformationalVersion 并去掉 <c>+源码修订号</c> 后缀；缺失时回退到程序集版本的三段形式。
-            manifest 里写的是 <c>4.2.0</c> 这种三段语义版本，两边必须能逐字符相等。
-            </summary>
-        </member>
-        <member name="M:Mercury.ProjectIconGenerator.ShortLabel(System.String)">
-            <summary>磁贴上显示的项目后缀：去掉编号前缀及品牌前缀，不添加省略号。</summary>
-        </member>
-        <member name="M:Mercury.ProjectIconGenerator.FitFontSize(System.String,System.Double,System.Double)">
-            <summary>按像素宽度选择完整标签可用的字号，保证 UI 不以省略号牺牲项目特征。</summary>
-        </member>
         <member name="T:Mercury.RecentFolders">
              <summary>
              从 Windows 最近使用项读取"项目主文件夹最近一次在资源管理器打开"的时间。
@@ -741,26 +749,18 @@
         <member name="T:Mercury.RecentFolders.IShellLinkW">
             <summary>只声明首个槽位 GetPath；本模块不调用其余方法。</summary>
         </member>
-        <member name="T:Mercury.ShortcutFileService">
-            <summary>Resolves and opens ordinary paths and Windows shortcut files.</summary>
-        </member>
-        <member name="M:Mercury.ShortcutFileService.TryReadShortcut(System.String,Mercury.ShortcutFileService.ShortcutContent@)">
+        <member name="T:Mercury.MercuryManagerPage">
             <summary>
-            读回快捷方式的全部受管字段，供写入前比对。取原始路径（不解析、不探测网络），
-            因为这里只需要判断"和我们要写的内容是否一致"。
+            MercuryManagerPage
             </summary>
         </member>
-        <member name="M:Mercury.ShortcutFileService.Release(System.Object)">
+        <member name="M:Mercury.MercuryManagerPage.InitializeComponent">
             <summary>
-            每次刷新都会创建若干 ShellLink，交给 GC 终结器回收会让 COM 引用在进程里堆积，
-            因此用完立刻释放 RCW。
+            InitializeComponent
             </summary>
         </member>
-        <member name="T:Mercury.ShortcutFileService.ShortcutContent">
-            <summary>快捷方式里由活动坞管理的字段。</summary>
-        </member>
-        <member name="M:Mercury.ShortcutFileService.ShortcutContent.#ctor(System.String,System.String,System.String,System.Int32)">
-            <summary>快捷方式里由活动坞管理的字段。</summary>
+        <member name="T:Mercury.MercuryManagerView">
+            <summary>扩展坞管理页面注册入口。</summary>
         </member>
         <member name="T:Mercury.SuggestOption">
             <summary>建议项：Text 为确认后落入输入框的全文，Display 为弹窗段落显示，IsBranch 表示还有下一级可下钻。</summary>

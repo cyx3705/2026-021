@@ -1,4 +1,4 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("HistoryVulcan.Tests")]
-[assembly: InternalsVisibleTo("Smoke")]
+[assembly: InternalsVisibleTo("HistoryMercury.Smoke")]
