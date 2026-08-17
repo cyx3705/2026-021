@@ -19,7 +19,7 @@
     <HistoryVulcanExtensibilityProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Extensibility\HistoryVulcan.Extensibility.csproj</HistoryVulcanExtensibilityProj>
     <!--
       模块对宿主的依赖面是 z 快照，和 project.manifest.json 的 externalDependencies 一致：
-      默认永远编译到 z-HistoryVulcan/host 里那份"正在跑的"宿主二进制。
+      默认永远编译到 z-Publish/host 里那份"正在跑的"宿主二进制。
 
       4.5.1 的事故就出在这里：这里原本写的是"只要 Vulcan 源码树存在就用 ProjectReference"，
       于是宿主工作区一有未发布的在途改动，模块就会链接到根本没在运行的宿主，装载时在 WPF
@@ -28,7 +28,7 @@
     <HistoryVulcanSourceAvailable Condition="'$(HistoryVulcanSourceAvailable)' == ''">false</HistoryVulcanSourceAvailable>
     <!-- AI 工作树落在库根之外，相对路径必然指空；diana.worktree.create 生成的
          Directory.Build.user.props 会设定 HistoryVulcanPackageRoot，这里据此推导。 -->
-    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-HistoryVulcan</HistoryVulcanPackageRoot>
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>

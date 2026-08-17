@@ -1,6 +1,7 @@
 ﻿[CmdletBinding()]
 param(
-    [switch]$Instantiation
+    [switch]$Instantiation,
+    [string]$DianaRoot = $env:ONEHISTORY_DIANA_ROOT
 )
 
 # HistoryMercury 的合同校验入口。
@@ -16,8 +17,13 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$resolvedDianaRoot = if ([string]::IsNullOrWhiteSpace($DianaRoot)) {
+    Join-Path $projectRoot '..\2026-019-HistoryDiana'
+} else {
+    $DianaRoot
+}
 $dianaEntry = [IO.Path]::GetFullPath(
-    (Join-Path $projectRoot '..\2026-019-HistoryDiana\b-Code\OneHistory.ModuleContract.ps1'))
+    (Join-Path $resolvedDianaRoot 'b-Code\OneHistory.ModuleContract.ps1'))
 
 if (-not (Test-Path -LiteralPath $dianaEntry -PathType Leaf)) {
     Write-Host "Shared module contract is missing: $dianaEntry" -ForegroundColor Red

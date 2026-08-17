@@ -12,4 +12,4 @@ dotnet run --project .\tests\Smoke\Smoke.csproj -c Release -p:NuGetAudit=false
 dotnet format .\HistoryMercury.csproj --verify-no-changes --no-restore
 ```
 
-The source manifest is `module.manifest.json`. `z-HistoryMercury` is the formal consumer snapshot and is refreshed only by the centralized Diana publisher.
+The source manifest is `module.manifest.json`. `z-Publish` is the formal consumer snapshot and is refreshed only by the centralized Diana publisher.

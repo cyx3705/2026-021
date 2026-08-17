@@ -82,7 +82,7 @@ internal static class HistoryVulcanLauncher
             candidates.Add(Path.Combine(
                 root,
                 "2026-023-HistoryVulcan",
-                "z-HistoryVulcan",
+                "z-Publish",
                 "host",
                 ExecutableName));
         }
