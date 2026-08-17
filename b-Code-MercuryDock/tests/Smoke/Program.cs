@@ -43,10 +43,16 @@ try
     shellHosted.CreateUi();
     Equal(1, registrar.Registered.Count, "The manager page must register once.");
     Equal("dock.manager", registrar.Registered[0], "Manager page ID");
+    True(MercuryState.IsWatching, "CreateUi must start the state watcher.");
     shellHosted.CreateUi();
     Equal(1, registrar.Registered.Count, "Repeated CreateUi must not register twice.");
     shellHosted.DestroyUi();
     Equal(1, registrar.Disposed, "DestroyUi must release the manager registration.");
+    True(!MercuryState.IsWatching, "DestroyUi must release the state watcher.");
+    shellHosted.CreateUi();
+    True(MercuryState.IsWatching, "The state watcher must restart after a UI reload.");
+    shellHosted.DestroyUi();
+    Equal(2, registrar.Disposed, "A reloaded UI must release its manager registration again.");
 }
 finally
 {
@@ -273,6 +279,14 @@ Directory.CreateDirectory(firstProject);
 Directory.CreateDirectory(secondProject);
 try
 {
+    DockShortcutFolder.StartWatching(_ => { }, shortcutRoot);
+    True(DockShortcutFolder.IsWatching, "The shortcut watcher must start for a module lifecycle.");
+    DockShortcutFolder.StopWatching();
+    True(!DockShortcutFolder.IsWatching, "Stopping must release the shortcut watcher handle.");
+    DockShortcutFolder.StartWatching(_ => { }, shortcutRoot);
+    True(DockShortcutFolder.IsWatching, "The shortcut watcher must restart after an unload.");
+    DockShortcutFolder.StopWatching();
+
     var now = DateTimeOffset.UtcNow;
     var first = new DockProject("2026-001-First", "2026-001", firstProject, now, false);
     var second = new DockProject("2026-002-Second", "2026-002", secondProject, now, false);

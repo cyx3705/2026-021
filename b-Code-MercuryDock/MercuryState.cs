@@ -129,6 +129,27 @@ internal static partial class MercuryState
         }
     }
 
+    public static void StopWatching()
+    {
+        lock (Gate)
+        {
+            if (_watcher == null)
+                return;
+            _watcher.EnableRaisingEvents = false;
+            _watcher.Dispose();
+            _watcher = null;
+        }
+    }
+
+    internal static bool IsWatching
+    {
+        get
+        {
+            lock (Gate)
+                return _watcher != null;
+        }
+    }
+
     /// <summary>重新读入偏好并通知界面。写入方自己触发的事件同样走这里，重载幂等，不会形成回环。</summary>
     private static void Reload()
     {
