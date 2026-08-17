@@ -17,7 +17,7 @@ namespace Mercury;
 /// 要求与项目根目录完全相等，任何子文件夹一律忽略。
 /// 解析失败时整体降级为"无此信号"，不得阻断活动坞刷新。
 /// </remarks>
-public static partial class RecentFolders
+public static class RecentFolders
 {
     private const uint RawPath = 0x4;
 
@@ -107,8 +107,10 @@ public static partial class RecentFolders
         }
     }
 
-    [GeneratedRegex(@"\s*\(\d+\)$", RegexOptions.CultureInvariant)]
-    private static partial Regex CopySuffix();
+    private static readonly Regex CopySuffixPattern =
+        new(@"\s*\(\d+\)$", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static Regex CopySuffix() => CopySuffixPattern;
 
     // 不能标 sealed：密封类到无关接口的转换会在编译期被拒，COM 转换需要运行时 QueryInterface。
     [ComImport]
