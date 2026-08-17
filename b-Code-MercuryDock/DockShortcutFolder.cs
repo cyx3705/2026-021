@@ -14,7 +14,6 @@ public static class DockShortcutFolder
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public const string FolderName = "\u5feb\u6377\u65b9\u5f0f";
-    public const string ModuleSlotName = "HistoryMercury";
 
     private const string IconSource = "%SystemRoot%\\System32\\shell32.dll";
     private const int IconIndex = 3;
@@ -122,9 +121,9 @@ public static class DockShortcutFolder
 
     private static string ResolvePath()
     {
-        // HistoryVulcan can shadow-copy a module into a transient load directory. Explorer must
-        // always target the durable module slot instead of that transient location.
-        return System.IO.Path.Combine(MercuryPaths.ModuleSlotRoot, FolderName);
+        // Runtime module slots are immutable manifest packages. Explorer-facing files are mutable
+        // user data and must stay outside the host's package discovery root.
+        return System.IO.Path.Combine(MercuryPaths.DataRoot, FolderName);
     }
 
     private static string LinkPath(string folder, DockProject project)

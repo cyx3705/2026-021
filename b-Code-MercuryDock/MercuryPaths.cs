@@ -20,7 +20,4 @@ internal static class MercuryPaths
     public static string LegacyActiveDockDataRoot => Path.Combine(LegacyAppRoot, "ActiveDock");
     public static string SettingsPath => Path.Combine(AppRoot, "settings.json");
     public static string LegacySettingsPath => Path.Combine(LegacyAppRoot, "settings.json");
-    public static string ModuleSlotRoot => Path.Combine(AppRoot, "Modules", ModuleName);
-    public static string PreviousModuleSlotRoot => Path.Combine(AppRoot, "Modules", PreviousModuleName);
-    public static string LegacyModuleSlotRoot => Path.Combine(LegacyAppRoot, "Modules", PreviousModuleName);
 }

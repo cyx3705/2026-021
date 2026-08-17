@@ -245,9 +245,16 @@ Equal("HistoryVulcan", MercuryPaths.HostName, "Host data root name");
 Equal(
     Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "HistoryVulcan", "Modules", "HistoryMercury", DockShortcutFolder.FolderName),
+        "HistoryVulcan", "HistoryMercury", DockShortcutFolder.FolderName),
     DockShortcutFolder.Path,
-    "Shortcut folder must use the module identity slot.");
+    "Shortcut folder must use the mutable module data root outside the package slot.");
+True(
+    !DockShortcutFolder.Path.StartsWith(
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "HistoryVulcan", "Modules") + Path.DirectorySeparatorChar,
+        StringComparison.OrdinalIgnoreCase),
+    "Shortcut files must never mutate the manifest-verified runtime package.");
 Equal("HistoryClio 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
 Equal(@"C:\OneHistory\HistoryClio", MercuryLibraryRoot.Default, "Default project library is HistoryClio");
 Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Coerce(MercuryLibraryRoot.LegacyVesta),
@@ -657,7 +664,7 @@ True(DockTheme.TileBackground(0.5).Color.B < coldTile.Color.B
 True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 0x12),
     "Tile text uses the documented deep-yellow accent.");
 
-Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, HistoryMercury identity slot, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
+Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
 
 static void True(bool condition, string message)
 {
