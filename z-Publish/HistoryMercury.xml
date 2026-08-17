@@ -178,6 +178,9 @@
             corresponding dock item was removed; a new link is a request to add its target.
             </summary>
         </member>
+        <member name="M:Mercury.DockShortcutFolder.StopWatching">
+            <summary>Stops watching and releases every handle held by this module lifecycle.</summary>
+        </member>
         <member name="M:Mercury.DockShortcutFolder.IsShortcutCurrent(System.String,Mercury.DockProject)">
             <summary>受管字段逐项相等才算最新；读不出来一律按需要重写处理。</summary>
         </member>
