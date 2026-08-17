@@ -20,7 +20,7 @@ public sealed record DockProject(
 /// <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
 public sealed record DockCommandEntry(string Command, string Label, DateTimeOffset Added);
 
-internal static partial class MercuryState
+internal static class MercuryState
 {
     private static readonly object Gate = new();
     private static FileSystemWatcher? _watcher;
@@ -873,8 +873,10 @@ internal static partial class MercuryState
         }
     }
 
-    [GeneratedRegex(@"\d{4}-\d{3}", RegexOptions.CultureInvariant)]
-    private static partial Regex ProjectNumber();
+    private static readonly Regex ProjectNumberPattern =
+        new(@"\d{4}-\d{3}", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    private static Regex ProjectNumber() => ProjectNumberPattern;
 
     private sealed record ScanResult(IReadOnlyList<DockProject> Selected, IReadOnlyList<DockProject> All);
 

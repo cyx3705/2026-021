@@ -92,6 +92,13 @@ $buildProperties = @('-p:NuGetAudit=false')
 if (-not [string]::IsNullOrWhiteSpace($HistoryVulcanPackageRoot)) {
     $buildProperties += "-p:HistoryVulcanPackageRoot=$HistoryVulcanPackageRoot"
 }
+# SDK 9 WPF 会把上一轮 obj 里的 AssemblyInfo 再编进主工程；发布前清掉中间产物。
+$projectRoot = Split-Path -Parent $projectPath
+foreach ($stale in @((Join-Path $projectRoot 'obj'), (Join-Path $projectRoot 'bin'))) {
+    if (Test-Path -LiteralPath $stale) {
+        Remove-Item -LiteralPath $stale -Recurse -Force
+    }
+}
 & dotnet build $projectPath -c $Configuration @buildProperties
 if ($LASTEXITCODE -ne 0) {
     throw "HistoryMercury $Configuration build failed with exit code $LASTEXITCODE"
