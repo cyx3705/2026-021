@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <!--
+    烟测验的是"将要装进 z 的那个模块"，因此宿主程序集也一律取已发布的 z 快照，
+    与 HistoryMercury.csproj 的默认路径保持同一个宿主。这里曾经按"源码 bin 存在就优先用源码"
+    选择，和模块侧的同款分支一起造成了 4.5.1 事故（见 DEC-013）。
+    联调时用 -p:HistoryVulcanCoreDll=... 逐个显式改写。
+  -->
+  <PropertyGroup>
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-HistoryVulcan</HistoryVulcanPackageRoot>
+    <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
+    <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
+    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
+    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
+    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\HistoryMercury.csproj" />
+    <Reference Include="HistoryVulcan.Core">
+      <HintPath>$(HistoryVulcanCoreDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- 模块侧改用 HintPath 引用后，宿主程序集不再经 ProjectReference 传递，烟测必须自己声明。 -->
+    <Reference Include="HistoryVulcan.Extensibility">
+      <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Shell">
+      <HintPath>$(HistoryVulcanShellDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="HistoryVulcan.Services">
+      <HintPath>$(HistoryVulcanServicesDll)</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
