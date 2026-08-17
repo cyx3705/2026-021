@@ -1,6 +1,6 @@
 # HistoryMercury Build Tools
 
-`Build-HistoryMercuryPackage.ps1` builds HistoryMercury and creates a hash-verified candidate package in `b-Publish/current/HistoryMercury`.
+`Build-HistoryMercuryPackage.ps1` builds HistoryMercury and creates a hash-verified candidate package in `z-Publish/current/HistoryMercury`.
 
 The script reads the authoritative source manifest at `b-Code-MercuryDock/module.manifest.json`. It never treats the formal `z-HistoryMercury` snapshot as a source of version metadata. Formal promotion is performed only by Diana.
 

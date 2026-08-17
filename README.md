@@ -14,5 +14,5 @@ dotnet run --project .\b-Code-MercuryDock\tests\Smoke\Smoke.csproj -c Release -p
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercuryPackage.ps1
 ```
 
-The final command creates and verifies a candidate package in `b-Publish/current`. Formal publication to `z-HistoryMercury`
+The final command creates and verifies a candidate package in `z-Publish/current`. Formal publication to `z-HistoryMercury`
 and the Diana consumer-document mirror is owned by `2026-019-HistoryDiana/b-Code/Publish-OneHistoryModule.ps1`.

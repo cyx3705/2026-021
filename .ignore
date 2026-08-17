@@ -1,6 +1,6 @@
 # Keep broad text searches focused on current, editable project truth.
 b-Office/history/
-b-Publish/
+z-Publish/
 artifacts/
 work/
 .vs/

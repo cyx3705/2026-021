@@ -30,10 +30,11 @@
     "generatedRoots": [
       "b-Code-MercuryDock/bin",
       "b-Code-MercuryDock/obj",
-      "b-Publish/current"
+      "z-Publish/current"
     ],
     "archiveRoots": [
-      "b-Office/history"
+      "b-Office/history",
+      "z-Publish"
     ],
     "allowedRootDirectoryPrefixes": [
       "a-",
@@ -64,7 +65,7 @@
   ],
   "contextExclusions": [
     "b-Office/history/**",
-    "b-Publish/**",
+    "z-Publish/**",
     "**/bin/**",
     "**/obj/**",
     "**/node_modules/**",
