@@ -469,7 +469,9 @@ Equal(0, matcher.Process(
 // 界面上表现为活动坞与命令集页一起消失——这条断言就是为了不再靠肉眼发现它。
 var moduleInfo = new ModuleInfo();
 var manifestPath = Path.Combine(
-    AppContext.BaseDirectory, "..", "..", "..", "..", "..", "module.manifest.json");
+    AppContext.BaseDirectory,
+    "..", "..", "..", "..", "..",
+    "b-Code-MercuryDock", "module.manifest.json");
 True(File.Exists(manifestPath), $"module.manifest.json must be locatable at {Path.GetFullPath(manifestPath)}.");
 using (var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath)))
 {

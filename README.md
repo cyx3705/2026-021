@@ -10,7 +10,7 @@ The module is developed in `b-Code-MercuryDock`. Its code namespace and command 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Test-ProjectContract.ps1 -Instantiation
-dotnet run --project .\b-Code-MercuryDock\tests\Smoke\Smoke.csproj -c Release -p:NuGetAudit=false
+dotnet run --project .\b-Code-Tests\HistoryMercury.Smoke\HistoryMercury.Smoke.csproj -c Release -p:NuGetAudit=false
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercuryPackage.ps1
 ```
 

@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>HistoryMercury.Smoke</AssemblyName>
   </PropertyGroup>
   <!--
     烟测验的是"将要装进 z 的那个模块"，因此宿主程序集也一律取已发布的 z 快照，
@@ -13,7 +14,7 @@
     联调时用 -p:HistoryVulcanCoreDll=... 逐个显式改写。
   -->
   <PropertyGroup>
-    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPackageRoot>
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
@@ -21,7 +22,7 @@
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\HistoryMercury.csproj" />
+    <ProjectReference Include="..\..\b-Code-MercuryDock\HistoryMercury.csproj" />
     <Reference Include="HistoryVulcan.Core">
       <HintPath>$(HistoryVulcanCoreDll)</HintPath>
       <Private>true</Private>
