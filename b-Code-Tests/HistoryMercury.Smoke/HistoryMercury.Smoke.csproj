@@ -16,11 +16,9 @@
   <PropertyGroup>
     <HistoryVulcanPublishRoot Condition="'$(HistoryVulcanPublishRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPublishRoot>
     <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
-    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\HistoryVulcan-v3.12.1\manifest.json')">$(HistoryVulcanPublishRoot)\HistoryVulcan-v3.12.1</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
-    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup>
@@ -32,10 +30,6 @@
     <!-- 模块侧改用 HintPath 引用后，宿主程序集不再经 ProjectReference 传递，烟测必须自己声明。 -->
     <Reference Include="HistoryVulcan.Extensibility">
       <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
-      <Private>true</Private>
-    </Reference>
-    <Reference Include="HistoryVulcan.Shell">
-      <HintPath>$(HistoryVulcanShellDll)</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="HistoryVulcan.Services">

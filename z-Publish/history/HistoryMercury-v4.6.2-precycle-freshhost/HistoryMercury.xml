@@ -46,7 +46,7 @@
             <summary>取第 <paramref name="index"/> 段；越界返回空串（尾随点号即空末段）。</summary>
         </member>
         <member name="T:Mercury.CommandSurface.CommandDetailView">
-            <summary>所选指令的 Help、MCP 映射与目录状态详情。</summary>
+            <summary>所选指令的 Help、MCP 映射与提示词治理详情。</summary>
             <summary>
             CommandDetailView
             </summary>
@@ -55,9 +55,6 @@
             <summary>
             InitializeComponent
             </summary>
-        </member>
-        <member name="T:Mercury.CommandSurface.CommandResultData">
-            <summary>Restores typed command contracts after a service-boundary round trip.</summary>
         </member>
         <member name="T:Mercury.CommandSurface.CommandSurfaceFeature">
             <summary>
@@ -189,13 +186,13 @@
         </member>
         <member name="P:Mercury.DockTheme.TileBase">
             <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
-            <c>Aurora.Brush.Surface</c>(#FFFFFF) 与 <c>Aurora.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
+            <c>Shell.Brush.Surface</c>(#FFFFFF) 与 <c>Shell.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
         </member>
         <member name="P:Mercury.DockTheme.TileTintTarget">
             <summary>磁贴底色偏黄端。</summary>
         </member>
         <member name="P:Mercury.DockTheme.TileText">
-            <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Aurora.Brush.Accent</c>(#A87A12)。
+            <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Shell.Brush.Accent</c>(#A87A12)。
             白底与 #FAF0D8 底上对比度都足够。</summary>
         </member>
         <member name="M:Mercury.DockTheme.TileBackground(System.Double)">

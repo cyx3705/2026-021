@@ -1,8 +1,7 @@
 ﻿using HistoryVulcan.Core;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Extensibility.CommandSurface;
-using HistoryVulcan.Shell;
-using HistoryVulcan.Shell.Mcp;
+using HistoryVulcan.Services.Mcp;
 
 namespace Mercury.CommandSurface;
 

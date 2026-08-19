@@ -611,7 +611,7 @@ Equal("mercury.go", CommandCompletionEngine.ResolveAgainstFocus("go", catalogue,
 
 // 远程目录回归：Mercury 聚焦状态下输入 go + 空格，详情查询必须是 mercury.go，
 // 不能请求不存在的 name=go；返回的目录注解继续驱动动态域候选。
-var remoteRows = new List<HistoryVulcan.Shell.Mcp.CommandCatalogRow>
+var remoteRows = new List<HistoryVulcan.Services.Mcp.CommandCatalogRow>
 {
     CatalogRow("mercury.go", "mercury", "域聚焦", ""),
     CatalogRow("vulcan.app.show", "vulcan", "显示前端", "app"),
@@ -626,7 +626,7 @@ var remoteBus = new CommandBus(new CommandRegistry(), new NullShellLog())
             return Task.FromResult(CommandResult.Ok(data: remoteRows));
         if (text == "vulcan.command.domains")
         {
-            IReadOnlyList<HistoryVulcan.Shell.Mcp.CommandDomainInfo> remoteDomains =
+            IReadOnlyList<HistoryVulcan.Services.Mcp.CommandDomainInfo> remoteDomains =
             [
                 new("mercury", 1),
                 new("vulcan", 1),
@@ -635,9 +635,9 @@ var remoteBus = new CommandBus(new CommandRegistry(), new NullShellLog())
         }
         if (text == "vulcan.command.show name=mercury.go")
         {
-            var detail = new HistoryVulcan.Shell.Mcp.CommandCatalogDetail(
+            var detail = new HistoryVulcan.Services.Mcp.CommandCatalogDetail(
                 remoteRows[0],
-                [new HistoryVulcan.Shell.Mcp.CommandParameterInfo(
+                [new HistoryVulcan.Services.Mcp.CommandParameterInfo(
                     "domain", "string", false, null, 0, [], "域")],
                 null)
             {
@@ -694,7 +694,7 @@ static void Equal<T>(T expected, T actual, string message)
         throw new InvalidOperationException($"{message}: expected={expected}, actual={actual}");
 }
 
-static HistoryVulcan.Shell.Mcp.CommandCatalogRow CatalogRow(
+static HistoryVulcan.Services.Mcp.CommandCatalogRow CatalogRow(
     string name,
     string domain,
     string summary,

@@ -1,6 +1,6 @@
 ﻿using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Extensibility.CommandSurface;
-using HistoryVulcan.Shell.Mcp;
+using HistoryVulcan.Services.Mcp;
 using System.Windows;
 using System.Windows.Controls;
 
