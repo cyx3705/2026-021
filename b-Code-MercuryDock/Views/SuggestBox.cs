@@ -30,11 +30,11 @@ internal sealed class SuggestBox : UserControl
             BorderThickness = new Thickness(1),
             VerticalContentAlignment = VerticalAlignment.Center,
         };
-        _input.SetResourceReference(Control.FontFamilyProperty, "Shell.Font.Family");
-        _input.SetResourceReference(Control.FontSizeProperty, "Shell.Font.Body");
-        _input.SetResourceReference(Control.ForegroundProperty, "Shell.Brush.TextPrimary");
-        _input.SetResourceReference(Control.BackgroundProperty, "Shell.Brush.Surface");
-        _input.SetResourceReference(Control.BorderBrushProperty, "Shell.Brush.ControlBorder");
+        _input.SetResourceReference(Control.FontFamilyProperty, "Aurora.Font.Family");
+        _input.SetResourceReference(Control.FontSizeProperty, "Aurora.Font.Body");
+        _input.SetResourceReference(Control.ForegroundProperty, "Aurora.Brush.TextPrimary");
+        _input.SetResourceReference(Control.BackgroundProperty, "Aurora.Brush.Surface");
+        _input.SetResourceReference(Control.BorderBrushProperty, "Aurora.Brush.ControlBorder");
         Content = _input;
 
         _list = new ListBox
@@ -44,9 +44,9 @@ internal sealed class SuggestBox : UserControl
             MaxHeight = 264,
             ItemTemplate = BuildOptionTemplate(),
         };
-        _list.SetResourceReference(Control.ForegroundProperty, "Shell.Brush.TextPrimary");
-        _list.SetResourceReference(Control.FontFamilyProperty, "Shell.Font.Family");
-        _list.SetResourceReference(Control.FontSizeProperty, "Shell.Font.Body");
+        _list.SetResourceReference(Control.ForegroundProperty, "Aurora.Brush.TextPrimary");
+        _list.SetResourceReference(Control.FontFamilyProperty, "Aurora.Font.Family");
+        _list.SetResourceReference(Control.FontSizeProperty, "Aurora.Font.Body");
         _list.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Auto);
         _popup = new Popup
         {
@@ -84,9 +84,9 @@ internal sealed class SuggestBox : UserControl
             Padding = new Thickness(2),
             Child = _list,
         };
-        border.SetResourceReference(Border.BackgroundProperty, "Shell.Brush.Surface");
-        border.SetResourceReference(Border.BorderBrushProperty, "Shell.Brush.Hairline");
-        border.SetResourceReference(Border.EffectProperty, "Shell.Shadow.Flyout");
+        border.SetResourceReference(Border.BackgroundProperty, "Aurora.Brush.Surface");
+        border.SetResourceReference(Border.BorderBrushProperty, "Aurora.Brush.Hairline");
+        border.SetResourceReference(Border.EffectProperty, "Aurora.Shadow.Flyout");
         return border;
     }
 
@@ -209,7 +209,7 @@ internal sealed class SuggestBox : UserControl
         stack.AppendChild(display);
         var detail = new FrameworkElementFactory(typeof(TextBlock));
         detail.SetBinding(TextBlock.TextProperty, new Binding(nameof(SuggestOption.Detail)));
-        detail.SetResourceReference(TextBlock.FontSizeProperty, "Shell.Font.Small");
+        detail.SetResourceReference(TextBlock.FontSizeProperty, "Aurora.Font.Small");
         detail.SetValue(UIElement.OpacityProperty, 0.7);
         detail.SetValue(FrameworkElement.MarginProperty, new Thickness(8, 0, 0, 0));
         detail.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);

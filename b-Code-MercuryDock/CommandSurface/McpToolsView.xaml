@@ -7,7 +7,7 @@
         <!-- 视图是独立 BAML:StaticResource 必须在自己的作用域里找得到 -->
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/HistoryVulcan.Shell;component/Themes/ShellControls.xaml" />
+                <ResourceDictionary Source="/HistoryAurora;component/Themes/AuroraControls.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
@@ -17,19 +17,19 @@
             3.2.1:顶部只保留有效的域/类/MCP 筛选和刷新动作，
             段间用发丝线切分，窄宽度下整条自动换行。
         -->
-        <Border DockPanel.Dock="Top" Style="{StaticResource Shell.Segment.Bar}">
+        <Border DockPanel.Dock="Top" Style="{StaticResource Aurora.Segment.Bar}">
             <WrapPanel Orientation="Horizontal">
-                <TextBlock Text="域" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock Text="域" Style="{StaticResource Aurora.Segment.Label}" />
                 <ComboBox x:Name="DomainFilterBox" Width="130"
-                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          Style="{StaticResource Aurora.Segment.ComboBox}"
                           SelectionChanged="OnDomainFilterChanged" />
-                <TextBlock Text="类" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock Text="类" Style="{StaticResource Aurora.Segment.Label}" />
                 <ComboBox x:Name="ClassFilterBox" Width="110"
-                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          Style="{StaticResource Aurora.Segment.ComboBox}"
                           SelectionChanged="OnClassFilterChanged" />
-                <TextBlock Text="MCP" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock Text="MCP" Style="{StaticResource Aurora.Segment.Label}" />
                 <ComboBox x:Name="McpFilterBox" Width="120" SelectedIndex="0"
-                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          Style="{StaticResource Aurora.Segment.ComboBox}"
                           SelectionChanged="OnFilterChanged">
                     <ComboBoxItem Content="全部" />
                     <ComboBoxItem Content="当前可见" />
@@ -37,21 +37,21 @@
                     <ComboBoxItem Content="硬排除" />
                     <ComboBoxItem Content="危险拒绝" />
                 </ComboBox>
-                <Border Style="{StaticResource Shell.Segment.Divider}" />
+                <Border Style="{StaticResource Aurora.Segment.Divider}" />
                 <Button x:Name="RefreshButton" Content="刷新"
-                        Style="{StaticResource Shell.Segment.Button}" Click="OnRefreshClick" />
+                        Style="{StaticResource Aurora.Segment.Button}" Click="OnRefreshClick" />
             </WrapPanel>
         </Border>
 
         <TextBlock DockPanel.Dock="Bottom" x:Name="StatusText"
-                   Foreground="{DynamicResource Shell.Brush.TextSecondary}"
-                   FontSize="{DynamicResource Shell.Font.Small}"
+                   Foreground="{DynamicResource Aurora.Brush.TextSecondary}"
+                   FontSize="{DynamicResource Aurora.Font.Small}"
                    Margin="2,8,0,0"
                    Text="命令注册表是能力真值；MCP 只是策略投影" TextWrapping="Wrap" />
 
         <ListView x:Name="ToolList" Margin="0,8,0,0" SelectionChanged="OnToolSelected">
             <ListView.View>
-                <GridView ColumnHeaderContainerStyle="{StaticResource Shell.GridHeader}">
+                <GridView ColumnHeaderContainerStyle="{StaticResource Aurora.GridHeader}">
                     <GridViewColumn Header="域" Width="90" DisplayMemberBinding="{Binding Domain}" />
                     <GridViewColumn Header="类" Width="90" DisplayMemberBinding="{Binding CommandClass}" />
                     <GridViewColumn Header="方法" Width="120" DisplayMemberBinding="{Binding Method}" />

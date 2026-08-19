@@ -8,11 +8,18 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>4.6.1</Version>
+    <Version>4.6.2</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="obj/**;tests/**" />
+    <EmbeddedResource Remove="obj/**;tests/**" />
+    <None Remove="obj/**;tests/**" />
+    <InternalsVisibleTo Include="HistoryVulcan.Tests" />
+    <InternalsVisibleTo Include="HistoryMercury.Smoke" />
+  </ItemGroup>
   <PropertyGroup>
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
-    <HistoryVulcanShellProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Shell\HistoryVulcan.Shell.csproj</HistoryVulcanShellProj>
     <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
     <!-- 演进层：CommandSurface 与命令工作台契约的家；不受宿主冻结门禁约束，随交互形态迭代。 -->
     <HistoryVulcanExtensibilityProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Extensibility\HistoryVulcan.Extensibility.csproj</HistoryVulcanExtensibilityProj>
@@ -27,11 +34,11 @@
     <HistoryVulcanSourceAvailable Condition="'$(HistoryVulcanSourceAvailable)' == ''">false</HistoryVulcanSourceAvailable>
     <!-- AI 工作树落在库根之外，相对路径必然指空；diana.worktree.create 生成的
          Directory.Build.user.props 会设定 HistoryVulcanPackageRoot，这里据此推导。 -->
-    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPackageRoot>
+    <HistoryVulcanPublishRoot Condition="'$(HistoryVulcanPublishRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPublishRoot>
+    <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
     <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
-    <HistoryVulcanShellDll Condition="'$(HistoryVulcanShellDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Shell.dll</HistoryVulcanShellDll>
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
@@ -39,9 +46,6 @@
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="$(HistoryVulcanExtensibilityProj)">
-      <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="$(HistoryVulcanShellProj)">
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="$(HistoryVulcanServicesProj)">
@@ -55,10 +59,6 @@
     </Reference>
     <Reference Include="HistoryVulcan.Extensibility">
       <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="HistoryVulcan.Shell">
-      <HintPath>$(HistoryVulcanShellDll)</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="HistoryVulcan.Services">

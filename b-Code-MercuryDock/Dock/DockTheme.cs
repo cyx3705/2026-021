@@ -26,13 +26,13 @@ public static class DockTheme
     public static SolidColorBrush Selection => Frozen(Color.FromRgb(0xEA, 0xDC, 0x9E));
     public static SolidColorBrush SelectionText => TextOnAccent;
     /// <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
-    /// <c>Shell.Brush.Surface</c>(#FFFFFF) 与 <c>Shell.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
+    /// <c>Aurora.Brush.Surface</c>(#FFFFFF) 与 <c>Aurora.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
     public static Color TileBase => Color.FromRgb(0xFF, 0xFF, 0xFF);
 
     /// <summary>磁贴底色偏黄端。</summary>
     public static Color TileTintTarget => Color.FromRgb(0xFA, 0xF0, 0xD8);
 
-    /// <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Shell.Brush.Accent</c>(#A87A12)。
+    /// <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Aurora.Brush.Accent</c>(#A87A12)。
     /// 白底与 #FAF0D8 底上对比度都足够。</summary>
     public static SolidColorBrush TileText => Frozen(Color.FromRgb(0xA8, 0x7A, 0x12));
 
@@ -45,10 +45,10 @@ public static class DockTheme
             (byte)Math.Round(TileBase.G + ((TileTintTarget.G - TileBase.G) * t)),
             (byte)Math.Round(TileBase.B + ((TileTintTarget.B - TileBase.B) * t))));
     }
-    public static FontFamily FontFamily => Find("Shell.Font.Family") as FontFamily ?? new FontFamily("Microsoft YaHei UI, Segoe UI");
-    public static double BodyFontSize => FindDouble("Shell.Font.Body", 13);
-    public static double SmallFontSize => FindDouble("Shell.Font.Small", 11);
-    public static Thickness ControlPadding => Find("Shell.Space.ControlPad") is Thickness thickness
+    public static FontFamily FontFamily => Find("Aurora.Font.Family") as FontFamily ?? new FontFamily("Microsoft YaHei UI, Segoe UI");
+    public static double BodyFontSize => FindDouble("Aurora.Font.Body", 13);
+    public static double SmallFontSize => FindDouble("Aurora.Font.Small", 11);
+    public static Thickness ControlPadding => Find("Aurora.Space.ControlPad") is Thickness thickness
         ? thickness
         : new Thickness(10, 4, 10, 4);
 

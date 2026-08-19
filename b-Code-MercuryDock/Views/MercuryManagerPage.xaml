@@ -7,13 +7,13 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/HistoryVulcan.Shell;component/Themes/ShellControls.xaml" />
+                <ResourceDictionary Source="/HistoryAurora;component/Themes/AuroraControls.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <local:NullToVisibilityConverter x:Key="NullToVisibility" />
         </ResourceDictionary>
     </UserControl.Resources>
 
-    <Grid Margin="{DynamicResource Shell.Space.PadTight}">
+    <Grid Margin="{DynamicResource Aurora.Space.PadTight}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -22,25 +22,25 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource Shell.Segment.Bar}">
+        <Border Grid.Row="0" Style="{StaticResource Aurora.Segment.Bar}">
             <WrapPanel Orientation="Horizontal">
-                <TextBlock Text="搜索" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock Text="搜索" Style="{StaticResource Aurora.Segment.Label}" />
                 <TextBox x:Name="SearchBox" Width="170"
-                         Style="{StaticResource Shell.Segment.TextBox}"
+                         Style="{StaticResource Aurora.Segment.TextBox}"
                          ToolTip="按名称或指令筛选"
                          TextChanged="OnFilterChanged" />
-                <TextBlock Text="类型" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock Text="类型" Style="{StaticResource Aurora.Segment.Label}" />
                 <ComboBox x:Name="TypeFilterBox" Width="92" SelectedIndex="0"
-                          Style="{StaticResource Shell.Segment.ComboBox}"
+                          Style="{StaticResource Aurora.Segment.ComboBox}"
                           SelectionChanged="OnFilterChanged">
                     <ComboBoxItem Content="全部" Tag="all" />
                     <ComboBoxItem Content="项目" Tag="project" />
                     <ComboBoxItem Content="命令" Tag="command" />
                     <ComboBoxItem Content="快捷文件" Tag="shortcut" />
                 </ComboBox>
-                <Border Style="{StaticResource Shell.Segment.Divider}" />
+                <Border Style="{StaticResource Aurora.Segment.Divider}" />
                 <Button x:Name="AddButton" Content="添加"
-                        Style="{StaticResource Shell.Button.Accent}"
+                        Style="{StaticResource Aurora.Button.Accent}"
                         Click="OnAddMenuClick" ToolTip="选择要加入扩展坞的条目类型">
                     <Button.ContextMenu>
                         <ContextMenu>
@@ -50,16 +50,16 @@
                         </ContextMenu>
                     </Button.ContextMenu>
                 </Button>
-                <Button Content="刷新" Style="{StaticResource Shell.Segment.Button}"
+                <Button Content="刷新" Style="{StaticResource Aurora.Segment.Button}"
                         Click="OnRefreshClick" ToolTip="重新扫描活动项目" />
                 <Button x:Name="PolicyButton" Content="策略"
-                        Style="{StaticResource Shell.Segment.Button}"
+                        Style="{StaticResource Aurora.Segment.Button}"
                         Click="OnPolicyClick" ToolTip="调整扩展坞收录策略" />
             </WrapPanel>
         </Border>
 
         <Border x:Name="EditorBar" Grid.Row="1" Margin="0,8,0,0"
-                Style="{StaticResource Shell.Segment.Bar}" Visibility="Collapsed">
+                Style="{StaticResource Aurora.Segment.Bar}" Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -67,13 +67,13 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="EditorLabel" Style="{StaticResource Shell.Segment.Label}" />
+                <TextBlock x:Name="EditorLabel" Style="{StaticResource Aurora.Segment.Label}" />
                 <local:SuggestBox x:Name="EntryInput" Grid.Column="1" MinWidth="120" Margin="2,0" />
                 <Button x:Name="BrowseButton" Grid.Column="2" Content="浏览"
-                        Style="{StaticResource Shell.Segment.Button}"
+                        Style="{StaticResource Aurora.Segment.Button}"
                         Click="OnBrowseClick" Visibility="Collapsed" />
                 <Button x:Name="ConfirmAddButton" Grid.Column="3" Content="加入"
-                        Style="{StaticResource Shell.Button.Accent}"
+                        Style="{StaticResource Aurora.Button.Accent}"
                         Click="OnConfirmAddClick" />
             </Grid>
         </Border>
@@ -91,7 +91,7 @@
                 </ContextMenu>
             </ListView.ContextMenu>
             <ListView.View>
-                <GridView ColumnHeaderContainerStyle="{StaticResource Shell.GridHeader}">
+                <GridView ColumnHeaderContainerStyle="{StaticResource Aurora.GridHeader}">
                     <GridViewColumn x:Name="NameColumn" Header="名称" Width="180"
                                     DisplayMemberBinding="{Binding Name}" />
                     <GridViewColumn x:Name="TypeColumn" Header="类型" Width="70"
@@ -110,7 +110,7 @@
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <Button Content="{Binding ActionText}"
-                                        Style="{StaticResource Shell.Button.Ghost}"
+                                        Style="{StaticResource Aurora.Button.Ghost}"
                                         MinWidth="54" Click="OnRowActionClick" />
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -120,12 +120,12 @@
         </ListView>
 
         <Border x:Name="CompactDetail" Grid.Row="3" Margin="0,8,0,0"
-                Style="{StaticResource Shell.Segment.Bar}" Visibility="Collapsed">
+                Style="{StaticResource Aurora.Segment.Bar}" Visibility="Collapsed">
             <StackPanel Margin="6,4">
                 <TextBlock Text="{Binding SelectedItem.Command, ElementName=DockList}"
-                           FontFamily="{DynamicResource Shell.Font.MonoFamily}"
-                           FontSize="{DynamicResource Shell.Font.Mono}" TextWrapping="Wrap" />
-                <TextBlock Style="{StaticResource Shell.Text.Caption}" Margin="0,3,0,0">
+                           FontFamily="{DynamicResource Aurora.Font.MonoFamily}"
+                           FontSize="{DynamicResource Aurora.Font.Mono}" TextWrapping="Wrap" />
+                <TextBlock Style="{StaticResource Aurora.Text.Caption}" Margin="0,3,0,0">
                     <Run Text="权重 " /><Run Text="{Binding SelectedItem.WeightText, ElementName=DockList}" />
                     <Run Text="  点击 " /><Run Text="{Binding SelectedItem.ClicksText, ElementName=DockList}" />
                     <Run Text="  最近打开 " /><Run Text="{Binding SelectedItem.LastOpenedText, ElementName=DockList}" />
@@ -134,17 +134,17 @@
         </Border>
 
         <TextBlock x:Name="StatusText" Grid.Row="4" Margin="2,7,0,0"
-                   Style="{StaticResource Shell.Text.Caption}" TextWrapping="Wrap" />
+                   Style="{StaticResource Aurora.Text.Caption}" TextWrapping="Wrap" />
 
         <Popup x:Name="PolicyPopup" PlacementTarget="{Binding ElementName=PolicyButton}"
                Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-            <Border Background="{DynamicResource Shell.Brush.Surface}"
-                    BorderBrush="{DynamicResource Shell.Brush.Hairline}"
-                    BorderThickness="1" CornerRadius="{DynamicResource Shell.Radius.Inner}"
-                    Padding="{DynamicResource Shell.Space.PadTight}"
-                    Effect="{DynamicResource Shell.Shadow.Flyout}">
+            <Border Background="{DynamicResource Aurora.Brush.Surface}"
+                    BorderBrush="{DynamicResource Aurora.Brush.Hairline}"
+                    BorderThickness="1" CornerRadius="{DynamicResource Aurora.Radius.Inner}"
+                    Padding="{DynamicResource Aurora.Space.PadTight}"
+                    Effect="{DynamicResource Aurora.Shadow.Flyout}">
                 <StackPanel Width="250">
-                    <TextBlock Text="收录策略" Style="{StaticResource Shell.Text.Body}" FontWeight="SemiBold" />
+                    <TextBlock Text="收录策略" Style="{StaticResource Aurora.Text.Body}" FontWeight="SemiBold" />
                     <Grid Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -152,20 +152,20 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                            <TextBlock Text="最少显示" Style="{StaticResource Shell.Text.Caption}" />
+                            <TextBlock Text="最少显示" Style="{StaticResource Aurora.Text.Caption}" />
                             <TextBox x:Name="MinItemsBox" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="0,0,6,0">
-                            <TextBlock Text="最多显示" Style="{StaticResource Shell.Text.Caption}" />
+                            <TextBlock Text="最多显示" Style="{StaticResource Aurora.Text.Caption}" />
                             <TextBox x:Name="MaxItemsBox" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="半衰期(天)" Style="{StaticResource Shell.Text.Caption}" />
+                            <TextBlock Text="半衰期(天)" Style="{StaticResource Aurora.Text.Caption}" />
                             <TextBox x:Name="HalfLifeBox" />
                         </StackPanel>
                     </Grid>
                     <Button Content="应用" Margin="0,8,0,0" HorizontalAlignment="Right"
-                            Style="{StaticResource Shell.Button.Accent}" Click="OnApplyPolicyClick" />
+                            Style="{StaticResource Aurora.Button.Accent}" Click="OnApplyPolicyClick" />
                 </StackPanel>
             </Border>
         </Popup>
