@@ -4,13 +4,16 @@
              xmlns:local="clr-namespace:Mercury"
              Background="Transparent"
              MinWidth="300">
+    <!--
+        DEC-011:页面只用宿主界面的动态资源,不在本地合并 Aurora 的样式字典。
+        合并一份 AuroraControls.xaml 的后果是作用域看着完整、实际只有一半:
+        Aurora.Text.* 定义在 AuroraTokens.xaml 里、不在这份字典中,于是 StaticResource
+        解析失败,整个管理页在注册时抛 StaticResourceExtension 异常而消失。
+        DynamicResource 一律沿可视树向上取到 ShellWindow.Resources,不留本地副本,
+        宿主切换主题时页面跟着走。
+    -->
     <UserControl.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/HistoryAurora;component/Themes/AuroraControls.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-            <local:NullToVisibilityConverter x:Key="NullToVisibility" />
-        </ResourceDictionary>
+        <local:NullToVisibilityConverter x:Key="NullToVisibility" />
     </UserControl.Resources>
 
     <Grid Margin="{DynamicResource Aurora.Space.PadTight}">
@@ -22,25 +25,25 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource Aurora.Segment.Bar}">
+        <Border Grid.Row="0" Style="{DynamicResource Aurora.Segment.Bar}">
             <WrapPanel Orientation="Horizontal">
-                <TextBlock Text="搜索" Style="{StaticResource Aurora.Segment.Label}" />
+                <TextBlock Text="搜索" Style="{DynamicResource Aurora.Segment.Label}" />
                 <TextBox x:Name="SearchBox" Width="170"
-                         Style="{StaticResource Aurora.Segment.TextBox}"
+                         Style="{DynamicResource Aurora.Segment.TextBox}"
                          ToolTip="按名称或指令筛选"
                          TextChanged="OnFilterChanged" />
-                <TextBlock Text="类型" Style="{StaticResource Aurora.Segment.Label}" />
+                <TextBlock Text="类型" Style="{DynamicResource Aurora.Segment.Label}" />
                 <ComboBox x:Name="TypeFilterBox" Width="92" SelectedIndex="0"
-                          Style="{StaticResource Aurora.Segment.ComboBox}"
+                          Style="{DynamicResource Aurora.Segment.ComboBox}"
                           SelectionChanged="OnFilterChanged">
                     <ComboBoxItem Content="全部" Tag="all" />
                     <ComboBoxItem Content="项目" Tag="project" />
                     <ComboBoxItem Content="命令" Tag="command" />
                     <ComboBoxItem Content="快捷文件" Tag="shortcut" />
                 </ComboBox>
-                <Border Style="{StaticResource Aurora.Segment.Divider}" />
+                <Border Style="{DynamicResource Aurora.Segment.Divider}" />
                 <Button x:Name="AddButton" Content="添加"
-                        Style="{StaticResource Aurora.Button.Accent}"
+                        Style="{DynamicResource Aurora.Button.Accent}"
                         Click="OnAddMenuClick" ToolTip="选择要加入扩展坞的条目类型">
                     <Button.ContextMenu>
                         <ContextMenu>
@@ -50,16 +53,16 @@
                         </ContextMenu>
                     </Button.ContextMenu>
                 </Button>
-                <Button Content="刷新" Style="{StaticResource Aurora.Segment.Button}"
+                <Button Content="刷新" Style="{DynamicResource Aurora.Segment.Button}"
                         Click="OnRefreshClick" ToolTip="重新扫描活动项目" />
                 <Button x:Name="PolicyButton" Content="策略"
-                        Style="{StaticResource Aurora.Segment.Button}"
+                        Style="{DynamicResource Aurora.Segment.Button}"
                         Click="OnPolicyClick" ToolTip="调整扩展坞收录策略" />
             </WrapPanel>
         </Border>
 
         <Border x:Name="EditorBar" Grid.Row="1" Margin="0,8,0,0"
-                Style="{StaticResource Aurora.Segment.Bar}" Visibility="Collapsed">
+                Style="{DynamicResource Aurora.Segment.Bar}" Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -67,13 +70,13 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="EditorLabel" Style="{StaticResource Aurora.Segment.Label}" />
+                <TextBlock x:Name="EditorLabel" Style="{DynamicResource Aurora.Segment.Label}" />
                 <local:SuggestBox x:Name="EntryInput" Grid.Column="1" MinWidth="120" Margin="2,0" />
                 <Button x:Name="BrowseButton" Grid.Column="2" Content="浏览"
-                        Style="{StaticResource Aurora.Segment.Button}"
+                        Style="{DynamicResource Aurora.Segment.Button}"
                         Click="OnBrowseClick" Visibility="Collapsed" />
                 <Button x:Name="ConfirmAddButton" Grid.Column="3" Content="加入"
-                        Style="{StaticResource Aurora.Button.Accent}"
+                        Style="{DynamicResource Aurora.Button.Accent}"
                         Click="OnConfirmAddClick" />
             </Grid>
         </Border>
@@ -91,7 +94,7 @@
                 </ContextMenu>
             </ListView.ContextMenu>
             <ListView.View>
-                <GridView ColumnHeaderContainerStyle="{StaticResource Aurora.GridHeader}">
+                <GridView ColumnHeaderContainerStyle="{DynamicResource Aurora.GridHeader}">
                     <GridViewColumn x:Name="NameColumn" Header="名称" Width="180"
                                     DisplayMemberBinding="{Binding Name}" />
                     <GridViewColumn x:Name="TypeColumn" Header="类型" Width="70"
@@ -110,7 +113,7 @@
                         <GridViewColumn.CellTemplate>
                             <DataTemplate>
                                 <Button Content="{Binding ActionText}"
-                                        Style="{StaticResource Aurora.Button.Ghost}"
+                                        Style="{DynamicResource Aurora.Button.Ghost}"
                                         MinWidth="54" Click="OnRowActionClick" />
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -120,12 +123,12 @@
         </ListView>
 
         <Border x:Name="CompactDetail" Grid.Row="3" Margin="0,8,0,0"
-                Style="{StaticResource Aurora.Segment.Bar}" Visibility="Collapsed">
+                Style="{DynamicResource Aurora.Segment.Bar}" Visibility="Collapsed">
             <StackPanel Margin="6,4">
                 <TextBlock Text="{Binding SelectedItem.Command, ElementName=DockList}"
                            FontFamily="{DynamicResource Aurora.Font.MonoFamily}"
                            FontSize="{DynamicResource Aurora.Font.Mono}" TextWrapping="Wrap" />
-                <TextBlock Style="{StaticResource Aurora.Text.Caption}" Margin="0,3,0,0">
+                <TextBlock Style="{DynamicResource Aurora.Text.Caption}" Margin="0,3,0,0">
                     <Run Text="权重 " /><Run Text="{Binding SelectedItem.WeightText, ElementName=DockList}" />
                     <Run Text="  点击 " /><Run Text="{Binding SelectedItem.ClicksText, ElementName=DockList}" />
                     <Run Text="  最近打开 " /><Run Text="{Binding SelectedItem.LastOpenedText, ElementName=DockList}" />
@@ -134,7 +137,7 @@
         </Border>
 
         <TextBlock x:Name="StatusText" Grid.Row="4" Margin="2,7,0,0"
-                   Style="{StaticResource Aurora.Text.Caption}" TextWrapping="Wrap" />
+                   Style="{DynamicResource Aurora.Text.Caption}" TextWrapping="Wrap" />
 
         <Popup x:Name="PolicyPopup" PlacementTarget="{Binding ElementName=PolicyButton}"
                Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
@@ -144,7 +147,7 @@
                     Padding="{DynamicResource Aurora.Space.PadTight}"
                     Effect="{DynamicResource Aurora.Shadow.Flyout}">
                 <StackPanel Width="250">
-                    <TextBlock Text="收录策略" Style="{StaticResource Aurora.Text.Body}" FontWeight="SemiBold" />
+                    <TextBlock Text="收录策略" Style="{DynamicResource Aurora.Text.Body}" FontWeight="SemiBold" />
                     <Grid Margin="0,8,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -152,20 +155,20 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,6,0">
-                            <TextBlock Text="最少显示" Style="{StaticResource Aurora.Text.Caption}" />
+                            <TextBlock Text="最少显示" Style="{DynamicResource Aurora.Text.Caption}" />
                             <TextBox x:Name="MinItemsBox" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="0,0,6,0">
-                            <TextBlock Text="最多显示" Style="{StaticResource Aurora.Text.Caption}" />
+                            <TextBlock Text="最多显示" Style="{DynamicResource Aurora.Text.Caption}" />
                             <TextBox x:Name="MaxItemsBox" />
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Text="半衰期(天)" Style="{StaticResource Aurora.Text.Caption}" />
+                            <TextBlock Text="半衰期(天)" Style="{DynamicResource Aurora.Text.Caption}" />
                             <TextBox x:Name="HalfLifeBox" />
                         </StackPanel>
                     </Grid>
                     <Button Content="应用" Margin="0,8,0,0" HorizontalAlignment="Right"
-                            Style="{StaticResource Aurora.Button.Accent}" Click="OnApplyPolicyClick" />
+                            Style="{DynamicResource Aurora.Button.Accent}" Click="OnApplyPolicyClick" />
                 </StackPanel>
             </Border>
         </Popup>

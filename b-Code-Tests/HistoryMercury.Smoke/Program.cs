@@ -53,11 +53,27 @@ try
     True(MercuryState.IsWatching, "The state watcher must restart after a UI reload.");
     shellHosted.DestroyUi();
     Equal(2, registrar.Disposed, "A reloaded UI must release its manager registration again.");
+
+    // 桌面坞归 Attach，不归 CreateUi。宿主只有在取到界面注册器（前端已装载）之后才调 CreateUi，
+    // 坞挂在那条链上就等于让唤起前端的入口依赖前端本身——4.6.2 就是这样在桌面上消失的。
+    True(!MercuryUiModule.IsDesktopDockRunning,
+        "CreateUi must not own the desktop dock: the dock belongs to Attach so it survives without the frontend.");
 }
 finally
 {
     Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", previousExplorerRegistrationSetting);
 }
+
+// 视图不得在本地合并 Aurora 的样式字典（DEC-011）。本地合并只覆盖那一份字典里的键，
+// 漏掉的键在解析 StaticResource 时把整页炸掉：4.6.2 的管理页引用 Aurora.Text.*，
+// 而它定义在 AuroraTokens.xaml、不在被合并的 AuroraControls.xaml 里，于是注册时抛
+// StaticResourceExtension 异常，宿主只记一行 Warn，页面无声消失。
+// BAML 里出现 HistoryAurora 的 pack URI 就是本地合并的唯一来源。
+AssertNoAuroraPackUri(assembly);
+
+// 无头构造管理页。DEC-013 留下的未决就是"能编译、装载时才炸"不在门禁内——
+// 这类缺陷只有真的解析一次 BAML 才暴露得出来。
+AssertConstructsHeadless("MercuryManagerPage", () => new MercuryManagerPage());
 
 Equal("dock.manager", MercuryManagerView.CreateDescriptor().Id, "Manager window ID");
 Equal("Mercury", ProjectIconGenerator.ShortLabel("2026-021-HistoryMercury"),
@@ -692,6 +708,55 @@ static void Equal<T>(T expected, T actual, string message)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))
         throw new InvalidOperationException($"{message}: expected={expected}, actual={actual}");
+}
+
+/// <summary>
+/// 扫描模块的编译后 BAML，确认没有任何视图引用 HistoryAurora 的 pack URI。
+/// BAML 把 URI 存成长度前缀的 UTF-8 字符串，按原始字节找就够，不必解析格式。
+/// </summary>
+static void AssertNoAuroraPackUri(System.Reflection.Assembly assembly)
+{
+    using var stream = assembly.GetManifestResourceStream("HistoryMercury.g.resources");
+    True(stream != null, "The module must ship compiled BAML resources.");
+
+    using var reader = new System.Resources.ResourceReader(stream!);
+    var needle = System.Text.Encoding.UTF8.GetBytes("HistoryAurora");
+    foreach (System.Collections.DictionaryEntry entry in reader)
+    {
+        if (entry.Value is not Stream baml)
+            continue;
+        using var buffer = new MemoryStream();
+        baml.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        for (var i = 0; i + needle.Length <= bytes.Length; i++)
+        {
+            var hit = true;
+            for (var j = 0; j < needle.Length && hit; j++)
+                hit = bytes[i + j] == needle[j];
+            True(!hit, $"{entry.Key} must not merge Aurora resource dictionaries; use DynamicResource instead.");
+        }
+    }
+}
+
+/// <summary>在 STA 线程上构造一个视图；解析 BAML 时的任何异常都在这里变成失败。</summary>
+static void AssertConstructsHeadless(string name, Func<object> factory)
+{
+    Exception? failure = null;
+    var thread = new Thread(() =>
+    {
+        try
+        {
+            factory();
+        }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
+    });
+    thread.SetApartmentState(ApartmentState.STA);
+    thread.Start();
+    True(thread.Join(TimeSpan.FromSeconds(30)), $"{name} construction must not hang.");
+    True(failure == null, $"{name} must construct without a shell present: {failure?.Message}");
 }
 
 static HistoryVulcan.Services.Mcp.CommandCatalogRow CatalogRow(

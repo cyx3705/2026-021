@@ -201,10 +201,22 @@
         <member name="M:Mercury.DockTheme.TileBackground(System.Double)">
             <summary>按偏黄程度插值出磁贴底色画刷；<paramref name="tint"/> 取 [0,1]。</summary>
         </member>
+        <member name="P:Mercury.DockTheme.FontFamily">
+            <summary>
+            字体与间距。取值与前端令牌 <c>Aurora.Font.*</c> / <c>Aurora.Space.ControlPad</c> 一致，
+            但**自己拿着**，不去查前端。
+            </summary>
+            <remarks>
+            原实现走 <c>Application.Current.TryFindResource</c>。桌面坞跑在自己的 STA 线程上，
+            前端在宿主进程内开窗时也刻意不建 WPF Application，这条查询因此恒为 null，
+            一直落在下面这些字面量上——写成"跟随宿主"只是错觉。坞是桌面上的常驻面，
+            它在前端起来之前就要显示，本来也不该跟着前端的主题走。
+            </remarks>
+        </member>
         <member name="P:Mercury.DockTheme.InputPadding">
             <summary>
             输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
-            垂直压到 0，水平仍跟宿主；按钮等无光标控件继续用 ControlPadding。
+            垂直压到 0，水平仍与按钮等无光标控件的 ControlPadding 对齐。
             </summary>
         </member>
         <member name="T:Mercury.DockWeight">
@@ -474,17 +486,38 @@
             <summary>模块卸载时停止并释放钩子。</summary>
         </member>
         <member name="T:Mercury.MercuryUiModule">
-            <summary>
-            活动坞界面生命周期。窗口自持、不依赖宿主窗口，因此只在有 WPF Application 的宿主中建窗。
-            </summary>
-            <remarks>
-            当前 HistoryVulcan 组合下只有桌面 Shell 进程会实例化 UI 模块（服务进程 EnableUiModules=false），
-            因此管理页与桌面坞都运行在 Shell 进程；模块指令由 mercury 三段式目录注册在服务进程，
-            Shell 侧经 <see cref="T:HistoryVulcan.Core.Commands.CommandBus"/> 的远程执行器透明转发，模块代码无需关心进程边界。
-            </remarks>
+             <summary>
+             Mercury 的两类界面各有各的生命周期，本类是两条线的入口。
+             </summary>
+             <remarks>
+             **桌面坞是 Mercury 自己的界面，不是前端里的一页**：它在 <see cref="M:Mercury.MercuryUiModule.Attach(HistoryVulcan.Core.Modules.IModuleContext)"/> 阶段起在
+             本模块自有的 STA 线程上，只要模块装载就存在，前端在不在、开没开都与它无关。
+             桌面坞是唤起前端的入口，若它反过来依赖前端，前端一关就再也叫不回来。
+            
+             管理页与命令工作台则相反：它们本就是前端里的页，只能在 <see cref="M:Mercury.MercuryUiModule.CreateUi"/> 阶段
+             挂进宿主转交的界面注册器，前端不在时整段不发生。
+            
+             DEC-008 之后宿主只有一个进程，模块指令、桌面坞与前端页都在其中；模块指令由 mercury
+             三段式目录注册进宿主注册表，跨线程调用经 <see cref="T:HistoryVulcan.Core.Commands.CommandBus"/> 编组，模块代码不必关心。
+             </remarks>
+        </member>
+        <member name="F:Mercury.MercuryUiModule._dockThread">
+            <summary>桌面坞自有的 STA 线程，坞的 Dispatcher 跑在它上面。</summary>
+        </member>
+        <member name="F:Mercury.MercuryUiModule.DockReady">
+            <summary>坞就绪信号；<see cref="M:Mercury.MercuryUiModule.StartDesktopDock"/> 等它之后 <see cref="M:Mercury.MercuryUiModule.Attach(HistoryVulcan.Core.Modules.IModuleContext)"/> 才返回。</summary>
+        </member>
+        <member name="F:Mercury.MercuryUiModule.DockReadyTimeout">
+            <summary>坞就绪等待上限。超时只告警不阻断——装不上坞也不该连累整个模块装载。</summary>
         </member>
         <member name="P:Mercury.MercuryUiModule.Bus">
             <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
+        </member>
+        <member name="P:Mercury.MercuryUiModule.IsDesktopDockRunning">
+            <summary>
+            桌面坞是否在跑。供烟测断言坞**不在** <see cref="M:Mercury.MercuryUiModule.CreateUi"/> 那条链上——
+            一旦它重新变成前端的下游，前端不在时桌面上就什么都没有。
+            </summary>
         </member>
         <member name="P:Mercury.MercuryUiModule.Log">
             <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
@@ -504,16 +537,30 @@
         </member>
         <member name="M:Mercury.MercuryUiModule.CreateUi">
             <summary>
-            建界面。桌面坞排在最前，宿主内的两处扩展各自隔离。
+            往前端里挂 Mercury 的两处扩展。桌面坞不在此列——它在 <see cref="M:Mercury.MercuryUiModule.Attach(HistoryVulcan.Core.Modules.IModuleContext)"/> 已经起来了。
             </summary>
             <remarks>
-            4.5.1 的事故：桌面坞原本建在管理页注册和工作台挂载之后，工作台构造 WPF 视图时抛异常，
-            宿主只记一行 Warn 就继续装载别的模块，桌面上的坞于是无声无息地消失。桌面坞是本模块
-            唯一常驻用户视野的东西，不能作为两个宿主内扩展的下游；任何一处扩展失败都只该损失它自己。
+            两处扩展各自兜异常：4.5.1 的事故是工作台构造 WPF 视图抛异常，宿主只记一行 Warn
+            就继续装载别的模块，排在它后面的桌面坞于是无声消失。现在坞根本不在这条链上，
+            但管理页与工作台之间仍要互不牵连。
             </remarks>
         </member>
-        <member name="M:Mercury.MercuryUiModule.CreateDesktopDock">
-            <summary>桌面坞。无 WPF Application 的宿主（服务进程、烟测）下不建窗。</summary>
+        <member name="M:Mercury.MercuryUiModule.StartDesktopDock">
+             <summary>
+             起桌面坞：自建 STA 线程 + Dispatcher，坞在这条线程上自持。
+             </summary>
+             <remarks>
+             不能借前端的界面线程。旧实现以 <c>Application.Current == null</c> 作为"此进程没有界面"
+             的判据，而 DEC-008 之后前端在宿主进程内开窗时**刻意不建 WPF Application**，
+             于是这个判据恒真、坞永远不建——症状是桌面上什么都没有，日志里一行错误也没有。
+             判据换成线程本身：坞有没有地方跑，只取决于本模块能不能开出一条 STA 线程。
+            
+             快捷方式文件夹与资源管理器入口也一并挪到这里。它们是坞的组成部分（坞的收录来源），
+             不是前端的；留在 CreateUi 里同样会随前端缺席而消失。
+             </remarks>
+        </member>
+        <member name="M:Mercury.MercuryUiModule.StopDesktopDock">
+            <summary>关坞并收线程。模块卸载前必须完成，否则可回收上下文卸载时坞还在跑它的类型。</summary>
         </member>
         <member name="M:Mercury.MercuryUiModule.DockWindow.ApplyAnchor">
             <summary>把窗口吸附到主显示器工作区右下角。</summary>
