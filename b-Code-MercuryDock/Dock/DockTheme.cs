@@ -45,16 +45,27 @@ public static class DockTheme
             (byte)Math.Round(TileBase.G + ((TileTintTarget.G - TileBase.G) * t)),
             (byte)Math.Round(TileBase.B + ((TileTintTarget.B - TileBase.B) * t))));
     }
-    public static FontFamily FontFamily => Find("Aurora.Font.Family") as FontFamily ?? new FontFamily("Microsoft YaHei UI, Segoe UI");
-    public static double BodyFontSize => FindDouble("Aurora.Font.Body", 13);
-    public static double SmallFontSize => FindDouble("Aurora.Font.Small", 11);
-    public static Thickness ControlPadding => Find("Aurora.Space.ControlPad") is Thickness thickness
-        ? thickness
-        : new Thickness(10, 4, 10, 4);
+    /// <summary>
+    /// 字体与间距。取值与前端令牌 <c>Aurora.Font.*</c> / <c>Aurora.Space.ControlPad</c> 一致，
+    /// 但**自己拿着**，不去查前端。
+    /// </summary>
+    /// <remarks>
+    /// 原实现走 <c>Application.Current.TryFindResource</c>。桌面坞跑在自己的 STA 线程上，
+    /// 前端在宿主进程内开窗时也刻意不建 WPF Application，这条查询因此恒为 null，
+    /// 一直落在下面这些字面量上——写成"跟随宿主"只是错觉。坞是桌面上的常驻面，
+    /// 它在前端起来之前就要显示，本来也不该跟着前端的主题走。
+    /// </remarks>
+    public static FontFamily FontFamily => new("Microsoft YaHei UI, Segoe UI");
+
+    public static double BodyFontSize => 13;
+
+    public static double SmallFontSize => 11;
+
+    public static Thickness ControlPadding => new(10, 4, 10, 4);
 
     /// <summary>
     /// 输入框内边距：28 高控件若沿用 (10,4) 垂直内边距，13 号字行高加光标留白会被裁掉半行；
-    /// 垂直压到 0，水平仍跟宿主；按钮等无光标控件继续用 ControlPadding。
+    /// 垂直压到 0，水平仍与按钮等无光标控件的 ControlPadding 对齐。
     /// </summary>
     public static Thickness InputPadding => new(ControlPadding.Left, 0, ControlPadding.Right, 0);
 
@@ -93,12 +104,6 @@ public static class DockTheme
         template.Triggers.Add(disabled);
         button.Template = template;
     }
-
-    private static object? Find(string key)
-        => Application.Current?.TryFindResource(key);
-
-    private static double FindDouble(string key, double fallback)
-        => Find(key) is double value && !double.IsNaN(value) && !double.IsInfinity(value) ? value : fallback;
 
     private static SolidColorBrush Frozen(Color color)
     {

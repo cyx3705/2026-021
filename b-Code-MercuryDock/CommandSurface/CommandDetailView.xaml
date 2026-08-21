@@ -2,14 +2,11 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="Transparent">
-    <UserControl.Resources>
-        <!-- 视图是独立 BAML:StaticResource 必须在自己的作用域里找得到 -->
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="/HistoryAurora;component/Themes/AuroraControls.xaml" />
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </UserControl.Resources>
+    <!--
+        视图不带本地字典:样式一律 DynamicResource,沿可视树取宿主界面的资源。
+        本地合并 Aurora 样式字典只能覆盖它自己那一份键,漏的那些会以
+        StaticResourceExtension 异常整页炸掉(管理页栽过一次)。
+    -->
 
     <DockPanel Margin="8">
         <TextBlock DockPanel.Dock="Bottom" x:Name="StatusText" Foreground="{DynamicResource Aurora.Brush.TextSecondary}"
@@ -30,7 +27,7 @@
                     <TextBlock Grid.Row="1" Text="参数" Foreground="{DynamicResource Aurora.Brush.TextSecondary}" FontSize="{DynamicResource Aurora.Font.Small}" Margin="0,8,0,2" />
                     <ListView Grid.Row="2" x:Name="ParameterList">
                         <ListView.View>
-                            <GridView ColumnHeaderContainerStyle="{StaticResource Aurora.GridHeader}">
+                            <GridView ColumnHeaderContainerStyle="{DynamicResource Aurora.GridHeader}">
                                 <GridViewColumn Header="名称" Width="100" DisplayMemberBinding="{Binding Name}" />
                                 <GridViewColumn Header="类型" Width="65" DisplayMemberBinding="{Binding Type}" />
                                 <GridViewColumn Header="必填" Width="48" DisplayMemberBinding="{Binding Required}" />
