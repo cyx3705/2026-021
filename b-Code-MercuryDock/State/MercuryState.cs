@@ -3,6 +3,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace Mercury;
 
@@ -119,8 +120,8 @@ internal static class MercuryState
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
                     EnableRaisingEvents = true,
                 };
-                _watcher.Changed += (_, _) => Reload();
-                _watcher.Created += (_, _) => Reload();
+                _watcher.Changed += (_, _) => SchedulePreferenceReload();
+                _watcher.Created += (_, _) => SchedulePreferenceReload();
             }
             catch (Exception)
             {
@@ -150,8 +151,33 @@ internal static class MercuryState
         }
     }
 
+    private static int _preferenceReloadQueued;
+
+    /// <summary>
+    /// state.json 一次写入会连打 LastWrite/Size 多次。合并到一次读盘，
+    /// 并且已有扫描缓存时只按新偏好重算收录，不再把整库扫描挂到文件监视上。
+    /// </summary>
+    private static async void SchedulePreferenceReload()
+    {
+        if (Interlocked.Exchange(ref _preferenceReloadQueued, 1) == 1)
+            return;
+        try
+        {
+            await Task.Delay(120).ConfigureAwait(false);
+            ReloadPreferencesFromDisk();
+        }
+        catch (Exception)
+        {
+            // 监视回调不得抛回文件监视线程。
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _preferenceReloadQueued, 0);
+        }
+    }
+
     /// <summary>重新读入偏好并通知界面。写入方自己触发的事件同样走这里，重载幂等，不会形成回环。</summary>
-    private static void Reload()
+    private static void ReloadPreferencesFromDisk()
     {
         try
         {
@@ -164,8 +190,37 @@ internal static class MercuryState
             return;
         }
 
+        bool needScan;
+        lock (Gate)
+            needScan = _allProjects.Count == 0;
+        if (needScan)
+        {
+            _ = RefreshAsync();
+            return;
+        }
+
+        RecomputeSelectedFromCache();
         Changed?.Invoke();
-        _ = RefreshAsync();
+    }
+
+    /// <summary>用当前偏好重算桌面坞收录，不碰磁盘扫描。</summary>
+    private static void RecomputeSelectedFromCache()
+    {
+        lock (Gate)
+        {
+            var policy = _preferences.Policy.Normalized();
+            var pins = _preferences.Pins;
+            var excluded = _preferences.Excluded;
+            var all = _allProjects
+                .Select(item => item with
+                {
+                    Pinned = pins.Contains(item.Name),
+                    Excluded = excluded.Contains(item.Name),
+                })
+                .ToList();
+            _allProjects = OrderAll(all);
+            _projects = SelectVisible(_allProjects, policy);
+        }
     }
 
     /// <summary>记一次通过活动坞的打开：先衰减到当前时刻，再累加一次点击。</summary>
@@ -197,11 +252,11 @@ internal static class MercuryState
             SavePreferences();
         }
 
+        RecomputeSelectedFromCache();
+        if (!DockShortcutFolder.IsExplorerRegistrationDisabled)
+            SynchronizeExplorerEntry(Projects);
         Changed?.Invoke();
-        _ = RefreshAsync();
     }
-
-    /// <summary>清除使用记录；name 为空表示全部。</summary>
     public static void Forget(string? name)
     {
         lock (Gate)
@@ -671,6 +726,12 @@ internal static class MercuryState
         }
 
         // 固定项无视权重恒在最前；其余按加权频率降序，同分回退到 git 活动时间。
+        var orderedAll = OrderAll(all);
+        return new ScanResult(SelectVisible(orderedAll, policy), orderedAll);
+    }
+
+    private static List<DockProject> SelectVisible(IReadOnlyList<DockProject> all, DockPolicy policy)
+    {
         var pinned = all.Where(item => item.Pinned && !item.Excluded)
             .OrderByDescending(item => item.Weight)
             .ThenByDescending(item => item.LastActivity)
@@ -690,7 +751,7 @@ internal static class MercuryState
                 .ToList();
         }
 
-        return new ScanResult(selected, OrderAll(all));
+        return selected;
     }
 
     private static string ReadWorktreeRoot()

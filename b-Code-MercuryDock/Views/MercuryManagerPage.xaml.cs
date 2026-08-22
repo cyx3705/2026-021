@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Extensibility.CommandSurface;
 using Mercury.CommandSurface;
@@ -14,18 +15,34 @@ public sealed partial class MercuryManagerPage : UserControl
 {
     private const double CompactWidth = 720;
     private readonly CommandCompletionEngine _completion = new();
+    private readonly DispatcherTimer _stateTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
+    private readonly DispatcherTimer _filterTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
     private IReadOnlyList<CommandCompletionDefinition> _definitions =
         MercuryCommandCatalog.CreateDescriptors()
             .Select(CommandCatalogSession.CreateCompletionDefinition)
             .ToList();
     private string _addKind = "command";
     private bool _busy;
+    private string _listFingerprint = string.Empty;
+    private bool _lastCompact;
+    private int _lastLayoutWidth;
 
     public MercuryManagerPage()
     {
         InitializeComponent();
         EntryInput.Source = EntryOptions;
-        SizeChanged += (_, _) => UpdateResponsiveColumns();
+        _stateTimer.Tick += (_, _) =>
+        {
+            _stateTimer.Stop();
+            LoadPolicy();
+            Reload();
+        };
+        _filterTimer.Tick += (_, _) =>
+        {
+            _filterTimer.Stop();
+            Reload();
+        };
+        SizeChanged += (_, _) => QueueResponsiveColumns();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
     }
@@ -37,21 +54,30 @@ public sealed partial class MercuryManagerPage : UserControl
         MercuryState.Changed += OnStateChanged;
         LoadPolicy();
         Reload();
-        UpdateResponsiveColumns();
+        UpdateResponsiveColumns(force: true);
         await LoadCommandCatalogAsync();
-        await ExecuteAsync("mercury.proj.refresh", "正在刷新项目...");
+        if (MercuryState.AllProjects.Count == 0)
+            _ = MercuryState.RefreshAsync();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
-        => MercuryState.Changed -= OnStateChanged;
+    {
+        _stateTimer.Stop();
+        _filterTimer.Stop();
+        MercuryState.Changed -= OnStateChanged;
+    }
 
     private void OnStateChanged() => Dispatcher.BeginInvoke(() =>
     {
-        LoadPolicy();
-        Reload();
+        _stateTimer.Stop();
+        _stateTimer.Start();
     });
 
-    private void OnFilterChanged(object sender, EventArgs e) => Reload();
+    private void OnFilterChanged(object sender, EventArgs e)
+    {
+        _filterTimer.Stop();
+        _filterTimer.Start();
+    }
 
     private void Reload()
     {
@@ -60,14 +86,21 @@ public sealed partial class MercuryManagerPage : UserControl
         var selectedKey = (DockList.SelectedItem as DockManagerRow)?.Key;
         var filter = SearchBox?.Text.Trim() ?? string.Empty;
         var type = (TypeFilterBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "all";
-        var rows = MercuryState.Projects.Select(DockManagerRow.FromProject)
+        var rows = MercuryState.AllProjects.Select(DockManagerRow.FromProject)
             .Concat(MercuryState.CommandEntries.Select(DockManagerRow.FromCommand))
             .Where(row => type == "all" || row.Type == type)
             .Where(row => filter.Length == 0
                 || row.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
                 || row.Command.Contains(filter, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        DockList.ItemsSource = rows;
+        var fingerprint = string.Join('\u001f', rows.Select(row =>
+            string.Join('\u001e', row.Key, row.StateText, row.WeightText, row.ClicksText, row.ActionText)));
+        if (fingerprint != _listFingerprint)
+        {
+            _listFingerprint = fingerprint;
+            DockList.ItemsSource = rows;
+        }
+
         DockList.SelectedItem = selectedKey == null
             ? null
             : rows.FirstOrDefault(row => row.Key == selectedKey);
@@ -220,8 +253,9 @@ public sealed partial class MercuryManagerPage : UserControl
             return false;
         }
         _busy = true;
-        IsEnabled = false;
         SetStatus(pending);
+        var previousCursor = Mouse.OverrideCursor;
+        Mouse.OverrideCursor = Cursors.Wait;
         try
         {
             var result = await bus.ExecuteAsync(command, "MercuryManager");
@@ -238,7 +272,7 @@ public sealed partial class MercuryManagerPage : UserControl
         finally
         {
             _busy = false;
-            IsEnabled = true;
+            Mouse.OverrideCursor = previousCursor;
         }
     }
 
@@ -287,11 +321,27 @@ public sealed partial class MercuryManagerPage : UserControl
         => value.Equals(filter, StringComparison.OrdinalIgnoreCase) ? 0
             : value.StartsWith(filter, StringComparison.OrdinalIgnoreCase) ? 1 : 2;
 
-    private void UpdateResponsiveColumns()
+    private void QueueResponsiveColumns()
+    {
+        var compact = ActualWidth < CompactWidth;
+        var width = (int)ActualWidth;
+        if (!compact && width == _lastLayoutWidth && compact == _lastCompact)
+            return;
+        if (compact == _lastCompact && Math.Abs(width - _lastLayoutWidth) < 8)
+            return;
+        UpdateResponsiveColumns(force: false);
+    }
+
+    private void UpdateResponsiveColumns(bool force)
     {
         if (NameColumn == null)
             return;
         var compact = ActualWidth < CompactWidth;
+        var width = (int)ActualWidth;
+        if (!force && compact == _lastCompact && Math.Abs(width - _lastLayoutWidth) < 8)
+            return;
+        _lastCompact = compact;
+        _lastLayoutWidth = width;
         CommandColumn.Width = compact ? 0 : Math.Max(180, ActualWidth - 646);
         WeightColumn.Width = compact ? 0 : 62;
         ClicksColumn.Width = compact ? 0 : 54;
@@ -336,7 +386,7 @@ internal sealed record DockManagerRow(
         project.Name,
         "project",
         "项目",
-        project.Pinned ? "固定" : "自动",
+        project.Excluded ? "排除" : project.Pinned ? "固定" : "自动",
         MercuryCommandCatalog.BuildOpenProjectCommand(project.Name),
         project.Weight.ToString("F2", CultureInfo.CurrentCulture),
         project.Clicks.ToString("F1", CultureInfo.CurrentCulture),
