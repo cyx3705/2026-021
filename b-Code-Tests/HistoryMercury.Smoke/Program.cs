@@ -137,7 +137,7 @@ True(openShortcut.Parameters.Single() is { Name: "path", Required: true, Positio
 True(addShortcut.Parameters.Single() is { Name: "path", Required: true, Position: 0 },
     "Shortcut-add path must be the unique positional parameter.");
 True(registry.TryGet("mercury.proj.pin", out var pin) && !pin.Readonly, "Project write command must be present.");
-True(registry.TryGet("mercury.usage.forget", out var forget) && forget.IsDangerous,
+True(registry.TryGet("mercury.usage.forget", out var forget) && forget.Level == CommandLevel.Ask,
     "Usage reset must require confirmation.");
 True(registry.TryGet(MercuryCommandCatalog.ProjectOpenCommandName, out var openProject), "Project open command must be registered.");
 Equal("mercury.proj.open 2026-021-HistoryMercury", MercuryCommandCatalog.BuildOpenProjectCommand("2026-021-HistoryMercury"),
