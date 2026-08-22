@@ -322,8 +322,8 @@ internal static class MercuryCommandCatalog
             CommandClass = commandClass,
             Summary = summary,
             Parameters = parameters,
+            Level = confirm == null ? CommandLevel.Run : CommandLevel.Ask,
             ConfirmPrompt = confirm == null ? null : _ => confirm,
-            Dangerous = confirm != null,
             Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
         };
 

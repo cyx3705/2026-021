@@ -1,7 +1,7 @@
 ﻿using HistoryVulcan.Core;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Extensibility.CommandSurface;
-using HistoryVulcan.Services.Mcp;
+using HistoryVulcan.Services.Commands;
 
 namespace Mercury.CommandSurface;
 
@@ -373,7 +373,7 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
                 descriptor.Parameters.Count,
                 source,
                 null,
-                descriptor.IsDangerous,
+                descriptor.Level == CommandLevel.Ask,
                 descriptor.RequiresUiThread,
                 null,
                 "hidden",
@@ -585,7 +585,7 @@ public sealed class CommandCatalogSession : ICommandCatalogSession
                 descriptor.Parameters.Count,
                 "local",
                 null,
-                descriptor.IsDangerous,
+                descriptor.Level == CommandLevel.Ask,
                 descriptor.RequiresUiThread,
                 null,
                 "hidden",
