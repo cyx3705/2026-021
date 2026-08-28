@@ -3,11 +3,10 @@ using System.Text.Json;
 using System.IO;
 using BaseVariable;
 using HistoryVulcan.Core.Commands;
-using HistoryVulcan.Core.Docking;
 using HistoryVulcan.Core.Modules;
 using Mercury;
-using Mercury.CommandSurface;
 using Mercury.Input;
+using Mercury.Ui;
 
 var previousExplorerRegistrationSetting = Environment.GetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION");
 Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", "1");
@@ -27,66 +26,44 @@ Equal("mercury", moduleInfos[0].GetType().GetProperty("CommandPrefix")?.GetValue
 True(!string.IsNullOrWhiteSpace(moduleInfos[0].Version), "Module version must be reported.");
 Equal(null, moduleInfos[0].MainClassType, "Commands must not use reflection projection.");
 
-var uiTypes = assembly.GetTypes()
-    .Where(type => type.IsPublic && !type.IsAbstract && typeof(IUiModule).IsAssignableFrom(type))
+// 宿主 5.0 删除了 IUiModule / IShellUiAware / CreateUi / DestroyUi 与整套停靠 SDK。
+// 模块入口现在只剩两个点：IModuleContextAware.Attach 与 IDisposable.Dispose，
+// 两者都由 ModuleHost 调用，因此都是与宿主的约定，而不是模块的私事。
+var entryTypes = assembly.GetTypes()
+    .Where(type => type.IsPublic && !type.IsAbstract && typeof(IModuleContextAware).IsAssignableFrom(type))
     .ToList();
-Equal(1, uiTypes.Count, "Exactly one UI lifecycle module is required.");
-Equal(typeof(MercuryUiModule), uiTypes[0], "UI lifecycle type");
-True(typeof(IShellUiAware).IsAssignableFrom(typeof(MercuryUiModule)), "UI module must accept shell UI registration.");
-True(typeof(IModuleContextAware).IsAssignableFrom(typeof(MercuryUiModule)), "UI module must receive the host command context.");
+Equal(1, entryTypes.Count, "Exactly one module entry point is required.");
+Equal(typeof(MercuryModule), entryTypes[0], "Module entry type");
+True(typeof(IDisposable).IsAssignableFrom(typeof(MercuryModule)),
+    "The module must be disposable: the host reclaims instances before unloading the collectible context.");
+True(!assembly.GetTypes().Any(type => type.GetInterfaces()
+        .Any(contract => contract.Name is "IUiModule" or "IShellUiAware" or "IShellCommandWorkbenchAware")),
+    "No type may implement the host UI lifecycle contracts deleted in HistoryVulcan 5.0.");
 
-var registrar = new RecordingRegistrar();
-var shellHosted = new MercuryUiModule();
-try
+// 桌面坞只归 Attach。构造实例本身不得把坞带上桌面，Dispose 必须是可重入的空操作。
 {
-    ((IShellUiAware)shellHosted).ShellUi = registrar;
-    shellHosted.CreateUi();
-    Equal(1, registrar.Registered.Count, "The manager page must register once.");
-    Equal("dock.manager", registrar.Registered[0], "Manager page ID");
-    True(MercuryState.IsWatching, "CreateUi must start the state watcher.");
-    shellHosted.CreateUi();
-    Equal(1, registrar.Registered.Count, "Repeated CreateUi must not register twice.");
-    shellHosted.DestroyUi();
-    Equal(1, registrar.Disposed, "DestroyUi must release the manager registration.");
-    True(!MercuryState.IsWatching, "DestroyUi must release the state watcher.");
-    shellHosted.CreateUi();
-    True(MercuryState.IsWatching, "The state watcher must restart after a UI reload.");
-    shellHosted.DestroyUi();
-    Equal(2, registrar.Disposed, "A reloaded UI must release its manager registration again.");
-
-    // 桌面坞归 Attach，不归 CreateUi。宿主只有在取到界面注册器（前端已装载）之后才调 CreateUi，
-    // 坞挂在那条链上就等于让唤起前端的入口依赖前端本身——4.6.2 就是这样在桌面上消失的。
-    True(!MercuryUiModule.IsDesktopDockRunning,
-        "CreateUi must not own the desktop dock: the dock belongs to Attach so it survives without the frontend.");
-}
-finally
-{
-    Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", previousExplorerRegistrationSetting);
+    var module = new MercuryModule();
+    True(!MercuryModule.IsDesktopDockRunning, "Constructing the module must not start the desktop dock.");
+    module.Dispose();
+    module.Dispose();
+    True(!MercuryModule.IsDesktopDockRunning, "Dispose must leave no dock behind.");
 }
 
-// 视图不得在本地合并 Aurora 的样式字典（DEC-011）。本地合并只覆盖那一份字典里的键，
-// 漏掉的键在解析 StaticResource 时把整页炸掉：4.6.2 的管理页引用 Aurora.Text.*，
-// 而它定义在 AuroraTokens.xaml、不在被合并的 AuroraControls.xaml 里，于是注册时抛
-// StaticResourceExtension 异常，宿主只记一行 Warn，页面无声消失。
-// BAML 里出现 HistoryAurora 的 pack URI 就是本地合并的唯一来源。
-AssertNoAuroraPackUri(assembly);
+// 模块不得自建前端组件（DEC-005 / 页面注册协议）。4.x 的三个页面是本模块编译进来的 XAML，
+// 曾因本地合并 Aurora 样式字典而在注册时抛 StaticResourceExtension 把整页带走；
+// 描述化之后模块里根本不该再有编译后的 BAML，这条断言比"BAML 里不含 Aurora pack URI"更强。
+AssertNoCompiledXaml(assembly);
 
-// 无头构造管理页。DEC-013 留下的未决就是"能编译、装载时才炸"不在门禁内——
-// 这类缺陷只有真的解析一次 BAML 才暴露得出来。
-AssertConstructsHeadless("MercuryManagerPage", () => new MercuryManagerPage());
-
-Equal("dock.manager", MercuryManagerView.CreateDescriptor().Id, "Manager window ID");
 Equal("Mercury", ProjectIconGenerator.ShortLabel("2026-021-HistoryMercury"),
     "Project tile short label removes number and History prefix.");
 True(ProjectIconGenerator.FitFontSize("A very long project suffix", 44) >= 6,
     "Project tile font remains a complete, non-ellipsis rendering path.");
-Equal(DockSide.Center, MercuryManagerView.CreateDescriptor().DefaultSide, "Manager window default side");
 
 var registry = new CommandRegistry();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-// 26 = 原 24 条 + mercury.dock.add/remove。
-Equal(26, commands.Count, "Command count");
+// 31 = 4.8.1 的 26 条 + 页面协议三条（ui.describe / ui.actions / ui.data）+ dock.run + shortcut.pick。
+Equal(31, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -112,7 +89,9 @@ True(commands.Where(command => command.Name.Split('.').Length == 2)
 // 它切换的是控制台状态，不隶属任何业务类。
 True(registry.TryGet("mercury.go", out var go), "Domain-focus command must be registered.");
 True(string.IsNullOrWhiteSpace(go.CommandClass), "mercury.go must be a classless direct method.");
-True(go.RequiresUiThread, "mercury.go must execute on the UI thread.");
+// 5.0 起 mercury.go 只是把域筛选转发给前端的 aurora.log.source，自己不碰界面对象；
+// 需要 UI 线程的是那一条。这里再声明一次只会多编组一次。
+True(!go.RequiresUiThread, "mercury.go only relays to the frontend command and must not claim the UI thread.");
 True(go.Parameters.Any(parameter => parameter.Name == "domain" && !parameter.Required),
     "mercury.go must take an optional domain parameter so the bare form exits focus.");
 Equal("registry.domains", go.Annotations["completion.values.domain"],
@@ -145,18 +124,12 @@ Equal("mercury.proj.open 2026-021-HistoryMercury", MercuryCommandCatalog.BuildOp
 Equal("mercury.proj.open \"a b\"", MercuryCommandCatalog.BuildOpenProjectCommand("a b"),
     "Whitespace project name command text");
 
-using var catalog = JsonDocument.Parse("""
-[{"commandName":"mercury.proj.open","domain":"Mercury","commandClass":"proj","summary":"打开项目"},
- {"commandName":"mercury.usage.list","domain":"Mercury","commandClass":"usage"},
- {"other":1}]
-""");
-var catalogItems = MercuryCommandCatalog.ParseCommandCatalog(catalog.RootElement);
-Equal(2, catalogItems.Count, "Command catalog JSON parsing");
-Equal("Mercury", catalogItems[0].Domain, "Command catalog domain");
-True(MercuryCommandCatalog.FallbackCommandCatalog().Select(item => item.Name)
+// 命令目录只有一个来源：CreateDescriptors。此前还有一份供界面补全用的"回退目录"，
+// 它是同一份数据的第二个副本，随描述化一起去掉了。
+True(MercuryCommandCatalog.CreateDescriptors().Select(command => command.Name)
     .OrderBy(name => name, StringComparer.Ordinal)
     .SequenceEqual(commands.Select(command => command.Name).OrderBy(name => name, StringComparer.Ordinal)),
-    "Fallback catalog must come from the registration source.");
+    "The registry must contain exactly the declared descriptors.");
 
 // 配置值来自用户设置文件，非字符串值必须按缺失处理，不能让活动坞扫描路径抛异常。
 using (var malformedSettings = JsonDocument.Parse("""
@@ -170,14 +143,6 @@ using (var malformedSettings = JsonDocument.Parse("""
     Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.other"),
         "Null settings must be ignored.");
 }
-
-var tree = CommandOptionTree.Build(MercuryCommandCatalog.FallbackCommandCatalog());
-var roots = tree.ChildrenOf("");
-Equal(1, roots.Count, "Only mercury may appear as a module root.");
-Equal("mercury.", roots[0].Text, "Root branch");
-var projectBranch = tree.ChildrenOf("mercury.proj.");
-True(projectBranch.Any(option => option.Text == "mercury.proj.open"), "Project open leaf");
-True(projectBranch.Any(option => option.Text == "mercury.proj.pin"), "Project pin leaf");
 
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding a dock command must succeed.");
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding the same dock command is idempotent.");
@@ -502,183 +467,133 @@ using (var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath)))
         "manifest name must equal ModuleInfo.ModuleName");
 }
 
-// 分段补全：域 → 类 → 方法 → 参数。域清单从传入定义现算，不硬编码。
-var completion = new CommandCompletionEngine();
-var catalogue = new List<CommandCompletionDefinition>
+// 页面注册协议 V1：描述、动作声明与取数三条命令是本模块唯一的前端接口。
+// 命令目录里必须有它们，且一律不对远端暴露——5.0 之后远端可见性只看 HiddenReason，
+// 宿主不再替模块判断这类"界面内部协议"。
+foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercury.ui.data" })
 {
-    new("janus.proj.list", "列出项目", []),
-    new("janus.proj.commit", "提交", [new ParameterSpec { Name = "name", Description = "项目名" }]),
-    new("janus.gitrule.scan", "扫描规则", []),
-    new("mercury.go", "域聚焦", [new ParameterSpec { Name = "domain", Description = "域", Position = 0 }],
-        DynamicValueProviders: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["domain"] = "registry.domains",
-        }),
-    new("vulcan.ui.reset", "重置布局", []),
-};
-
-static string[] Inserts(HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionResult result)
-    => result.Candidates.Select(candidate => candidate.InsertText).ToArray();
-
-// 第一段选域，落点带点号。
-var domains = completion.Complete("", 0, catalogue);
-True(Inserts(domains).SequenceEqual(["janus.", "mercury.", "vulcan."]),
-    "Empty input offers every registered domain.");
-True(domains.Candidates.All(candidate => candidate.Kind == HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionKind.Domain),
-    "Domain stage yields domain candidates.");
-True(Inserts(completion.Complete("erc", 3, catalogue)).SequenceEqual(["mercury."]),
-    "Domain filtering supports case-insensitive contains matching.");
-
-// 第二段选类，同时给出该域的无类直接方法。
-var janusClasses = completion.Complete("janus.", 6, catalogue);
-True(Inserts(janusClasses).SequenceEqual(["janus.gitrule.", "janus.proj."]),
-    "Second stage offers the classes of the typed domain.");
-True(Inserts(completion.Complete("janus.rule", 10, catalogue)).SequenceEqual(["janus.gitrule."]),
-    "Class filtering supports contains matching.");
-var mercuryStage = completion.Complete("mercury.", 8, catalogue);
-True(Inserts(mercuryStage).Contains("mercury.go "),
-    "A domain's classless direct methods appear at the class stage with a trailing space.");
-
-// 第三段选方法，落点带尾随空格以直接进入参数段。
-var methods = completion.Complete("janus.proj.", 11, catalogue);
-True(Inserts(methods).SequenceEqual(["janus.proj.commit ", "janus.proj.list "]),
-    "Third stage offers methods and lands on the parameter stage.");
-
-// 参数候选来自注册的 ParameterSpec，不是猜的。
-var parameters = completion.Complete("janus.proj.commit ", 18, catalogue);
-True(Inserts(parameters).SequenceEqual(["name="]),
-    "Parameter candidates come from the registered ParameterSpec.");
-
-var positionalCatalogue = new List<CommandCompletionDefinition>
-{
-    new("janus.app.mode", "模式", [new ParameterSpec
-    {
-        Name = "mode",
-        Description = "模式",
-        Position = 0,
-        AllowedValues = ["alpha", "beta"],
-    }]),
-};
-var positional = completion.Complete("janus.app.mode ", 16, positionalCatalogue);
-True(Inserts(positional).SequenceEqual(["alpha", "beta"]),
-    "Position=0 parameters use bare values without name=.");
-var projectDescriptors = MercuryCommandCatalog.CreateDescriptors()
-    .Where(command => command.Name.StartsWith("mercury.proj.", StringComparison.Ordinal)
-                      && command.Parameters.Any(parameter => parameter.Name == "name"))
-    .ToList();
-True(projectDescriptors.Count > 0
-     && projectDescriptors.All(command =>
-         command.Annotations.TryGetValue("completion.values.name", out var provider)
-         && provider == "mercury.projects"),
-    "Mercury project commands declare their common values through the mercury.projects provider.");
-var projectDefinition = CommandCatalogSession.CreateCompletionDefinition(openProject);
-True(projectDefinition.DynamicValues?.TryGetValue("name", out var projectValues) == true
-     && projectValues.SequenceEqual(MercuryState.ListWorktreeProjects()),
-    "The catalog session resolves mercury.projects into runtime worktree values.");
-var goDomains = completion.Complete("mercury.go ", 11, catalogue);
-True(Inserts(goDomains).SequenceEqual(["janus", "mercury", "vulcan"]),
-    "mercury.go dynamically offers registered domains as bare positional values.");
-var undeclaredDynamicValues = completion.Complete(
-    "sample.go ",
-    10,
-    [new CommandCompletionDefinition("sample.go", "聚焦", [new ParameterSpec
-    {
-        Name = "domain",
-        Description = "域",
-        Position = 0,
-    }])]);
-True(undeclaredDynamicValues.Candidates.Count == 1
-     && undeclaredDynamicValues.Candidates[0].InsertText.Length == 0,
-    "Dynamic domains must not be inferred from a command name without provider metadata.");
-var freeTextPositional = completion.Complete(
-    "janus.proj.open ",
-    16,
-    [
-        new CommandCompletionDefinition("janus.proj.open", "打开项目", [new ParameterSpec
-        {
-            Name = "project",
-            Description = "项目",
-            Position = 0,
-        }]),
-    ]);
-True(freeTextPositional.Candidates.Count == 1
-     && freeTextPositional.Candidates[0].DisplayText == "project"
-     && freeTextPositional.Candidates[0].InsertText.Length == 0
-     && freeTextPositional.Candidates[0].Kind == HistoryVulcan.Extensibility.CommandSurface.ConsoleCompletionKind.Parameter,
-    "Free-form Position=0 parameters expose only a structure candidate and never insert name=.");
-
-// 域聚焦：省略域前缀直接补类，同时其他域的绝对名仍然补得出来（脱固入口不能消失）。
-var focused = completion.Complete("", 0, catalogue, "janus");
-True(Inserts(focused).Take(2).SequenceEqual(["gitrule.", "proj."]),
-    "Focused domain classes come first and drop the domain prefix.");
-True(Inserts(focused).Contains("mercury."),
-    "Other registered domains stay reachable while focused, so focus can always be left.");
-
-var focusedMethods = completion.Complete("proj.", 5, catalogue, "janus");
-True(Inserts(focusedMethods).SequenceEqual(["proj.commit ", "proj.list "]),
-    "Focused class input advances to methods without duplicating the domain prefix.");
-
-// 聚焦时省略域前缀后，参数段仍要能解析到正确的命令。
-var focusedParameters = completion.Complete("proj.commit ", 12, catalogue, "janus");
-True(Inserts(focusedParameters).SequenceEqual(["name="]),
-    "Focused input resolves to the full command before reading its parameters.");
-Equal("mercury.go", CommandCompletionEngine.ResolveAgainstFocus("go", catalogue, "mercury"),
-    "Focused shorthand resolves to its full command before detail lookup.");
-
-// 远程目录回归：Mercury 聚焦状态下输入 go + 空格，详情查询必须是 mercury.go，
-// 不能请求不存在的 name=go；返回的目录注解继续驱动动态域候选。
-var remoteRows = new List<HistoryVulcan.Services.Commands.CommandCatalogRow>
-{
-    CatalogRow("mercury.go", "mercury", "域聚焦", ""),
-    CatalogRow("vulcan.app.show", "vulcan", "显示前端", "app"),
-};
-var remoteCalls = new List<string>();
-var remoteBus = new CommandBus(new CommandRegistry(), new NullShellLog())
-{
-    RemoteExecutor = (text, _, _) =>
-    {
-        remoteCalls.Add(text);
-        if (text == "vulcan.command.list")
-            return Task.FromResult(CommandResult.Ok(data: remoteRows));
-        if (text == "vulcan.command.domains")
-        {
-            IReadOnlyList<HistoryVulcan.Services.Commands.CommandDomainInfo> remoteDomains =
-            [
-                new("mercury", 1),
-                new("vulcan", 1),
-            ];
-            return Task.FromResult(CommandResult.Ok(data: remoteDomains));
-        }
-        if (text == "vulcan.command.show name=mercury.go")
-        {
-            var detail = new HistoryVulcan.Services.Commands.CommandCatalogDetail(
-                remoteRows[0],
-                [new HistoryVulcan.Services.Commands.CommandParameterInfo(
-                    "domain", "string", false, null, 0, [], "域")],
-                null)
-            {
-                Annotations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["completion.values.domain"] = "registry.domains",
-                },
-            };
-            return Task.FromResult(CommandResult.Ok(data: detail));
-        }
-        return Task.FromResult(CommandResult.Fail("unexpected: " + text));
-    },
-};
-using (var remoteSession = new CommandCatalogSession(remoteBus, new CommandSelectionState()))
-{
-    True(remoteSession.RefreshAsync().GetAwaiter().GetResult(), "Remote catalog snapshot must load.");
-    True(remoteSession.TrySetDomain("mercury", out _), "Remote Mercury focus must be accepted.");
-    var remoteGo = remoteSession.CompleteAsync("go ", 3).GetAwaiter().GetResult();
-    True(Inserts(remoteGo).SequenceEqual(["mercury", "vulcan"]),
-        "Remote command annotations drive mercury.go domain values.");
+    True(registry.TryGet(name, out var page), $"Page-protocol command must be registered: {name}.");
+    True(page.Readonly, $"{name} must be readonly.");
+    True(!string.IsNullOrWhiteSpace(page.HiddenReason),
+        $"{name} is an in-frontend protocol and must declare a HiddenReason.");
 }
-True(remoteCalls.Contains("vulcan.command.show name=mercury.go"),
-    "Focused go detail lookup must resolve to mercury.go.");
-True(!remoteCalls.Any(call => call.Contains("name=go", StringComparison.Ordinal)),
-    "Focused go completion must never request a nonexistent short command.");
+True(registry.TryGet("mercury.dock.run", out var dockRun)
+     && !string.IsNullOrWhiteSpace(dockRun.HiddenReason),
+    "mercury.dock.run relays a stored command text and must not be remotely visible.");
+
+// 描述与声明必须是合法 JSON，且满足 Aurora 的校验口径：schemaVersion 与 owner 对得上、
+// 页面 id 小写无空格、按钮绑的动作都在声明里。这三条 4.x 时代是编译器保证的，
+// 换成文本协议之后没有编译器，只能自己验。
+
+// 描述块与取数块共用：占位符与列名的对齐要等取数真的产出一行才查得了。
+var rowActions = new List<string>();
+{
+    using var describe = JsonDocument.Parse(MercuryPages.DescribeJson());
+    var root = describe.RootElement;
+    Equal(1, root.GetProperty("schemaVersion").GetInt32(), "Page description schema version");
+    Equal("HistoryMercury", root.GetProperty("owner").GetString(), "Page description owner");
+    var pages = root.GetProperty("pages").EnumerateArray().ToList();
+    True(pages.Count >= 1, "The module must describe at least one page.");
+    var ids = pages.Select(page => page.GetProperty("id").GetString() ?? "").ToList();
+    True(ids.Contains(MercuryPages.ManagerPageId), "The dock manager page must stay declared.");
+    True(ids.All(id => id.Length > 0 && id == id.ToLowerInvariant() && !id.Contains(' ')),
+        "Page ids must be lowercase without spaces or Aurora discards the whole description.");
+    Equal(ids.Count, ids.Distinct(StringComparer.OrdinalIgnoreCase).Count(), "Page ids must be unique.");
+    foreach (var page in pages)
+    {
+        True(!string.IsNullOrWhiteSpace(page.GetProperty("title").GetString()), "Every page needs a title.");
+        True(page.TryGetProperty("content", out _), "Every page needs content.");
+    }
+
+    using var declared = JsonDocument.Parse(MercuryPages.ActionsJson());
+    Equal(1, declared.RootElement.GetProperty("schemaVersion").GetInt32(), "Action schema version");
+    Equal("HistoryMercury", declared.RootElement.GetProperty("owner").GetString(), "Action owner");
+    var actions = declared.RootElement.GetProperty("actions").EnumerateArray().ToList();
+    var actionIds = actions.Select(action => action.GetProperty("id").GetString() ?? "").ToList();
+    True(actionIds.All(id => id.Length > 0 && id == id.ToLowerInvariant() && !id.Contains(' ')),
+        "Action ids must be lowercase without spaces.");
+    Equal(actionIds.Count, actionIds.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "Action ids must be unique.");
+
+    // 动作指向的每一条指令都必须真的注册着。"改了指令名、按钮静默变哑"正是动作声明要消灭的形态，
+    // 而声明本身写错名字会得到一模一样的症状。
+    foreach (var action in actions)
+    {
+        var command = action.GetProperty("command").GetString() ?? "";
+        if (!command.StartsWith("mercury.", StringComparison.Ordinal))
+            continue;
+        True(registry.TryGet(command, out _), $"Declared action targets an unregistered command: {command}.");
+    }
+
+    // 页面里出现的每个动作 id 都必须已声明：Aurora 解析不到就把按钮渲染成显式占位。
+    var used = new List<string>();
+    CollectActions(root.GetProperty("pages"), used);
+    foreach (var id in used.Distinct(StringComparer.OrdinalIgnoreCase))
+        True(actionIds.Contains(id, StringComparer.OrdinalIgnoreCase), $"Page references an undeclared action: {id}.");
+    True(used.Count > 0, "The manager page must bind at least one action.");
+
+    // 描述必须跟着 Aurora 的规则走。下面三条各对应一次已经踩过的静默失效——
+    // 三种都不会让页面崩，只会让页面**看起来还在，点下去没有反应**。
+
+    // 一、退役的页面节点（Aurora 1.8.14）。button / input / select 只能出现在控制面板里，
+    //     写在页面这一层会渲染成一块写着退役原因的牌子。5.0.0 的管理页在表格下面排了
+    //     7 个 type:"button"，整排行操作因此全哑——而模块这边一个错误都没有。
+    var nodeTypes = new List<string>();
+    CollectNodeTypes(root.GetProperty("pages"), nodeTypes);
+    foreach (var retired in new[] { "button", "input", "select" })
+        True(!nodeTypes.Contains(retired, StringComparer.OrdinalIgnoreCase),
+            $"Retired page node type still in the description: {retired}. "
+            + "Small controls belong in a panel or popup (Aurora 1.8.14).");
+
+    // 二、表格的 view 是空转声明（Aurora REQ-UI-054）。解析得了、全仓没人读它，
+    //     留着只会让人以为这张表能筛能排。
+    True(!DeclaresTableViewOptions(root.GetProperty("pages")),
+        "Tables must not declare view: filterable / sortable / selection have no implementation "
+        + "in Aurora and are accounted for as a debt (REQ-UI-054).");
+
+    // 三、行操作必须真的声明出来。5.0.0 用的是表格下面一排页面按钮，1.8.14 之后那条路没了；
+    //     这条钉住的是"别再换回去"。占位符与取数列的对齐在下面的取数块里查。
+    CollectRowActions(root.GetProperty("pages"), rowActions);
+    True(rowActions.Count > 0,
+        "The dock manager table must declare rowActions: page-level buttons were retired in Aurora 1.8.14.");
+}
+
+// 取数：扩展坞条目视图的列必须与描述里声明的列对齐，否则表格会整列空着而不报错。
+{
+    True(MercuryState.AddCommand("mercury.proj.list", "取数烟测"), "Seeding a dock entry must succeed.");
+    var rows = MercuryUiData.Entries();
+    True(rows.Count > 0, "The entries view must return the seeded dock entry.");
+    foreach (var column in new[] { "key", "name", "type", "state", "command", "weight", "clicks", "lastopened" })
+        True(rows.All(row => row.ContainsKey(column)), $"Entry rows must carry the declared column: {column}.");
+
+    // 行操作的占位符按**被点那一行的同名列**取值（Aurora REQ-UI-011）。对不上不会报错，
+    // 只会把一个空值发上总线——症状是"点了一下，什么都没发生"，而两边都没有一条日志。
+    var entryColumns = rows.SelectMany(row => row.Keys).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    using var declaredActions = JsonDocument.Parse(MercuryPages.ActionsJson());
+    foreach (var id in rowActions.Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        var action = declaredActions.RootElement.GetProperty("actions").EnumerateArray().Single(candidate =>
+            string.Equals(candidate.GetProperty("id").GetString(), id, StringComparison.OrdinalIgnoreCase));
+        if (!action.TryGetProperty("args", out var actionArgs) || actionArgs.ValueKind != JsonValueKind.Object)
+            continue;
+        foreach (var argument in actionArgs.EnumerateObject())
+        {
+            var value = argument.Value.GetString() ?? "";
+            if (value.Length < 3 || value[0] != '{' || value[^1] != '}')
+                continue;
+            True(entryColumns.Contains(value[1..^1]),
+                $"Row action {id} takes {value} from the clicked row, but the entries view has no such column.");
+        }
+    }
+    var seeded = rows.Single(row => row["command"] == "mercury.proj.list");
+    Equal("cmd:mercury.proj.list", seeded["key"], "Command entries use the cmd: row key.");
+
+    var missing = MercuryUiData.RunEntryAsync("cmd:mercury.does.not.exist", null).GetAwaiter().GetResult();
+    True(!missing.Success, "Running a key that is not in the dock must fail rather than execute it.");
+    var malformed = MercuryUiData.RunEntryAsync("mercury.proj.list", null).GetAwaiter().GetResult();
+    True(!malformed.Success, "Raw command text must not be accepted as a row key.");
+    True(MercuryState.RemoveCommand("mercury.proj.list"), "Entry-view seed cleanup");
+}
 
 // 活动坞磁贴：底色随使用频率由纯白线性趋近柔和强调色，不再用光晕表达频率。
 Equal(0d, DockWeight.TileTint(0, 10), "Unused project keeps a plain white tile.");
@@ -696,7 +611,7 @@ True(DockTheme.TileBackground(0.5).Color.B < coldTile.Color.B
 True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 0x12),
     "Tile text uses the documented deep-yellow accent.");
 
-Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, shell UI, Explorer shortcut folder, global shortcuts, domain focus).");
+Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, described pages, Explorer shortcut folder, global shortcuts, domain focus).");
 
 static void True(bool condition, string message)
 {
@@ -711,81 +626,137 @@ static void Equal<T>(T expected, T actual, string message)
 }
 
 /// <summary>
-/// 扫描模块的编译后 BAML，确认没有任何视图引用 HistoryAurora 的 pack URI。
-/// BAML 把 URI 存成长度前缀的 UTF-8 字符串，按原始字节找就够，不必解析格式。
+/// 确认模块里没有任何编译后的 XAML。
 /// </summary>
-static void AssertNoAuroraPackUri(System.Reflection.Assembly assembly)
+/// <remarks>
+/// 描述化之后模块不再构造前端控件，因此不该有 <c>*.g.resources</c>。这条比 4.x 的
+/// "BAML 里不含 HistoryAurora pack URI" 更强：那时只能防住本地合并样式字典这一种失败形态，
+/// 现在连"模块自己画了一个控件"都编译不进来。
+///
+/// 桌面坞不受影响——它是代码构造的 WPF 窗口，属于本模块自己的界面，不经 XAML。
+/// </remarks>
+static void AssertNoCompiledXaml(System.Reflection.Assembly assembly)
 {
     using var stream = assembly.GetManifestResourceStream("HistoryMercury.g.resources");
-    True(stream != null, "The module must ship compiled BAML resources.");
+    True(stream == null,
+        "The module must not ship compiled XAML: pages are described as data and rendered by HistoryAurora.");
+}
 
-    using var reader = new System.Resources.ResourceReader(stream!);
-    var needle = System.Text.Encoding.UTF8.GetBytes("HistoryAurora");
-    foreach (System.Collections.DictionaryEntry entry in reader)
+/// <summary>递归收集页面描述里出现的全部节点 <c>type</c>。</summary>
+static void CollectNodeTypes(JsonElement node, List<string> found)
+{
+    switch (node.ValueKind)
     {
-        if (entry.Value is not Stream baml)
-            continue;
-        using var buffer = new MemoryStream();
-        baml.CopyTo(buffer);
-        var bytes = buffer.ToArray();
-        for (var i = 0; i + needle.Length <= bytes.Length; i++)
-        {
-            var hit = true;
-            for (var j = 0; j < needle.Length && hit; j++)
-                hit = bytes[i + j] == needle[j];
-            True(!hit, $"{entry.Key} must not merge Aurora resource dictionaries; use DynamicResource instead.");
-        }
+        case JsonValueKind.Object:
+            foreach (var property in node.EnumerateObject())
+            {
+                if (property.NameEquals("type") && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    found.Add(property.Value.GetString() ?? "");
+                    continue;
+                }
+
+                CollectNodeTypes(property.Value, found);
+            }
+
+            break;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                CollectNodeTypes(item, found);
+            break;
     }
 }
 
-/// <summary>在 STA 线程上构造一个视图；解析 BAML 时的任何异常都在这里变成失败。</summary>
-static void AssertConstructsHeadless(string name, Func<object> factory)
+/// <summary>递归收集 <c>rowActions</c> 里出现的动作 id。</summary>
+static void CollectRowActions(JsonElement node, List<string> found)
 {
-    Exception? failure = null;
-    var thread = new Thread(() =>
+    switch (node.ValueKind)
     {
-        try
-        {
-            factory();
-        }
-        catch (Exception ex)
-        {
-            failure = ex;
-        }
-    });
-    thread.SetApartmentState(ApartmentState.STA);
-    thread.Start();
-    True(thread.Join(TimeSpan.FromSeconds(30)), $"{name} construction must not hang.");
-    True(failure == null, $"{name} must construct without a shell present: {failure?.Message}");
+        case JsonValueKind.Object:
+            foreach (var property in node.EnumerateObject())
+            {
+                if (property.NameEquals("rowActions"))
+                {
+                    foreach (var entry in property.Value.EnumerateArray())
+                        if (entry.TryGetProperty("action", out var id) && id.ValueKind == JsonValueKind.String)
+                            found.Add(id.GetString() ?? "");
+                    continue;
+                }
+
+                CollectRowActions(property.Value, found);
+            }
+
+            break;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                CollectRowActions(item, found);
+            break;
+    }
 }
 
-static HistoryVulcan.Services.Commands.CommandCatalogRow CatalogRow(
-    string name,
-    string domain,
-    string summary,
-    string commandClass)
-    => new(
-        name,
-        domain,
-        summary,
-        null,
-        0,
-        "test",
-        null,
-        false,
-        false,
-        null,
-        "hidden",
-        false,
-        false,
-        null,
-        0,
-        0,
-        null)
+/// <summary>
+/// 描述里是否还有表格声明了 <c>view</c>（Aurora REQ-UI-054 的空转声明）。
+/// </summary>
+/// <remarks>
+/// 只认**表格节点自己的** <c>view</c>。不能按属性名一路搜下去：取数参数里的
+/// <c>dataSource.args.view</c> 是本模块自己的视图名（entries / commands），
+/// 与它同名却毫无关系——按名搜会把一条正常声明报成违规，而误报的门禁最后一定被删掉。
+/// </remarks>
+static bool DeclaresTableViewOptions(JsonElement node)
+{
+    switch (node.ValueKind)
     {
-        CommandClass = commandClass,
-        Method = name[(name.LastIndexOf('.') + 1)..],
-    };
+        case JsonValueKind.Object:
+            if (node.TryGetProperty("type", out var type)
+                && type.ValueKind == JsonValueKind.String
+                && string.Equals(type.GetString(), "table", StringComparison.OrdinalIgnoreCase)
+                && node.TryGetProperty("view", out _))
+                return true;
+
+            foreach (var property in node.EnumerateObject())
+                if (DeclaresTableViewOptions(property.Value))
+                    return true;
+
+            return false;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                if (DeclaresTableViewOptions(item))
+                    return true;
+            return false;
+
+        default:
+            return false;
+    }
+}
+
+/// <summary>递归收集页面描述里出现的全部动作 id。</summary>
+static void CollectActions(JsonElement node, List<string> found)
+{
+    switch (node.ValueKind)
+    {
+        case JsonValueKind.Object:
+            foreach (var property in node.EnumerateObject())
+            {
+                if (property.NameEquals("action") && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    found.Add(property.Value.GetString() ?? "");
+                    continue;
+                }
+
+                CollectActions(property.Value, found);
+            }
+
+            break;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                CollectActions(item, found);
+            break;
+    }
+}
 
 file sealed class NullShellLog : HistoryVulcan.Core.Logging.IShellLog
 {
@@ -798,32 +769,4 @@ file sealed class NullShellLog : HistoryVulcan.Core.Logging.IShellLog
     }
 
     public IReadOnlyList<HistoryVulcan.Core.Logging.ShellLogEntry> Snapshot() => [];
-}
-
-file sealed class RecordingRegistrar : IShellUiRegistrar
-{
-    public List<string> Registered { get; } = [];
-    public int Disposed { get; private set; }
-    public bool IsUiThread => true;
-    public void Invoke(Action action) => action();
-    public IDisposable RegisterToolWindow(ToolWindowDescriptor descriptor, string owner)
-    {
-        Registered.Add(descriptor.Id);
-        if (!string.Equals("HistoryMercury", owner, StringComparison.Ordinal))
-            throw new InvalidOperationException($"UI owner: expected=HistoryMercury, actual={owner}");
-        return new Handle(() => Disposed++);
-    }
-
-    public void UnregisterToolWindow(string id)
-    {
-    }
-
-    public void UnregisterOwner(string owner)
-    {
-    }
-
-    private sealed class Handle(Action dispose) : IDisposable
-    {
-        public void Dispose() => dispose();
-    }
 }

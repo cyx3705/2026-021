@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using HistoryVulcan.Core.Commands;
-using HistoryVulcan.Extensibility.Commands;
 
 namespace Mercury;
 
@@ -11,24 +10,34 @@ public static class MercuryCommands
         => new(ExplorerNamespaceRegistration.IsRegistered(), DockShortcutFolder.Path);
 
     /// <summary>
-    /// 切换控制台的域聚焦。聚焦状态存放在共享的命令目录会话里，与控制台域筛选下拉同源，
-    /// 因此这里只写会话，下拉会自己跟上。
+    /// 切换控制台的域聚焦。
     /// </summary>
+    /// <remarks>
+    /// 4.x 时代聚焦状态存在 Mercury 自持的命令目录会话里；宿主 5.0 删除了命令工作台的挂接点，
+    /// 控制台连同它的域筛选一起归 HistoryAurora。因此这里改成在总线上调
+    /// <c>aurora.log.source</c>——那正是控制台域筛选的唯一写入口，
+    /// <c>ConsoleView</c> 用同一个值做 <c>DomainFocus.Resolve</c>，语义与旧实现一致。
+    ///
+    /// 未装前端时该指令不存在，总线立刻返回明确失败，不等超时。
+    /// </remarks>
     /// <param name="domain">要聚焦的域；空表示退出聚焦。</param>
-    public static string Go(string? domain)
+    public static async Task<CommandResult> GoAsync(string? domain)
     {
-        var session = MercuryUiModule.CatalogSession;
-        if (session == null)
-            return "命令目录会话未就绪，无法切换域聚焦。";
+        var bus = MercuryModule.Bus;
+        if (bus == null)
+            return CommandResult.Fail("指令总线未就绪。");
 
         var requested = string.IsNullOrWhiteSpace(domain) ? DomainFocus.All : domain.Trim();
-        if (!session.TrySetDomain(requested, out var available))
-            return $"未知指令域 {requested}；可选：{string.Join("、", available)}。";
+        var result = await bus
+            .ExecuteAsync("aurora.log.source " + CommandParser.QuoteArg(requested), "Mercury")
+            .ConfigureAwait(false);
+        if (!result.Success)
+            return result;
 
-        return DomainFocus.IsUnfocused(requested)
+        return CommandResult.Ok(DomainFocus.IsUnfocused(requested)
             ? "已退出域聚焦，恢复全部指令域。"
             : $"已聚焦到 {requested} 域；之后只需输入「类.方法」，"
-              + "输入其他已注册域的完整名仍可直接执行。";
+              + "输入其他已注册域的完整名仍可直接执行。");
     }
 
     public static string RegisterExplorer()
@@ -72,7 +81,7 @@ public static class MercuryCommands
 
     public static async Task<CommandResult> ShowHostAsync()
     {
-        var bus = MercuryUiModule.Bus;
+        var bus = MercuryModule.Bus;
         if (bus != null)
         {
             var result = await bus.ExecuteAsync("vulcan.app.show", "Mercury").ConfigureAwait(false);
@@ -87,7 +96,7 @@ public static class MercuryCommands
 
     public static async Task<CommandResult> WakeConsoleAsync()
     {
-        var bus = MercuryUiModule.Bus;
+        var bus = MercuryModule.Bus;
         if (bus == null)
             return CommandResult.Fail("指令总线未就绪。");
 
@@ -117,6 +126,30 @@ public static class MercuryCommands
         if (!MercuryState.AddCommand(command, label))
             return CommandResult.Fail("快捷文件路径为空，未加入扩展坞。");
         return CommandResult.Ok($"已将快捷文件加入扩展坞：{label}。");
+    }
+
+    /// <summary>
+    /// 选一个文件并把它加进扩展坞。
+    /// </summary>
+    /// <remarks>
+    /// 4.x 的管理页上「浏览」按钮开对话框、把路径填回输入框，再点「加入」。描述化协议里
+    /// 没有「把一条指令的结果写回某个控件」这种表达，硬拆成两步就会得到一个点了没反应的按钮。
+    /// 因此把两步收成一条指令：选择归前端（<c>aurora.ui.selectfile</c>），加入归本模块。
+    /// 取消不是失败——用户改主意了而已。
+    /// </remarks>
+    public static async Task<CommandResult> PickShortcutAsync()
+    {
+        var bus = MercuryModule.Bus;
+        if (bus == null)
+            return CommandResult.Fail("指令总线未就绪。");
+
+        var picked = await bus.ExecuteAsync("aurora.ui.selectfile", "Mercury").ConfigureAwait(false);
+        if (!picked.Success)
+            return picked;
+        if (picked.Data is not string path || string.IsNullOrWhiteSpace(path))
+            return CommandResult.Ok("已取消选择，未加入扩展坞。");
+
+        return AddShortcut(path);
     }
 
     public static CommandResult AddDockCommand(string? command, string? label = null)

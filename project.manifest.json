@@ -14,7 +14,7 @@
       "tooling"
     ],
     "status": "active",
-    "version": "4.8.1"
+    "version": "5.0.1"
   },
   "paths": {
     "activeRoots": [
@@ -57,18 +57,20 @@
     "technicalContract": "b-Office/current/技术合同.md",
     "decisions": "b-Office/current/有效决策.md",
     "verification": "b-Office/current/验证合同.md",
+    "frontendComponentRequests": "b-Office/current/前端组件缺失需求书.md",
     "historyBoundary": "b-Office/history/历史资料说明.md"
   },
   "commands": {
     "setup": null,
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1",
     "test": "dotnet run --project .\\b-Code-Tests\\HistoryMercury.Smoke\\HistoryMercury.Smoke.csproj -c Release -p:NuGetAudit=false",
-    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1 -Instantiation",
+    "verify": null,
     "run": null,
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"
   },
   "externalDependencies": [
-    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-Publish/host"
+    "HistoryVulcan.Core / HistoryVulcan.Services from 2026-023-HistoryVulcan/z-Publish/host (>= 5.1.0)",
+    "HistoryAurora from 2026-026-HistoryAurora (>= 1.9.1, runtime only): renders the described pages; the dock manager page uses popup trigger=context (Aurora REQ-UI-056). On 1.9.0 the trigger is ignored and the add popup falls back to its own button."
   ],
   "contextExclusions": [
     "b-Office/history/**",

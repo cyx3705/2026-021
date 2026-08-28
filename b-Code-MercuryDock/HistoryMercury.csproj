@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>4.8.1</Version>
+    <Version>5.0.1</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
@@ -19,10 +19,8 @@
     <InternalsVisibleTo Include="HistoryMercury.Smoke" />
   </ItemGroup>
   <PropertyGroup>
-    <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
-    <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
-    <!-- 演进层：CommandSurface 与命令工作台契约的家；不受宿主冻结门禁约束，随交互形态迭代。 -->
-    <HistoryVulcanExtensibilityProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\src\HistoryVulcan.Extensibility\HistoryVulcan.Extensibility.csproj</HistoryVulcanExtensibilityProj>
+    <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
+    <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
     <!--
       模块对宿主的依赖面是 z 快照，和 project.manifest.json 的 externalDependencies 一致：
       默认永远编译到 z-Publish/host 里那份"正在跑的"宿主二进制。
@@ -38,14 +36,10 @@
     <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
-    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
     <ProjectReference Include="$(HistoryVulcanCoreProj)">
-      <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="$(HistoryVulcanExtensibilityProj)">
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="$(HistoryVulcanServicesProj)">
@@ -55,10 +49,6 @@
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' != 'true'">
     <Reference Include="HistoryVulcan.Core">
       <HintPath>$(HistoryVulcanCoreDll)</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="HistoryVulcan.Extensibility">
-      <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="HistoryVulcan.Services">

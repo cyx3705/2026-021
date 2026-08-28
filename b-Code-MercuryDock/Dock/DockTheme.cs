@@ -36,6 +36,12 @@ public static class DockTheme
     /// 白底与 #FAF0D8 底上对比度都足够。</summary>
     public static SolidColorBrush TileText => Frozen(Color.FromRgb(0xA8, 0x7A, 0x12));
 
+    /// <summary>
+    /// 置顶磁贴的一圈亮黄描边。用 <see cref="Accent"/> 而不是更亮的
+    /// <see cref="AccentHover"/>：磁贴底色是白到 #FAF0D8 的浅色，越亮反而越看不见。
+    /// </summary>
+    public static SolidColorBrush PinnedRing => Accent;
+
     /// <summary>按偏黄程度插值出磁贴底色画刷；<paramref name="tint"/> 取 [0,1]。</summary>
     public static SolidColorBrush TileBackground(double tint)
     {

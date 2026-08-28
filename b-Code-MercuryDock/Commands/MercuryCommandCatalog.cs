@@ -1,7 +1,6 @@
-using System.Collections;
-using System.IO;
-using System.Text.Json;
+﻿using System.IO;
 using HistoryVulcan.Core.Commands;
+using Mercury.Ui;
 
 namespace Mercury;
 
@@ -22,44 +21,6 @@ internal static class MercuryCommandCatalog
     public static string BuildOpenShortcutCommand(string path)
         => ShortcutOpenCommandName + " " + CommandParser.QuoteArg(Path.GetFullPath(path.Trim()));
 
-    public static IReadOnlyList<CommandCatalogItem> FallbackCommandCatalog()
-        => CreateDescriptors()
-            .Select(command => new CommandCatalogItem(
-                command.Name,
-                "Mercury",
-                command.CommandClass ?? string.Empty,
-                command.Summary))
-            .ToList();
-
-    public static IReadOnlyList<CommandCatalogItem> ParseCommandCatalog(object? data)
-    {
-        try
-        {
-            if (data is JsonElement json && json.ValueKind == JsonValueKind.Array)
-            {
-                return json.EnumerateArray()
-                    .Select(ReadJsonItem)
-                    .Where(item => item != null)
-                    .Cast<CommandCatalogItem>()
-                    .ToList();
-            }
-
-            if (data is IEnumerable items)
-            {
-                return items.Cast<object?>()
-                    .Select(ReadTypedItem)
-                    .Where(item => item != null)
-                    .Cast<CommandCatalogItem>()
-                    .ToList();
-            }
-        }
-        catch (Exception)
-        {
-        }
-
-        return [];
-    }
-
     internal static IReadOnlyList<CommandDescriptor> CreateDescriptors() =>
     [
         // mercury.go 是本域的无类直接方法（两段名）：它切换的是控制台的域聚焦，
@@ -69,11 +30,11 @@ internal static class MercuryCommandCatalog
         {
             Name = "mercury.go",
             Summary = "聚焦到指定指令域；省略 domain 则退出聚焦。",
-            RequiresUiThread = true,
+            // 5.0 起本命令只是把域筛选转发给前端的 aurora.log.source，自己不碰任何界面对象；
+            // 需要 UI 线程的是那一条，由它自己声明。这里再声明一次等于多编组一次。
             Parameters = [DomainParameter()],
             Annotations = CompletionProvider("domain", "registry.domains"),
-            Handler = CommandDescriptor.Sync(context =>
-                CommandResult.Ok(MercuryCommands.Go(context.GetString("domain")))),
+            Handler = context => MercuryCommands.GoAsync(context.GetString("domain")),
         },
         Readonly("mercury.app.status", "app", "查看托管的资源管理器入口状态。",
             _ => MercuryCommands.Status()),
@@ -83,6 +44,15 @@ internal static class MercuryCommandCatalog
             context => MercuryCommands.OpenShortcut(context.GetString("path")), ShortcutPathParameter()),
         Result("mercury.shortcut.add", "shortcut", "把快捷文件注册为扩展坞常驻项。",
             context => MercuryCommands.AddShortcut(context.GetString("path")), ShortcutPathParameter()),
+        new CommandDescriptor
+        {
+            Name = "mercury.shortcut.pick",
+            CommandClass = "shortcut",
+            Summary = "打开文件选择器并把选中的文件加入扩展坞。",
+            // 需要前端弹对话框，因此对远端没有意义：模型点不了那个框，只会把调用挂在那里。
+            HiddenReason = "需要前端交互，远端应直接调用 mercury.shortcut.add path=",
+            Handler = _ => MercuryCommands.PickShortcutAsync(),
+        },
         Write("mercury.explorer.register", "explorer", "注册托管的资源管理器入口。",
             _ => MercuryCommands.RegisterExplorer()),
         Write("mercury.explorer.remove", "explorer", "移除托管的资源管理器入口。",
@@ -156,7 +126,70 @@ internal static class MercuryCommandCatalog
         Write("mercury.hotkey.unregister", "hotkey", "注销此前注册的全局快捷键。",
             context => Input.HotkeyCommands.Unregister(context.RequireString("id")),
             HotkeyIdParameter()),
+
+        // 页面注册协议 V1：描述 / 动作 / 取数三条。它们是模块与前端之间的内部协议，
+        // 对模型没有意义（且 ui.data 会产生大量条目），因此一律声明 HiddenReason——
+        // 5.0 之后远端是否可见只看这个字段，宿主不再替模块判断。
+        Internal("mercury.ui.describe", "ui", "返回本模块的页面描述（页面注册协议 V1）。",
+            _ => Task.FromResult(Payload(MercuryPages.DescribeJson()))),
+        Internal("mercury.ui.actions", "ui", "返回本模块可被按钮绑定的动作声明。",
+            _ => Task.FromResult(Payload(MercuryPages.ActionsJson()))),
+        Internal(MercuryUiData.DataCommandName, "ui", "按视图返回页面组件所需的行数据。",
+            context => MercuryUiData.ReadAsync(context.GetString("view"), MercuryModule.Bus),
+            ViewParameter()),
+
+        // 页面按钮的「打开」落点。只接受当前坞里确实存在的行键，不接受任意指令文本。
+        new CommandDescriptor
+        {
+            Name = "mercury.dock.run",
+            CommandClass = "dock",
+            Summary = "执行扩展坞中的一个条目：项目开目录，常驻项走总线。",
+            Example = "mercury.dock.run key=proj:2026-021-HistoryMercury",
+            HiddenReason = "会代为执行扩展坞条目登记的指令文本，远端应直接调用原指令",
+            Parameters = [EntryKeyParameter()],
+            Handler = context => MercuryUiData.RunEntryAsync(context.GetString("key"), MercuryModule.Bus),
+        },
     ];
+
+    /// <summary>
+    /// 同一份 JSON 同时放 Data 与 Message：<c>Data</c> 是 <c>object?</c>，跨进程中继后
+    /// 结构化载荷不保证存活，前端因此约定优先读 Data、回退 Message。
+    /// </summary>
+    private static CommandResult Payload(string json) => CommandResult.Ok(json, json);
+
+    /// <summary>界面内部协议命令：只读、且不对任何远端表面暴露。</summary>
+    private static CommandDescriptor Internal(
+        string name,
+        string commandClass,
+        string summary,
+        Func<CommandContext, Task<CommandResult>> handler,
+        params ParameterSpec[] parameters)
+        => new()
+        {
+            Name = name,
+            CommandClass = commandClass,
+            Summary = summary,
+            Readonly = true,
+            HiddenReason = "界面内部协议，对模型无意义",
+            Parameters = parameters,
+            Handler = handler,
+        };
+
+    private static ParameterSpec ViewParameter() => new()
+    {
+        Name = "view",
+        Description = "取数视图：entries（扩展坞条目）或 commands（命令目录）；省略为 entries。",
+        Required = false,
+        Position = 0,
+    };
+
+    private static ParameterSpec EntryKeyParameter() => new()
+    {
+        Name = "key",
+        Description = "行键：proj:<项目名> 或 cmd:<指令文本>。",
+        Required = true,
+        Position = 0,
+    };
 
     private static ParameterSpec HotkeyIdParameter() => new()
     {
@@ -382,114 +415,4 @@ internal static class MercuryCommandCatalog
         Type = ParamType.Double,
         Required = false,
     };
-
-    private static CommandCatalogItem? ReadJsonItem(JsonElement item)
-    {
-        if (!item.TryGetProperty("commandName", out var name) || string.IsNullOrWhiteSpace(name.GetString()))
-            return null;
-        return new CommandCatalogItem(
-            name.GetString()!,
-            ReadJsonString(item, "domain"),
-            ReadJsonString(item, "commandClass"),
-            ReadJsonString(item, "summary"));
-    }
-
-    private static string ReadJsonString(JsonElement item, string property)
-        => item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString() ?? string.Empty
-            : string.Empty;
-
-    private static CommandCatalogItem? ReadTypedItem(object? item)
-    {
-        var type = item?.GetType();
-        var name = type?.GetProperty("CommandName")?.GetValue(item) as string;
-        if (string.IsNullOrWhiteSpace(name))
-            return null;
-        return new CommandCatalogItem(
-            name,
-            type?.GetProperty("Domain")?.GetValue(item) as string ?? string.Empty,
-            type?.GetProperty("CommandClass")?.GetValue(item) as string ?? string.Empty,
-            type?.GetProperty("Summary")?.GetValue(item) as string ?? string.Empty);
-    }
-}
-
-public sealed record CommandCatalogItem(string Name, string Domain, string CommandClass, string Summary);
-
-internal sealed class CommandOptionTree
-{
-    private readonly Node _root = new();
-
-    public static CommandOptionTree Build(IReadOnlyList<CommandCatalogItem> commands)
-    {
-        var tree = new CommandOptionTree();
-        foreach (var command in commands)
-        {
-            var segments = command.Name.Split('.', StringSplitOptions.RemoveEmptyEntries);
-            if (segments.Length == 0)
-                continue;
-            var node = tree._root;
-            foreach (var segment in segments)
-                node = node.Children.TryGetValue(segment, out var child)
-                    ? child
-                    : node.Children[segment] = new Node();
-            node.Command = command;
-        }
-        return tree;
-    }
-
-    public IReadOnlyList<SuggestOption> ChildrenOf(string text)
-    {
-        var lastDot = text.LastIndexOf('.');
-        var prefix = lastDot < 0 ? string.Empty : text[..(lastDot + 1)];
-        var fragment = lastDot < 0 ? text : text[(lastDot + 1)..];
-
-        var node = _root;
-        if (prefix.Length > 0)
-        {
-            foreach (var segment in prefix.Split('.', StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (!node.Children.TryGetValue(segment, out var child))
-                    return [];
-                node = child;
-            }
-        }
-
-        return node.Children
-            .Where(pair => Matches(pair.Key, fragment))
-            .OrderBy(pair => MatchRank(pair.Key, fragment))
-            .ThenBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(pair => new SuggestOption(
-                pair.Value.Children.Count > 0 ? prefix + pair.Key + "." : prefix + pair.Key,
-                pair.Value.Children.Count > 0 ? pair.Key + " >" : pair.Key,
-                Describe(pair.Value),
-                pair.Value.Children.Count > 0))
-            .ToList();
-    }
-
-    private static string Describe(Node node)
-    {
-        if (node.Command is { Summary.Length: > 0 } command)
-            return node.Children.Count > 0 ? command.Summary + "（含下级命令）" : command.Summary;
-        return $"{node.Children.Count} 个下级命令";
-    }
-
-    private static bool Matches(string value, string filter)
-        => filter.Length == 0 || value.Contains(filter, StringComparison.OrdinalIgnoreCase);
-
-    private static int MatchRank(string value, string filter)
-    {
-        if (filter.Length == 0)
-            return 2;
-        if (value.Equals(filter, StringComparison.OrdinalIgnoreCase))
-            return 0;
-        if (value.StartsWith(filter, StringComparison.OrdinalIgnoreCase))
-            return 1;
-        return 2;
-    }
-
-    private sealed class Node
-    {
-        public Dictionary<string, Node> Children { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public CommandCatalogItem? Command { get; set; }
-    }
 }
