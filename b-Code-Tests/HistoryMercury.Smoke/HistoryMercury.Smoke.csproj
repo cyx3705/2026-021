@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -18,7 +18,6 @@
     <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
-    <HistoryVulcanExtensibilityDll Condition="'$(HistoryVulcanExtensibilityDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Extensibility.dll</HistoryVulcanExtensibilityDll>
     <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup>
@@ -28,10 +27,6 @@
       <Private>true</Private>
     </Reference>
     <!-- 模块侧改用 HintPath 引用后，宿主程序集不再经 ProjectReference 传递，烟测必须自己声明。 -->
-    <Reference Include="HistoryVulcan.Extensibility">
-      <HintPath>$(HistoryVulcanExtensibilityDll)</HintPath>
-      <Private>true</Private>
-    </Reference>
     <Reference Include="HistoryVulcan.Services">
       <HintPath>$(HistoryVulcanServicesDll)</HintPath>
       <Private>true</Private>

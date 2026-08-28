@@ -8,26 +8,29 @@ using System.Windows.Threading;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Logging;
 using HistoryVulcan.Core.Modules;
-using HistoryVulcan.Extensibility.Modules;
-using Mercury.CommandSurface;
+using Mercury.Diagnostics;
+using Mercury.Ui;
 
 namespace Mercury;
 
 /// <summary>
-/// Mercury 的两类界面各有各的生命周期，本类是两条线的入口。
+/// Mercury 的模块入口：桌面坞、快捷键与指令面在这里挂上宿主总线。
 /// </summary>
 /// <remarks>
 /// **桌面坞是 Mercury 自己的界面，不是前端里的一页**：它在 <see cref="Attach"/> 阶段起在
 /// 本模块自有的 STA 线程上，只要模块装载就存在，前端在不在、开没开都与它无关。
 /// 桌面坞是唤起前端的入口，若它反过来依赖前端，前端一关就再也叫不回来。
 ///
-/// 管理页与命令工作台则相反：它们本就是前端里的页，只能在 <see cref="CreateUi"/> 阶段
-/// 挂进宿主转交的界面注册器，前端不在时整段不发生。
+/// 前端里的页则相反：宿主 5.0 起不再提供界面生命周期（<c>IUiModule</c>、<c>CreateUi</c> /
+/// <c>DestroyUi</c> 与整套停靠 SDK 都已删除），本模块**不再构造任何前端控件**，改用
+/// <c>mercury.ui.describe</c> / <c>mercury.ui.actions</c> / <c>mercury.ui.data</c>
+/// 把页面描述成数据，由 HistoryAurora 拉取并渲染（见 <see cref="Ui.MercuryPages"/>）。
 ///
-/// DEC-008 之后宿主只有一个进程，模块指令、桌面坞与前端页都在其中；模块指令由 mercury
-/// 三段式目录注册进宿主注册表，跨线程调用经 <see cref="CommandBus"/> 编组，模块代码不必关心。
+/// 于是本类的生命周期只剩两个点：<see cref="Attach"/> 与 <see cref="Dispose"/>。
+/// 宿主在拆除阶段按 <see cref="IDisposable"/> 回收实例，桌面坞的线程必须在那时收干净，
+/// 否则它会在可回收装载上下文卸载之后继续跑已卸载的类型。
 /// </remarks>
-public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAware, IShellCommandWorkbenchAware
+public sealed class MercuryModule : IModuleContextAware, IDisposable
 {
     private static readonly object DockGate = new();
 
@@ -41,44 +44,26 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     private static readonly TimeSpan DockReadyTimeout = TimeSpan.FromSeconds(10);
 
     private static DockWindow? _window;
-    private IShellUiRegistrar? _shellUi;
-    private IShellCommandWorkbenchHost? _commandWorkbench;
-    private IDisposable? _managerWindow;
-    private CommandSurfaceFeature? _commandSurface;
+    private bool _disposed;
 
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
     internal static CommandBus? Bus { get; private set; }
 
     /// <summary>
-    /// 桌面坞是否在跑。供烟测断言坞**不在** <see cref="CreateUi"/> 那条链上——
+    /// 桌面坞是否在跑。供烟测断言坞只归 <see cref="Attach"/>——
     /// 一旦它重新变成前端的下游，前端不在时桌面上就什么都没有。
     /// </summary>
     internal static bool IsDesktopDockRunning => _window != null;
 
-    /// <summary>宿主日志。建界面时各扩展单独兜异常，失败原因只能从这里出去。</summary>
-    private static IShellLog? Log { get; set; }
-
     /// <summary>
-    /// 共享的命令目录会话。域聚焦状态就存放在它的域筛选里：控制台下拉与
-    /// <c>mercury.go</c> 读写同一份状态，因此两者天然同步，不需要额外的同步通道。
-    /// 无 UI 宿主（服务进程、烟测）下为 null。
+    /// 模块日志。宿主 5.0 不再注入日志，这里换成 Mercury 自持的实例；
+    /// 调用点写法不变，落点从宿主控制台变成模块数据根下的 <c>logs/</c>。
     /// </summary>
-    internal static CommandCatalogSession? CatalogSession { get; private set; }
-
-    IShellUiRegistrar IShellUiAware.ShellUi
-    {
-        set => _shellUi = value;
-    }
-
-    IShellCommandWorkbenchHost? IShellCommandWorkbenchAware.CommandWorkbench
-    {
-        set => _commandWorkbench = value;
-    }
+    internal static IShellLog Log { get; } = MercuryLog.Shared;
 
     public void Attach(IModuleContext context)
     {
         Bus = context.Bus;
-        Log = context.Log;
         context.RegisterCommands(MercuryCommandCatalog.Register);
 
         // 服务进程也必须跟随 state.json。它执行绝大多数写状态的指令，若只在建界面时才开监视，
@@ -86,16 +71,20 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         // 两侧算出的收录列表也会不一致，进而互相把对方写的快捷方式当成用户增删。
         MercuryState.StartWatching();
 
+        // 页面是派生状态：坞的内容一变，前端那两页就旧了。模块只负责说「我变了」，
+        // 由 Aurora 决定怎么重建（协议 §1.3）。前端不在时这条指令不存在，失败即静默。
+        PageInvalidation.Start(context.Bus);
+
         // 全局快捷键完全由 Mercury 自持：服务在此构造并启动，能力经 mercury.hotkey.* 命令暴露。
         // 宿主不再预扫描模块 DLL 去寻找 IGlobalShortcutHost 实现，也不再驱动注册。
         if (OperatingSystem.IsWindows())
         {
-            Input.HotkeyService.Start(context.Bus, context.Log);
-            RegisterOwnShortcuts(context);
+            Input.HotkeyService.Start(context.Bus, Log);
+            RegisterOwnShortcuts();
 
-            // 桌面坞在这里起，不在 CreateUi 里：宿主只有取到界面注册器（即前端已装载）
-            // 之后才会调 CreateUi，前端缺席时整段跳过。坞挂在那上面，就等于让唤起前端的
-            // 入口依赖前端本身——前端一关就再也叫不回来。
+            // 桌面坞在这里起。5.0 之前它一度挂在 CreateUi 上，而宿主只有取到界面注册器
+            // （即前端已装载）之后才调 CreateUi，于是唤起前端的入口反过来依赖前端本身——
+            // 前端一关就再也叫不回来。现在宿主根本没有那条链，坞只认 Attach。
             StartDesktopDock();
         }
     }
@@ -104,7 +93,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
     /// Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
     /// 用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
     /// </summary>
-    private static void RegisterOwnShortcuts(IModuleContext context)
+    private static void RegisterOwnShortcuts()
     {
         try
         {
@@ -117,23 +106,8 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         }
         catch (Exception ex)
         {
-            context.Log.Warn("hotkey", $"注册 Mercury 自有快捷键失败: {ex.Message}");
+            Log.Warn("hotkey", $"注册 Mercury 自有快捷键失败: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    /// 往前端里挂 Mercury 的两处扩展。桌面坞不在此列——它在 <see cref="Attach"/> 已经起来了。
-    /// </summary>
-    /// <remarks>
-    /// 两处扩展各自兜异常：4.5.1 的事故是工作台构造 WPF 视图抛异常，宿主只记一行 Warn
-    /// 就继续装载别的模块，排在它后面的桌面坞于是无声消失。现在坞根本不在这条链上，
-    /// 但管理页与工作台之间仍要互不牵连。
-    /// </remarks>
-    public void CreateUi()
-    {
-        MercuryState.StartWatching();
-        RegisterManagerWindow();
-        AttachCommandSurface();
     }
 
     /// <summary>
@@ -172,7 +146,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         // 而随后建出来的窗口已经没有任何人持有它的引用——桌面上从此多一个关不掉的坞。
         // 等到就绪信号，拆除才一定拆得到东西。
         if (!DockReady.Wait(DockReadyTimeout))
-            Log?.Warn("dock", $"桌面坞未在 {DockReadyTimeout.TotalSeconds:0.#}s 内就绪，下一次重载可能漏关它");
+            Log.Warn("dock", $"桌面坞未在 {DockReadyTimeout.TotalSeconds:0.#}s 内就绪，下一次重载可能漏关它");
     }
 
     private static void RunDock()
@@ -193,12 +167,12 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
             // 未处理异常落日志而不弹框：坞常驻桌面，没有人在屏幕前等着点"确定"。
             Dispatcher.CurrentDispatcher.UnhandledException += (_, args) =>
             {
-                Log?.Warn("dock", $"桌面坞未处理异常: {args.Exception.Message}");
+                Log.Warn("dock", $"桌面坞未处理异常: {args.Exception.Message}");
                 args.Handled = true;
             };
 
             // 坞已在屏幕上，Attach 可以放行了。收录来源还没接，但那不影响桌面上有没有坞。
-            Log?.Info("dock", "桌面坞已就绪");
+            Log.Info("dock", "桌面坞已就绪");
             DockReady.Set();
 
             // 收录来源最后接上。它要写注册表并通知外壳，是三步里最慢的，
@@ -216,7 +190,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         catch (Exception ex)
         {
             _window = null;
-            Log?.Warn("dock", $"桌面坞创建失败: {ex.Message}");
+            Log.Warn("dock", $"桌面坞创建失败: {ex.Message}");
         }
         finally
         {
@@ -251,51 +225,28 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
         }
         catch (Exception ex)
         {
-            Log?.Warn("dock", $"桌面坞关闭失败: {ex.Message}");
+            Log.Warn("dock", $"桌面坞关闭失败: {ex.Message}");
         }
 
     }
 
-    private void RegisterManagerWindow()
+    /// <summary>
+    /// 宿主拆除模块时回收。必须关窗、停 Dispatcher 并收线程（join 上限 5s）：
+    /// 模块跑在可回收的装载上下文里，线程不收就会在卸载后继续跑已卸载的类型。
+    /// </summary>
+    public void Dispose()
     {
-        if (_shellUi == null || _managerWindow != null)
+        if (_disposed)
             return;
+        _disposed = true;
 
-        try
-        {
-            _managerWindow = _shellUi.RegisterToolWindow(MercuryManagerView.CreateDescriptor(), "HistoryMercury");
-        }
-        catch (Exception ex)
-        {
-            Log?.Warn("dock", $"管理页注册失败，桌面坞不受影响: {ex.Message}");
-        }
-    }
-
-    private void AttachCommandSurface()
-    {
-        if (_commandSurface != null)
-            return;
-
-        try
-        {
-            _commandSurface = CommandSurfaceFeature.TryAttach(_commandWorkbench, _shellUi);
-            CatalogSession = _commandSurface?.Session;
-        }
-        catch (Exception ex)
-        {
-            Log?.Warn("dock", $"命令工作台挂载失败，桌面坞不受影响: {ex.Message}");
-        }
-    }
-
-    public void DestroyUi()
-    {
+        PageInvalidation.Stop();
         DockShortcutFolder.StopWatching();
         MercuryState.StopWatching();
-        _commandSurface?.Dispose();
-        _commandSurface = null;
-        _managerWindow?.Dispose();
-        _managerWindow = null;
+        if (OperatingSystem.IsWindows())
+            Input.HotkeyService.Stop();
         StopDesktopDock();
+        Bus = null;
     }
 
     private sealed class DockWindow : Window
@@ -544,11 +495,22 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
                 Height = 52,
                 CornerRadius = new CornerRadius(8),
                 Background = DockTheme.TileBackground(DockWeight.TileTint(project.Weight, maximum)),
+
+                // 置顶标记：磁贴上的一圈亮黄描边。5.0.1 之前是在标签里追加 "  ·"，
+                // 那个点不解释自己是什么——用户看见的是"编号后面莫名多了个点"，
+                // 而坞上没有任何地方说它代表置顶。
+                //
+                // 描边**恒占 2px，只换颜色**。只在置顶时加边框的话，磁贴内容区会在
+                // 置顶前后差 4px，而字号是按内容区宽度算出来的：同一个项目一置顶字就变小，
+                // 且只有长名字的磁贴才看得出来。
+                BorderThickness = new Thickness(2),
+                BorderBrush = project.Pinned ? DockTheme.PinnedRing : Brushes.Transparent,
                 Child = new TextBlock
                 {
                     Text = ProjectIconGenerator.ShortLabel(project.Name),
                     FontFamily = DockTheme.FontFamily,
-                    FontSize = ProjectIconGenerator.FitFontSize(ProjectIconGenerator.ShortLabel(project.Name), 44, 15),
+                    // 40 = 52 - 描边 2×2 - 文字左右边距 4×2。
+                    FontSize = ProjectIconGenerator.FitFontSize(ProjectIconGenerator.ShortLabel(project.Name), 40, 15),
                     FontWeight = FontWeights.SemiBold,
                     Foreground = DockTheme.TileText,
                     TextAlignment = TextAlignment.Center,
@@ -562,7 +524,7 @@ public sealed class MercuryUiModule : IUiModule, IShellUiAware, IModuleContextAw
 
             var label = new TextBlock
             {
-                Text = project.Number + (project.Pinned ? "  ·" : ""),
+                Text = project.Number,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Label,

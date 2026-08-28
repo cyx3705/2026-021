@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 
-namespace Mercury.CommandSurface;
+namespace Mercury.Ui;
 
 /// <summary>Restores typed command contracts after a service-boundary round trip.</summary>
 internal static class CommandResultData
