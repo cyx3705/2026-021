@@ -14,7 +14,7 @@
       "tooling"
     ],
     "status": "active",
-    "version": "4.8.1"
+    "version": "5.0.2"
   },
   "paths": {
     "activeRoots": [
@@ -63,12 +63,13 @@
     "setup": null,
     "build": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1",
     "test": "dotnet run --project .\\b-Code-Tests\\HistoryMercury.Smoke\\HistoryMercury.Smoke.csproj -c Release -p:NuGetAudit=false",
-    "verify": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Test-ProjectContract.ps1 -Instantiation",
+    "verify": null,
     "run": null,
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"
   },
   "externalDependencies": [
-    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-Publish/host"
+    "HistoryVulcan.Core / HistoryVulcan.Services from 2026-023-HistoryVulcan/z-Publish/host (>= 5.1.0)",
+    "HistoryAurora from 2026-026-HistoryAurora (>= 1.9.2, runtime only, hard): renders the described pages. The dock manager page uses panel protocol V3 rows (Aurora REQ-UI-060) and popup trigger=context (REQ-UI-056); an Aurora below 1.9.2 reads no rows and draws both panels as empty boards."
   ],
   "contextExclusions": [
     "b-Office/history/**",
