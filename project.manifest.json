@@ -14,7 +14,7 @@
       "tooling"
     ],
     "status": "active",
-    "version": "5.0.1"
+    "version": "5.0.2"
   },
   "paths": {
     "activeRoots": [
@@ -57,7 +57,6 @@
     "technicalContract": "b-Office/current/技术合同.md",
     "decisions": "b-Office/current/有效决策.md",
     "verification": "b-Office/current/验证合同.md",
-    "frontendComponentRequests": "b-Office/current/前端组件缺失需求书.md",
     "historyBoundary": "b-Office/history/历史资料说明.md"
   },
   "commands": {
@@ -70,7 +69,7 @@
   },
   "externalDependencies": [
     "HistoryVulcan.Core / HistoryVulcan.Services from 2026-023-HistoryVulcan/z-Publish/host (>= 5.1.0)",
-    "HistoryAurora from 2026-026-HistoryAurora (>= 1.9.1, runtime only): renders the described pages; the dock manager page uses popup trigger=context (Aurora REQ-UI-056). On 1.9.0 the trigger is ignored and the add popup falls back to its own button."
+    "HistoryAurora from 2026-026-HistoryAurora (>= 1.9.2, runtime only, hard): renders the described pages. The dock manager page uses panel protocol V3 rows (Aurora REQ-UI-060) and popup trigger=context (REQ-UI-056); an Aurora below 1.9.2 reads no rows and draws both panels as empty boards."
   ],
   "contextExclusions": [
     "b-Office/history/**",

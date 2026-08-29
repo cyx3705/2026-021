@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>5.0.1</Version>
+    <Version>5.0.2</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
@@ -17,6 +17,15 @@
     <None Remove="obj/**;tests/**" />
     <InternalsVisibleTo Include="HistoryVulcan.Tests" />
     <InternalsVisibleTo Include="HistoryMercury.Smoke" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      运行包的清单必须落进构建输出：宿主的进程内发布管线按登记表
+      （module-publish.manifest.json 的 package.files）直接从输出目录取
+      dll / xml / module.manifest.json，它不会去跑本仓的打包脚本。
+      少了这一行，管线在构建成功之后才报"缺少预期产物"，而本地构建一切正常。
+    -->
+    <None Update="module.manifest.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>

@@ -556,6 +556,31 @@ var rowActions = new List<string>();
     CollectRowActions(root.GetProperty("pages"), rowActions);
     True(rowActions.Count > 0,
         "The dock manager table must declare rowActions: page-level buttons were retired in Aurora 1.8.14.");
+
+    // 四、5.0.2 的版面取舍（REQ-MERC-502）。三样东西一起从管理页上去掉，各有一条门禁：
+    //     Aurora 只在**有** inline 行操作时才建最右那个「操作」列（AuroraTable），
+    //     所以"那一列还在不在"在描述这一侧就是"还有没有一条 inline 行操作"。
+    var manager = pages.Single(page => page.GetProperty("id").GetString() == MercuryPages.ManagerPageId);
+
+    //     三条查的都是"某样东西不在了"，因此每条先证明自己认得出那样东西——
+    //     一个永远为真的门禁与没有门禁是一回事，而它还会让人以为这里有人看着。
+    using (var probe = JsonDocument.Parse("""{"rowActions":[{"action":"a","title":"t"}]}"""))
+        True(DeclaresInlineRowAction(probe.RootElement),
+            "The inline-row-action gate must recognise an inline action (inline defaults to true when omitted).");
+    True(DeclaresColumn(manager, "name"), "The column gate must find a column the manager table does declare.");
+
+    True(!DeclaresInlineRowAction(manager),
+        "Every row action must declare inline:false: the dock manager keeps no in-row button column (REQ-MERC-502).");
+    var managerTypes = new List<string>();
+    CollectNodeTypes(manager, managerTypes);
+    True(managerTypes.Contains("table", StringComparer.OrdinalIgnoreCase),
+        "The node-type gate must see the manager page's own nodes before it can prove a type is absent.");
+    True(!managerTypes.Contains("text", StringComparer.OrdinalIgnoreCase),
+        "The dock manager page must carry no caption text: the page does not scroll, and that line costs a table row "
+        + "(REQ-MERC-502).");
+    True(!DeclaresColumn(manager, "lastopened"),
+        "The dock manager table must not show the lastopened column; the entries view still produces it for "
+        + "row-action placeholders (REQ-MERC-502).");
 }
 
 // 取数：扩展坞条目视图的列必须与描述里声明的列对齐，否则表格会整列空着而不报错。
@@ -693,6 +718,78 @@ static void CollectRowActions(JsonElement node, List<string> found)
             foreach (var item in node.EnumerateArray())
                 CollectRowActions(item, found);
             break;
+    }
+}
+
+/// <summary>描述里是否还有一条行操作要在行内放按钮。</summary>
+/// <remarks>
+/// Aurora 只在存在 inline 行操作时才建最右那个「操作」列，因此这一条查的就是「那一列还在不在」。
+/// <c>inline</c> 不写等于 true（默认值在 Aurora 那一侧，不归本仓控制），所以缺省也算违规。
+/// </remarks>
+static bool DeclaresInlineRowAction(JsonElement node)
+{
+    switch (node.ValueKind)
+    {
+        case JsonValueKind.Object:
+            foreach (var property in node.EnumerateObject())
+            {
+                if (property.NameEquals("rowActions"))
+                {
+                    foreach (var entry in property.Value.EnumerateArray())
+                        if (!entry.TryGetProperty("inline", out var inline)
+                            || inline.ValueKind != JsonValueKind.False)
+                            return true;
+                    continue;
+                }
+
+                if (DeclaresInlineRowAction(property.Value))
+                    return true;
+            }
+
+            return false;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                if (DeclaresInlineRowAction(item))
+                    return true;
+            return false;
+
+        default:
+            return false;
+    }
+}
+
+/// <summary>描述里是否有表格列声明了这个取值键。取数产出该列不算——查的是"上不上表"。</summary>
+static bool DeclaresColumn(JsonElement node, string key)
+{
+    switch (node.ValueKind)
+    {
+        case JsonValueKind.Object:
+            foreach (var property in node.EnumerateObject())
+            {
+                if (property.NameEquals("columns"))
+                {
+                    foreach (var column in property.Value.EnumerateArray())
+                        if (column.TryGetProperty("key", out var name)
+                            && string.Equals(name.GetString(), key, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                    continue;
+                }
+
+                if (DeclaresColumn(property.Value, key))
+                    return true;
+            }
+
+            return false;
+
+        case JsonValueKind.Array:
+            foreach (var item in node.EnumerateArray())
+                if (DeclaresColumn(item, key))
+                    return true;
+            return false;
+
+        default:
+            return false;
     }
 }
 

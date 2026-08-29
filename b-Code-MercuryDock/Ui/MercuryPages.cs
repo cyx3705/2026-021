@@ -48,7 +48,15 @@ namespace Mercury.Ui;
 /// 「加入扩展坞」现在挂在页面右键上（Aurora 1.9.1 的 <c>popup.trigger</c>，REQ-UI-056）。
 /// 这条能力是为本页提的：弹出层本来就存在，缺的只是一个不占版面的触发方式，
 /// 因此 Aurora 那边没有新建组件，只给现成的浮层多了一条开关。
-/// 代价是**看不见**——版面上没有东西提示「这里右键有内容」，所以页首那句说明必须写出来。
+/// </para>
+/// <para>
+/// <b>5.0.2：版面再让一步，行操作整体退到右键。</b>页首那段说明、表格的「最近打开」列，
+/// 以及 Aurora 为行内按钮自动加在最右的「操作」列，三样一起去掉。页面不滚（REQ-UI-050），
+/// 省下的一行就是条目表多看得见的一行，省下的两列宽度全部归数据列。
+/// 六条行操作因此一律 <c>inline: false</c>：<c>AuroraTable</c> 只在**有**行内动作时才建那一列，
+/// 而右键菜单从来收的就是全部动作——两个出口不是一份声明必须各占一半。
+/// 代价是这一页现在没有任何东西提示右键有内容：加入条目在页面右键上，行操作在行右键上，
+/// 版面上都看不见。这是明确要的取舍（DEC-020），不是把提示漏掉了。
 /// </para>
 /// </remarks>
 internal static class MercuryPages
@@ -116,10 +124,6 @@ internal static class MercuryPages
                         gap = "tight",
                         children = new object[]
                         {
-                            Text(
-                                "扩展坞收录活动项目与常驻指令项：项目按使用权重自动收录，常驻项手动增删。"
-                                + "右键页面空白处加入新条目；右键某一行看该条目的全部操作。",
-                                "caption"),
                             OpsPanel(policy),
                             EntriesTable(),
                             AddPopup(),
@@ -322,8 +326,11 @@ internal static class MercuryPages
     /// 换成行操作之后不再有「选中」这个中间态：**点哪一行就是哪一行**，
     /// 占位符也直接取那一行的同名列，不用绕 <c>entries.selected.name</c> 那种跨节点路径。
     ///
-    /// 只有「打开」「固定」留在行内。Aurora 的用法文档明说行操作超过两三条就该用
-    /// <c>inline: false</c>——六个按钮会把数据列挤没，而那正是这个组件要解决的问题的反面。
+    /// 5.0.2 起**一个行内按钮都没有**：六条动作全部 <c>inline: false</c>，只进右键菜单。
+    /// Aurora 只在有行内动作时才在最右加那个「操作」列，因此这一改直接去掉整列，
+    /// 宽度归数据列——六个按钮会把数据列挤没，而那正是这个组件要解决的问题的反面。
+    /// 「最近打开」列同轮下表：取数照常产出这一列（占位符对齐与烟测都还比着它），
+    /// 只是不再占版面。
     /// 其余四条只进右键菜单：它们要么低频（排除 / 重新纳入 / 取消固定），
     /// 要么只对一类行有意义（移除常驻项）。
     ///
@@ -348,20 +355,22 @@ internal static class MercuryPages
                 new { key = "command", title = "指令", width = "*" },
                 new { key = "weight", title = "权重", width = "62" },
                 new { key = "clicks", title = "点击", width = "54" },
-                new { key = "lastopened", title = "最近打开", width = "128" },
             },
             rowActions = new object[]
             {
                 RowAction(OpenAction, "打开"),
                 RowAction(PinAction, "固定"),
-                RowAction(UnpinAction, "取消固定", inline: false),
-                RowAction(ExcludeAction, "排除", inline: false, style: "danger"),
-                RowAction(IncludeAction, "重新纳入", inline: false),
-                RowAction(RemoveAction, "移除常驻项", inline: false, style: "danger"),
+                RowAction(UnpinAction, "取消固定"),
+                RowAction(ExcludeAction, "排除", style: "danger"),
+                RowAction(IncludeAction, "重新纳入"),
+                RowAction(RemoveAction, "移除常驻项", style: "danger"),
             },
         };
 
-    /// <summary>一条行操作。<c>inline</c> 缺省 true：不写就同时进行内按钮与右键菜单。</summary>
-    private static object RowAction(string action, string title, bool inline = true, string? style = null)
-        => new { action, title, inline, style };
+    /// <summary>
+    /// 一条行操作。<c>inline</c> 恒为 false：这一页不要行内按钮列（5.0.2），
+    /// 写成常量而不是留个默认 true 的参数——留着的话下一个加动作的人只要不写它就又长出一列。
+    /// </summary>
+    private static object RowAction(string action, string title, string? style = null)
+        => new { action, title, inline = false, style };
 }
