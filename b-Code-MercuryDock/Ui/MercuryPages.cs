@@ -216,15 +216,21 @@ internal static class MercuryPages
         => new { type = "text", text, style };
 
     /// <summary>
-    /// 页面唯一常驻的控制面板：刷新加收录策略，横排成一条工具条。
+    /// 页面唯一常驻的控制面板：刷新加收录策略，**一行**工具条。
     /// </summary>
     /// <remarks>
-    /// **横排不是审美选择。** Aurora 1.9.0 起页面不滚、装不下就裁掉，这一页顶上每多一行，
-    /// 条目表就少一行。竖排时这四个控件占四行；横排后由 Aurora 按可用宽度自己分列，
-    /// 窄窗口下才换行——换行由它算，模块这边没有也不该有列数可声明。
+    /// **一行不是审美选择。** Aurora 1.9.0 起页面不滚、装不下就裁掉，这一页顶上每多一行，
+    /// 条目表就少一行。五个元素写成一个 <c>rows</c> 项，Aurora 按最窄宽度排；
+    /// 只有窄到连最窄宽度都放不下时才折行，而折出来的仍然是同一行
+    /// （Aurora 协议 V3 / REQ-UI-060）——换行由它算，模块这边没有也不该有列数可声明。
     ///
-    /// 「应用」写 <c>inline</c>，因此它跟在半衰期那一格右边而不是自己占一格。
-    /// 「刷新」不写：它与策略三项没有取值关系，跟着谁同行都是误导。
+    /// 模式取 <c>even</c>：三个数字框是同一组同类输入，等比放大之后仍然一样宽，
+    /// 而可变宽度模式会把余量全给最后那个「应用」按钮，把它拉成一条横杠。
+    ///
+    /// 三个数字框**不再写 <c>required</c>**：那个字段随协议 V3 退役了。它当年是全局的，
+    /// 三个框共用同一批按钮，等于把整块面板锁在「三个都填了」上——
+    /// 而这三项本来就各有默认值，空着一个不该连「刷新」都点不动。
+    /// 参数缺失交给策略指令自己的 Required 去报。
     /// </remarks>
     private static object OpsPanel(DockPolicy policy)
         => new
@@ -232,24 +238,34 @@ internal static class MercuryPages
             type = "panel",
             id = "dock.ops",
             text = "扩展坞",
-            orientation = "horizontal",
-            widgets = new object[]
+            rows = new object[]
             {
-                new { kind = "button", text = "刷新", action = RefreshAction },
-                Number("min", "最少显示", policy.MinItems),
-                Number("max", "最多显示", policy.MaxItems),
-                Number("halflife", "半衰期(天)", policy.HalfLifeDays),
-                new { kind = "button", text = "应用", action = PolicyAction, inline = true },
+                new
+                {
+                    mode = "even",
+                    widgets = new object[]
+                    {
+                        new { kind = "button", text = "刷新", action = RefreshAction },
+                        Number("min", "最少显示", policy.MinItems),
+                        Number("max", "最多显示", policy.MaxItems),
+                        Number("halflife", "半衰期(天)", policy.HalfLifeDays),
+                        new { kind = "button", text = "应用", action = PolicyAction },
+                    },
+                },
             },
         };
 
+    /// <summary>
+    /// 一个数字输入格。<c>minWidth</c> 写小一点：这三格里放的是个位到三位数，
+    /// 按缺省的 120 排会让工具条在中等宽度下就开始折行，而它们本来只要放得下四个字。
+    /// </summary>
     private static object Number(string id, string label, IFormattable value)
         => new
         {
             kind = "textbox",
             id,
             label,
-            required = true,
+            minWidth = 64,
             value = value.ToString("G", System.Globalization.CultureInfo.InvariantCulture),
         };
 
@@ -263,8 +279,8 @@ internal static class MercuryPages
     /// 右键页面空白处才弹出来。它是这一页最高的一块，而实际使用频率是一周一两次——
     /// 页面不滚之后，它占的高度就是条目表看不见的行。
     ///
-    /// 内部保持**竖排**：一个输入框加四个按钮，横排会被浮层宽度挤成一团。
-    /// 竖排下它读起来正是一个右键菜单——顶上一个输入框，下面四条「加为……」。
+    /// 内部**一个元素一行**：一个输入框加四个按钮，挤在一行会被浮层宽度压成一团。
+    /// 分成五行之后它读起来正是一个右键菜单——顶上一个输入框，下面四条「加为……」。
     /// </remarks>
     private static object AddPopup()
         => new
@@ -273,14 +289,28 @@ internal static class MercuryPages
             id = "dock.add",
             text = "加入扩展坞",
             trigger = "context",
-            widgets = new object[]
+            rows = new object[]
             {
-                new { kind = "textbox", id = "value", label = "名称 / 指令 / 路径", required = true },
-                new { kind = "button", text = "加为项目", action = AddProjectAction },
-                new { kind = "button", text = "加为常驻指令", action = AddCommandAction },
-                new { kind = "button", text = "加为快捷文件", action = AddShortcutAction },
-                new { kind = "button", text = "从文件选择…", action = PickShortcutAction },
+                new
+                {
+                    widgets = new object[]
+                    {
+                        new { kind = "textbox", id = "value", label = "名称 / 指令 / 路径" },
+                    },
+                },
+                Row("加为项目", AddProjectAction),
+                Row("加为常驻指令", AddCommandAction),
+                Row("加为快捷文件", AddShortcutAction),
+                Row("从文件选择…", PickShortcutAction),
             },
+        };
+
+    /// <summary>只放一个按钮的一行。均布，因此按钮铺满浮层宽度，四条读起来像一列菜单项。</summary>
+    private static object Row(string text, string action)
+        => new
+        {
+            mode = "even",
+            widgets = new object[] { new { kind = "button", text, action } },
         };
 
     /// <summary>
@@ -331,7 +361,7 @@ internal static class MercuryPages
             },
         };
 
-    /// <summary>一条行操作。<c>inline</c> 缺省 true（与面板按钮的 <c>inline</c> 相反）。</summary>
+    /// <summary>一条行操作。<c>inline</c> 缺省 true：不写就同时进行内按钮与右键菜单。</summary>
     private static object RowAction(string action, string title, bool inline = true, string? style = null)
         => new { action, title, inline, style };
 }
