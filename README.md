@@ -36,7 +36,7 @@ The page does not scroll, so each line and column removed is a table row or a co
 back. The trade-off is that nothing on the page advertises the right-click: adding an entry and acting on a row are
 both right-click only.
 
-The module is developed in `b-Code-MercuryDock`. Its code namespace and command domain are `Mercury`; its module identity, assembly and consumer snapshot are `HistoryMercury`, `HistoryMercury.dll` and `z-Publish`.
+The module is developed in `b-Code-MercuryDock`. Its code namespace and command domain are `Mercury`; its module identity, assembly and consumer snapshot are `HistoryMercury`, `HistoryMercury.dll` and `z-Publish/HistoryMercury-vX.Y.Z`.
 
 ## Commands
 
@@ -45,6 +45,4 @@ dotnet run --project .\b-Code-Tests\HistoryMercury.Smoke\HistoryMercury.Smoke.cs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercuryPackage.ps1
 ```
 
-The final command creates and verifies a candidate package in `z-Publish`. Formal publication is owned by the host's
-in-process pipeline (`HistoryVulcan.exe --cli vulcan.release.cycle module=HistoryMercury`); project-contract validation
-lives there too, which is why this repo no longer ships `Test-ProjectContract.ps1`.
+The final command creates and verifies a candidate package in `z-Publish/HistoryMercury-vX.Y.Z`. Formal publication is owned by the host development pipeline (`HistoryVulcan.Cli.exe --cli vulcan.dev.submit name=HistoryMercury`). Diana does not publish.
