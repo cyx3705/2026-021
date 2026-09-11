@@ -84,9 +84,11 @@ internal static class MercuryPages
     public const string PolicyAction = ActionPrefix + "policy";
 
     /// <summary>本模块声明的页面 id，供烟测与文档引用。</summary>
+    /// <remarks>
+    /// 只有这一页。5.0.0 起还声明过一页 <c>mercury.commands</c>（命令集），与 Aurora 自带的
+    /// 命令集页重复——控制台连同命令集本来就归 Aurora（DEC-018），5.0.3 删去（DEC-021）。
+    /// </remarks>
     public const string ManagerPageId = "dock.manager";
-
-    public const string CommandsPageId = "mercury.commands";
 
     /// <summary>条目表的节点 id。行操作按被点的那一行取值，因此它只用于日志归因与烟测。</summary>
     public const string EntriesNodeId = "entries";
@@ -127,39 +129,6 @@ internal static class MercuryPages
                             OpsPanel(policy),
                             EntriesTable(),
                             AddPopup(),
-                        },
-                    },
-                },
-                new
-                {
-                    id = CommandsPageId,
-                    title = "命令集",
-                    placement = new { side = "center", visible = false, singleton = true },
-                    content = new
-                    {
-                        type = "stack",
-                        orientation = "vertical",
-                        gap = "tight",
-                        children = new object[]
-                        {
-                            Text("宿主注册表的完整命令目录，数据取自 vulcan.command.list。", "caption"),
-                            new
-                            {
-                                type = "table",
-                                id = "commands",
-                                dataSource = new
-                                {
-                                    command = MercuryUiData.DataCommandName,
-                                    args = new { view = MercuryUiData.CommandsView },
-                                },
-                                columns = new object[]
-                                {
-                                    new { key = "name", title = "命令", width = "260" },
-                                    new { key = "domain", title = "域", width = "90" },
-                                    new { key = "class", title = "类", width = "90" },
-                                    new { key = "summary", title = "说明", width = "*" },
-                                },
-                            },
                         },
                     },
                 },
