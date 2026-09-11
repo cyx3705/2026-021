@@ -2,15 +2,14 @@
 
 HistoryMercury owns the HistoryVulcan desktop project dock and Explorer entry for the `HistoryClio` project library.
 
-Current source: `5.0.2`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
+Current source: `5.0.3`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
 (page-registration protocol V1; panel protocol V3 is a hard requirement). The dock tile reads `HC`, the Explorer namespace entry is `HistoryClio 项目`, and the project scan prefers
 `proj.libraryroot` (default `C:\OneHistory\HistoryClio`). Configured `HistoryVesta` roots are rewritten to Clio.
 Mutable shortcut files, state and logs live under `%APPDATA%\HistoryVulcan\HistoryMercury`, outside the
 manifest-verified runtime module package.
 
 5.0.0 follows the host's 5.0 removal of the module UI SDK. The module entry is `MercuryModule`
-(`IModuleContextAware` + `IDisposable`) and it constructs **no frontend control**: its two pages — the dock manager and
-the command set — are declared as data through `mercury.ui.describe` / `mercury.ui.actions` / `mercury.ui.data` and
+(`IModuleContextAware` + `IDisposable`) and it constructs **no frontend control**: its page — the dock manager — is declared as data through `mercury.ui.describe` / `mercury.ui.actions` / `mercury.ui.data` and
 rendered by HistoryAurora. The desktop dock is unaffected: it is Mercury's own window, code-built on its own STA
 thread, and it stays on screen whether or not the frontend is running. The command workbench (catalog session,
 completion, detail page) left with the host mount point it was attached to; `mercury.go` now relays

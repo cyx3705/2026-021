@@ -20,8 +20,6 @@ internal static class MercuryUiData
 
     public const string EntriesView = "entries";
 
-    public const string CommandsView = "commands";
-
     /// <summary>行键：<c>proj:&lt;项目名&gt;</c> 或 <c>cmd:&lt;指令文本&gt;</c>。</summary>
     private const string ProjectKeyPrefix = "proj:";
 
@@ -32,17 +30,16 @@ internal static class MercuryUiData
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static async Task<CommandResult> ReadAsync(string? view, CommandBus? bus)
+    public static CommandResult Read(string? view)
     {
         var rows = (view ?? EntriesView).Trim().ToLowerInvariant() switch
         {
             EntriesView or "" => Entries(),
-            CommandsView => await CommandsAsync(bus).ConfigureAwait(false),
             _ => null,
         };
 
         if (rows == null)
-            return CommandResult.Fail($"未知取数视图：{view}。可选 {EntriesView} / {CommandsView}。");
+            return CommandResult.Fail($"未知取数视图：{view}。可选 {EntriesView}。");
 
         var json = JsonSerializer.Serialize(rows, Options);
         return CommandResult.Ok(json, json);
@@ -84,40 +81,6 @@ internal static class MercuryUiData
             ["clicks"] = "-",
             ["lastopened"] = "-",
         };
-    }
-
-    /// <summary>
-    /// 命令集：目录权威始终是宿主注册表，本模块只做一次形状转换。
-    /// 取不到目录时返回空表而不是失败——一张空表比整页红字更接近事实。
-    /// </summary>
-    private static async Task<List<Dictionary<string, string>>> CommandsAsync(CommandBus? bus)
-    {
-        if (bus == null)
-            return [];
-
-        CommandResult result;
-        try
-        {
-            result = await bus.ExecuteAsync("vulcan.command.list", "Mercury").ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            return [];
-        }
-
-        if (!result.Success || !CommandResultData.TryRead<IReadOnlyList<CommandCatalogRow>>(result.Data, out var rows))
-            return [];
-
-        return rows
-            .OrderBy(row => row.CommandName, StringComparer.OrdinalIgnoreCase)
-            .Select(row => new Dictionary<string, string>
-            {
-                ["name"] = row.CommandName,
-                ["domain"] = row.Domain,
-                ["class"] = row.CommandClass,
-                ["summary"] = row.Summary,
-            })
-            .ToList();
     }
 
     /// <summary>

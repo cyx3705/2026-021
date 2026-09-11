@@ -447,7 +447,7 @@ Equal(0, matcher.Process(
 
 // 模块身份：manifest 与 ModuleInfo 的版本必须逐字符相等。
 // 宿主在两者不一致时会静默跳过整个模块（只在服务进程日志留一行 module.discovery 警告），
-// 界面上表现为活动坞与命令集页一起消失——这条断言就是为了不再靠肉眼发现它。
+// 界面上表现为活动坞与扩展坞管理页一起消失——这条断言就是为了不再靠肉眼发现它。
 var moduleInfo = new ModuleInfo();
 var manifestPath = Path.Combine(
     AppContext.BaseDirectory,
@@ -496,6 +496,9 @@ var rowActions = new List<string>();
     True(pages.Count >= 1, "The module must describe at least one page.");
     var ids = pages.Select(page => page.GetProperty("id").GetString() ?? "").ToList();
     True(ids.Contains(MercuryPages.ManagerPageId), "The dock manager page must stay declared.");
+    // 命令集页归 Aurora（DEC-018 / DEC-021）。5.0.0–5.0.2 本模块也声明过一页，前端里出现两份。
+    True(!ids.Contains("mercury.commands"),
+        "The command-set page belongs to HistoryAurora; Mercury must not declare a duplicate.");
     True(ids.All(id => id.Length > 0 && id == id.ToLowerInvariant() && !id.Contains(' ')),
         "Page ids must be lowercase without spaces or Aurora discards the whole description.");
     Equal(ids.Count, ids.Distinct(StringComparer.OrdinalIgnoreCase).Count(), "Page ids must be unique.");

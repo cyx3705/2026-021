@@ -135,7 +135,7 @@ internal static class MercuryCommandCatalog
         Internal("mercury.ui.actions", "ui", "返回本模块可被按钮绑定的动作声明。",
             _ => Task.FromResult(Payload(MercuryPages.ActionsJson()))),
         Internal(MercuryUiData.DataCommandName, "ui", "按视图返回页面组件所需的行数据。",
-            context => MercuryUiData.ReadAsync(context.GetString("view"), MercuryModule.Bus),
+            context => Task.FromResult(MercuryUiData.Read(context.GetString("view"))),
             ViewParameter()),
 
         // 页面按钮的「打开」落点。只接受当前坞里确实存在的行键，不接受任意指令文本。
@@ -178,7 +178,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec ViewParameter() => new()
     {
         Name = "view",
-        Description = "取数视图：entries（扩展坞条目）或 commands（命令目录）；省略为 entries。",
+        Description = "取数视图：entries（扩展坞条目）；省略为 entries。",
         Required = false,
         Position = 0,
     };
