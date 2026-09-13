@@ -2,7 +2,7 @@
 
 HistoryMercury owns the HistoryVulcan desktop project dock and Explorer entry for the `HistoryClio` project library.
 
-Current source: `5.0.4`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
+Current source: `5.0.5`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
 (page-registration protocol V1; panel protocol V3 is a hard requirement). The dock tile reads `HC`, the Explorer namespace entry is `HistoryClio 项目`, and the project scan prefers
 `proj.libraryroot` (default `C:\OneHistory\HistoryClio`). Configured `HistoryVesta` roots are rewritten to Clio.
 Mutable shortcut files, state and logs live under `%APPDATA%\HistoryVulcan\HistoryMercury`, outside the
