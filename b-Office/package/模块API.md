@@ -1,6 +1,6 @@
 # HistoryMercury 模块 API
 
-模块版本：**5.0.4**；最低宿主：**HistoryVulcan 5.1.0**。
+模块版本：**5.0.5**；最低宿主：**HistoryVulcan 5.1.0**。
 
 本文件是**总线面**合同：别的模块或远端通过命令总线调用 HistoryMercury 时，看这一篇就够。
 
@@ -13,7 +13,7 @@ Mercury 是**项目与入口的调度台**：活动项目清单、项目坞（Do
 资源管理器托管入口、使用历史。指令域 `mercury`。
 
 它**不**提供：文件内容读写、Git 操作（那是 Janus）、界面布局（那是 Aurora）。
-它不构造任何前端控件——页面以 Aurora 页面注册协议 V1 声明。
+它不构造任何前端控件——页面以 Aurora 1.21.1 的场景页面注册协议声明。
 
 ## 指令目录
 
@@ -128,3 +128,7 @@ submit 回执含「已热重载到活宿主」后，执行 `diana.host.observe n
 核对目标 instanceChanged=true、其他模块无指令数退化、issues 与日志；logsComplete=false 时不能声明期间无错误。
 同版本覆盖仍以实例 ID 判断，不只看版本字符串。Diana 的 ready 不是开发管线完成状态。
 界面检查仍是 diana.view.windows → diana.view.capture → 实际读取 PNG；不要为只读观察抢占前台。
+
+## 场景页面注册（5.0.5）
+
+REQ-SCENE-REG：页面显式声明 `scene=HistoryMercury`，注册初值只用于本模块场景。用户保存的各场景完整布局（包括分栏、位置、比例和隐藏状态）优先；模块刷新不得主动打开其他场景的页面。需要 Aurora 1.21.1 的场景注册隔离。

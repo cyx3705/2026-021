@@ -116,6 +116,7 @@ internal static class MercuryPages
                     title = "扩展坞管理",
                     // 不写 ratio：中央文档区不吃比例（比例只用于四边），而 Aurora 会把
                     // 落在 (0,1) 之外的值静默换成 0.25——描述里写 1.0 只会让描述与实际不符。
+                    scene = "HistoryMercury",
                     placement = new { side = "center", visible = true, singleton = true },
                     content = new
                     {
