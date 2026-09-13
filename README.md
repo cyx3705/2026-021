@@ -2,7 +2,7 @@
 
 HistoryMercury owns the HistoryVulcan desktop project dock and Explorer entry for the `HistoryClio` project library.
 
-Current source: `5.0.3`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
+Current source: `5.0.4`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
 (page-registration protocol V1; panel protocol V3 is a hard requirement). The dock tile reads `HC`, the Explorer namespace entry is `HistoryClio 项目`, and the project scan prefers
 `proj.libraryroot` (default `C:\OneHistory\HistoryClio`). Configured `HistoryVesta` roots are rewritten to Clio.
 Mutable shortcut files, state and logs live under `%APPDATA%\HistoryVulcan\HistoryMercury`, outside the
@@ -44,4 +44,4 @@ dotnet run --project .\b-Code-Tests\HistoryMercury.Smoke\HistoryMercury.Smoke.cs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercuryPackage.ps1
 ```
 
-The final command creates and verifies a candidate package in `z-Publish/HistoryMercury-vX.Y.Z`. Formal publication is owned by the host development pipeline (`HistoryVulcan.Cli.exe --cli vulcan.dev.submit name=HistoryMercury`). Diana does not publish.
+The final command creates and verifies a candidate package in `z-Publish/HistoryMercury-vX.Y.Z`. Module development uses the host Console CLI: start, submit with an explicit worktree, then finish after approval. Diana does not publish.
