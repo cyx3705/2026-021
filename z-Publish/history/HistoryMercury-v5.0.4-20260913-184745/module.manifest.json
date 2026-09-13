@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "type": "HistoryVulcan.Module",
+  "name": "HistoryMercury",
+  "version": "5.0.4",
+  "description": "活动项目坞、快捷键与描述化页面",
+  "artifact": "HistoryMercury.dll",
+  "docs": "HistoryMercury.xml",
+  "mcpExposure": "standard",
+  "ui": true
+}
