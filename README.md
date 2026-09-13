@@ -2,15 +2,14 @@
 
 HistoryMercury owns the HistoryVulcan desktop project dock and Explorer entry for the `HistoryClio` project library.
 
-Current source: `5.0.2`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
+Current source: `5.0.4`, built against host **HistoryVulcan 5.1.0** and rendered by **HistoryAurora 1.9.2**
 (page-registration protocol V1; panel protocol V3 is a hard requirement). The dock tile reads `HC`, the Explorer namespace entry is `HistoryClio 项目`, and the project scan prefers
 `proj.libraryroot` (default `C:\OneHistory\HistoryClio`). Configured `HistoryVesta` roots are rewritten to Clio.
 Mutable shortcut files, state and logs live under `%APPDATA%\HistoryVulcan\HistoryMercury`, outside the
 manifest-verified runtime module package.
 
 5.0.0 follows the host's 5.0 removal of the module UI SDK. The module entry is `MercuryModule`
-(`IModuleContextAware` + `IDisposable`) and it constructs **no frontend control**: its two pages — the dock manager and
-the command set — are declared as data through `mercury.ui.describe` / `mercury.ui.actions` / `mercury.ui.data` and
+(`IModuleContextAware` + `IDisposable`) and it constructs **no frontend control**: its page — the dock manager — is declared as data through `mercury.ui.describe` / `mercury.ui.actions` / `mercury.ui.data` and
 rendered by HistoryAurora. The desktop dock is unaffected: it is Mercury's own window, code-built on its own STA
 thread, and it stays on screen whether or not the frontend is running. The command workbench (catalog session,
 completion, detail page) left with the host mount point it was attached to; `mercury.go` now relays
@@ -36,7 +35,7 @@ The page does not scroll, so each line and column removed is a table row or a co
 back. The trade-off is that nothing on the page advertises the right-click: adding an entry and acting on a row are
 both right-click only.
 
-The module is developed in `b-Code-MercuryDock`. Its code namespace and command domain are `Mercury`; its module identity, assembly and consumer snapshot are `HistoryMercury`, `HistoryMercury.dll` and `z-Publish`.
+The module is developed in `b-Code-MercuryDock`. Its code namespace and command domain are `Mercury`; its module identity, assembly and consumer snapshot are `HistoryMercury`, `HistoryMercury.dll` and `z-Publish/HistoryMercury-vX.Y.Z`.
 
 ## Commands
 
@@ -45,6 +44,4 @@ dotnet run --project .\b-Code-Tests\HistoryMercury.Smoke\HistoryMercury.Smoke.cs
 powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercuryPackage.ps1
 ```
 
-The final command creates and verifies a candidate package in `z-Publish`. Formal publication is owned by the host's
-in-process pipeline (`HistoryVulcan.exe --cli vulcan.release.cycle module=HistoryMercury`); project-contract validation
-lives there too, which is why this repo no longer ships `Test-ProjectContract.ps1`.
+The final command creates and verifies a candidate package in `z-Publish/HistoryMercury-vX.Y.Z`. Module development uses the host Console CLI: start, submit with an explicit worktree, then finish after approval. Diana does not publish.
