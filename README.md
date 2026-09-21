@@ -2,8 +2,6 @@
 
 > 项目与入口的调度台：桌面项目坞、全局快捷键与资源管理器入口
 
-![OneHistory Logo](./Logo.png)
-
 ## 定位
 
 HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（磁贴 `HC`）、全局快捷键、
@@ -82,6 +80,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercur
 - 项目扫描优先 `proj.libraryroot`（默认 `C:\OneHistory\HistoryClio`）；指向旧 `HistoryVesta` 的配置会被改写到 Clio。
 - 管理页的行操作只在右键菜单里（`rowActions` 一律 `inline: false`），「加入扩展坞」也是右键弹出。
 
----
+## 保留内容
+- 本模板项目介绍：此为最初的准备的项目模板
+    每个分支项目都会由他去继承
+- 作者：Pinavia - 2025
 
-作者：Pinavia
+![logo](./Logo.png)
