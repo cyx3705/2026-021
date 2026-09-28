@@ -77,7 +77,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercur
 ## 要点
 
 - 快捷方式、状态与日志放在 `%APPDATA%\HistoryVulcan\HistoryMercury`，运行包目录 `Modules\HistoryMercury` 只放不可变、可校验的文件。
-- 项目扫描优先 `proj.libraryroot`（默认 `C:\OneHistory\HistoryClio`）；指向旧 `HistoryVesta` 的配置会被改写到 Clio。
+- 项目扫描优先 `proj.libraryroot`（默认 `C:\OneHistory\HistoryClio`）；配置的目录不存在时回落到缺省库根。
 - 管理页的行操作只在右键菜单里（`rowActions` 一律 `inline: false`），「加入扩展坞」也是右键弹出。
 
 ## 保留内容

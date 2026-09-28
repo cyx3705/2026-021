@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>5.0.5</Version>
+    <Version>5.0.6</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
@@ -39,7 +39,7 @@
       视图构造处抛 connectionId 异常，桌面坞被静默吞掉。源码联调必须显式表态。
     -->
     <HistoryVulcanSourceAvailable Condition="'$(HistoryVulcanSourceAvailable)' == ''">false</HistoryVulcanSourceAvailable>
-    <!-- AI 工作树落在库根之外，相对路径必然指空；diana.worktree.create 生成的
+    <!-- AI 工作树落在库根之外，相对路径必然指空；vulcan.dev.start 生成的
          Directory.Build.user.props 会设定 HistoryVulcanPackageRoot，这里据此推导。 -->
     <HistoryVulcanPublishRoot Condition="'$(HistoryVulcanPublishRoot)' == ''">$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\z-Publish</HistoryVulcanPublishRoot>
     <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
