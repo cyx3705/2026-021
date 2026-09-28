@@ -763,7 +763,7 @@ internal static class MercuryState
                 if (!File.Exists(settingsPath))
                     continue;
                 using var doc = JsonDocument.Parse(File.ReadAllText(settingsPath));
-                // 优先 proj.libraryroot；旧 proj.worktreeroot 若仍指向 Vesta 会改写到 Clio。
+                // 优先 proj.libraryroot，其次旧 proj.worktreeroot；只认磁盘上仍存在的目录。
                 // 配置值必须真实存在，否则扫描结果恒空、活动坞只剩"暂无活动项目"。
                 var library = ReadSetting(doc, "proj.libraryroot");
                 var worktree = ReadSetting(doc, "proj.worktreeroot");
