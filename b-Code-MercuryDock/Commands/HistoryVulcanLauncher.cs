@@ -16,7 +16,9 @@ internal static class HistoryVulcanLauncher
         Process[] peers;
         try
         {
-            peers = Process.GetProcessesByName("HistoryVulcan");
+            peers = ResolveExecutable() is { } hostExecutable
+                ? Process.GetProcessesByName(Path.GetFileNameWithoutExtension(hostExecutable))
+                : [];
         }
         catch (Exception)
         {
@@ -63,56 +65,21 @@ internal static class HistoryVulcanLauncher
         return CommandResult.Ok("HistoryVulcan 前端正在启动。");
     }
 
+    /// <summary>
+    /// 宿主 5.9.0 起由 <c>vulcan.host.info</c> 报告正式服务程序的位置（Attach 时取到）；
+    /// 不再按固定目录名或进程名猜。环境变量覆盖只给烟测用。
+    /// </summary>
     internal static string? ResolveExecutable()
     {
-        var candidates = new List<string?>
+        var candidates = new[]
         {
             Environment.GetEnvironmentVariable("MERCURY_VULCAN_EXECUTABLE"),
-            Path.Combine(AppContext.BaseDirectory, ExecutableName),
-            Environment.ProcessPath,
+            MercuryPaths.HostExecutable,
         };
-
-        var assemblyDirectory = Path.GetDirectoryName(typeof(HistoryVulcanLauncher).Assembly.Location);
-        if (!string.IsNullOrWhiteSpace(assemblyDirectory))
-            candidates.Add(Path.Combine(assemblyDirectory, ExecutableName));
-
-        foreach (var root in Ancestors(Environment.CurrentDirectory)
-                     .Concat(Ancestors(assemblyDirectory)))
-        {
-            candidates.Add(Path.Combine(
-                root,
-                "2026-023-HistoryVulcan",
-                "z-Publish",
-                "host",
-                ExecutableName));
-        }
-
         return candidates
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Select(path => Path.GetFullPath(path!))
-            .FirstOrDefault(path =>
-                Path.GetFileName(path).Equals(ExecutableName, StringComparison.OrdinalIgnoreCase)
-                && File.Exists(path));
-    }
-
-    private static IEnumerable<string> Ancestors(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            yield break;
-        DirectoryInfo? current;
-        try
-        {
-            current = new DirectoryInfo(Path.GetFullPath(path));
-        }
-        catch (Exception)
-        {
-            yield break;
-        }
-        while (current != null)
-        {
-            yield return current.FullName;
-            current = current.Parent;
-        }
+            .FirstOrDefault(File.Exists);
     }
 
     [DllImport("user32.dll")]

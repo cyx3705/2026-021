@@ -32,12 +32,11 @@ internal static class MercuryState
         Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
             ? overrideRoot
             : MercuryPaths.DataRoot;
+    private static readonly string PreviousHistoryVulcanRoot = MercuryPaths.PreviousHistoryVulcanDataRoot;
     private static readonly string PreviousMercuryDockRoot = MercuryPaths.PreviousDataRoot;
     private static readonly string LegacyMercuryDockRoot = MercuryPaths.LegacyMercuryDockDataRoot;
     private static readonly string LegacyActiveDockRoot = MercuryPaths.LegacyActiveDockDataRoot;
     private static readonly string StatePath = Path.Combine(DockRoot, "state.json");
-    private static readonly string SettingsPath = MercuryPaths.SettingsPath;
-    private static readonly string LegacySettingsPath = MercuryPaths.LegacySettingsPath;
 
     /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
     private const string DefaultWorktreeRoot = MercuryLibraryRoot.Default;
@@ -754,29 +753,14 @@ internal static class MercuryState
         return selected;
     }
 
+    /// <summary>
+    /// 项目库根取宿主报告的值（宿主 5.9.0 起经 <c>vulcan.host.info</c> 在 Attach 时拿到），
+    /// 不再直接读宿主的设置文件。只认磁盘上仍存在的目录，否则回退缺省。
+    /// </summary>
     private static string ReadWorktreeRoot()
-    {
-        foreach (var settingsPath in new[] { SettingsPath, LegacySettingsPath })
-        {
-            try
-            {
-                if (!File.Exists(settingsPath))
-                    continue;
-                using var doc = JsonDocument.Parse(File.ReadAllText(settingsPath));
-                // 优先 proj.libraryroot，其次旧 proj.worktreeroot；只认磁盘上仍存在的目录。
-                // 配置值必须真实存在，否则扫描结果恒空、活动坞只剩"暂无活动项目"。
-                var library = ReadSetting(doc, "proj.libraryroot");
-                var worktree = ReadSetting(doc, "proj.worktreeroot");
-                if (library != null || worktree != null)
-                    return MercuryLibraryRoot.Resolve(library, worktree);
-            }
-            catch (JsonException)
-            {
-            }
-        }
-
-        return DefaultWorktreeRoot;
-    }
+        => MercuryPaths.LibraryRoot is { } library
+            ? MercuryLibraryRoot.Resolve(library, null)
+            : DefaultWorktreeRoot;
 
     internal static string? ReadSetting(JsonDocument doc, string name)
     {
@@ -889,7 +873,7 @@ internal static class MercuryState
                 return;
             if (File.Exists(StatePath))
                 return;
-            foreach (var root in new[] { PreviousMercuryDockRoot, LegacyMercuryDockRoot, LegacyActiveDockRoot })
+            foreach (var root in new[] { PreviousHistoryVulcanRoot, PreviousMercuryDockRoot, LegacyMercuryDockRoot, LegacyActiveDockRoot })
             {
                 var legacy = Path.Combine(root, "state.json");
                 if (!File.Exists(legacy))

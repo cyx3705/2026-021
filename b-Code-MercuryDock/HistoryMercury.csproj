@@ -8,14 +8,13 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>5.0.6</Version>
+    <Version>5.1.0</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="obj/**;tests/**" />
     <EmbeddedResource Remove="obj/**;tests/**" />
     <None Remove="obj/**;tests/**" />
-    <InternalsVisibleTo Include="HistoryVulcan.Tests" />
     <InternalsVisibleTo Include="HistoryMercury.Smoke" />
   </ItemGroup>
   <ItemGroup>
@@ -29,7 +28,6 @@
   </ItemGroup>
   <PropertyGroup>
     <HistoryVulcanCoreProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\HistoryVulcan.Core\HistoryVulcan.Core.csproj</HistoryVulcanCoreProj>
-    <HistoryVulcanServicesProj>$(MSBuildThisFileDirectory)..\..\2026-023-HistoryVulcan\b-Code-HistoryVulcan\HistoryVulcan.Services\HistoryVulcan.Services.csproj</HistoryVulcanServicesProj>
     <!--
       模块对宿主的依赖面是 z 快照，和 project.manifest.json 的 externalDependencies 一致：
       默认永远编译到 z-Publish/host 里那份"正在跑的"宿主二进制。
@@ -45,23 +43,15 @@
     <HistoryVulcanPackageRoot Condition="'$(HistoryVulcanPackageRoot)' == '' and Exists('$(HistoryVulcanPublishRoot)\manifest.json')">$(HistoryVulcanPublishRoot)</HistoryVulcanPackageRoot>
     <HistoryVulcanHostDir Condition="'$(HistoryVulcanHostDir)' == ''">$(HistoryVulcanPackageRoot)\host</HistoryVulcanHostDir>
     <HistoryVulcanCoreDll Condition="'$(HistoryVulcanCoreDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Core.dll</HistoryVulcanCoreDll>
-    <HistoryVulcanServicesDll Condition="'$(HistoryVulcanServicesDll)' == ''">$(HistoryVulcanHostDir)\HistoryVulcan.Services.dll</HistoryVulcanServicesDll>
   </PropertyGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' == 'true'">
     <ProjectReference Include="$(HistoryVulcanCoreProj)">
-      <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="$(HistoryVulcanServicesProj)">
       <Private>false</Private>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup Condition="'$(HistoryVulcanSourceAvailable)' != 'true'">
     <Reference Include="HistoryVulcan.Core">
       <HintPath>$(HistoryVulcanCoreDll)</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="HistoryVulcan.Services">
-      <HintPath>$(HistoryVulcanServicesDll)</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

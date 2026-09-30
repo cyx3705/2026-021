@@ -12,6 +12,9 @@ var previousExplorerRegistrationSetting = Environment.GetEnvironmentVariable("ME
 Environment.SetEnvironmentVariable("MERCURY_DISABLE_EXPLORER_REGISTRATION", "1");
 var stateOverride = Path.Combine(Path.GetTempPath(), "mercury-state-" + Guid.NewGuid().ToString("N"));
 Environment.SetEnvironmentVariable("MERCURY_STATE_DIRECTORY", stateOverride);
+// 宿主 5.9.0 统一契约：数据目录由宿主在 Attach 时给。烟测没有宿主，照 Attach 的第一步先配置一次。
+var smokeDataRoot = Path.Combine(stateOverride, "ModuleData", "HistoryMercury");
+MercuryPaths.Configure(smokeDataRoot, null, null);
 
 var assembly = typeof(MercuryCommands).Assembly;
 var moduleInfos = assembly.GetTypes()
@@ -230,18 +233,18 @@ finally
 
 Equal("HistoryVulcan", MercuryPaths.HostName, "Host data root name");
 Equal(
-    Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "HistoryVulcan", "HistoryMercury", DockShortcutFolder.FolderName),
+    Path.Combine(Path.GetFullPath(smokeDataRoot), DockShortcutFolder.FolderName),
     DockShortcutFolder.Path,
-    "Shortcut folder must use the mutable module data root outside the package slot.");
+    "Shortcut folder must live in the data directory the host hands out (outside the package slot).");
 True(
-    !DockShortcutFolder.Path.StartsWith(
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "HistoryVulcan", "Modules") + Path.DirectorySeparatorChar,
+    !DockShortcutFolder.Path.Contains(
+        Path.DirectorySeparatorChar + "Modules" + Path.DirectorySeparatorChar,
         StringComparison.OrdinalIgnoreCase),
     "Shortcut files must never mutate the manifest-verified runtime package.");
+Equal(
+    Path.Combine(Path.GetFullPath(stateOverride), "HistoryMercury"),
+    MercuryPaths.PreviousHistoryVulcanDataRoot,
+    "The pre-5.1 data root is the one-time migration source.");
 Equal("HistoryClio 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
 Equal(@"C:\OneHistory\HistoryClio", MercuryLibraryRoot.Default, "Default project library is HistoryClio");
 Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Resolve(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")), null),

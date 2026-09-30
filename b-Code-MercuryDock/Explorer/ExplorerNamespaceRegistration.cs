@@ -31,6 +31,9 @@ public static class ExplorerNamespaceRegistration
     private const uint ShcnfPathW = 0x0005;
     private static readonly string BackupPath = Path.Combine(
         MercuryPaths.DataRoot, "explorer-registration-backup.json");
+    // 5.1.0：数据目录迁到宿主给的 ModuleData 后，5.0.x 的备份在旧数据根，作为第一个迁移来源。
+    private static readonly string PreviousHistoryVulcanBackupPath = Path.Combine(
+        MercuryPaths.PreviousHistoryVulcanDataRoot, "explorer-registration-backup.json");
     private static readonly string PreviousBackupPath = Path.Combine(
         MercuryPaths.PreviousDataRoot, "explorer-registration-backup.json");
     private static readonly string LegacyMercuryDockBackupPath = Path.Combine(
@@ -250,7 +253,7 @@ public static class ExplorerNamespaceRegistration
         {
             if (File.Exists(BackupPath))
                 return;
-            var source = new[] { PreviousBackupPath, LegacyMercuryDockBackupPath, LegacyActiveDockBackupPath }
+            var source = new[] { PreviousHistoryVulcanBackupPath, PreviousBackupPath, LegacyMercuryDockBackupPath, LegacyActiveDockBackupPath }
                 .FirstOrDefault(File.Exists);
             if (source == null || !File.Exists(source))
                 return;
