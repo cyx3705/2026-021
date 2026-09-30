@@ -79,5 +79,32 @@
     "**/node_modules/**",
     "**/.vs/**",
     "artifacts/**"
-  ]
+  ],
+  "publish": {
+    "versionProps": "b-Code-MercuryDock\\HistoryMercury.csproj",
+    "versionProperty": "Version",
+    "sourceManifest": "b-Code-MercuryDock\\module.manifest.json",
+    "package": {
+      "project": "b-Code-MercuryDock\\HistoryMercury.csproj",
+      "files": [
+        "HistoryMercury.dll",
+        "HistoryMercury.xml",
+        "module.manifest.json"
+      ]
+    },
+    "validation": [
+      {
+        "tool": "dotnet.exe",
+        "arguments": [
+          "run",
+          "--project",
+          "b-Code-Tests\\HistoryMercury.Smoke\\HistoryMercury.Smoke.csproj",
+          "-c",
+          "Release",
+          "-p:NuGetAudit=false"
+        ],
+        "description": "Run module Smoke"
+      }
+    ]
+  }
 }
