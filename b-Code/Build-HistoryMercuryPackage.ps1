@@ -14,10 +14,6 @@ $publishRoot = Join-Path $repoRoot 'z-Publish'
 
 $projectPath = Join-Path $repoRoot 'b-Code-MercuryDock\HistoryMercury.csproj'
 $manifestSource = Join-Path $repoRoot 'b-Code-MercuryDock\module.manifest.json'
-$packageDocuments = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot 'b-Office\package') -Filter '*.md' -File)
-if ($packageDocuments.Count -eq 0) {
-    throw 'b-Office/package must contain at least one Markdown document'
-}
 $releaseRoot = Join-Path $repoRoot "b-Code-MercuryDock\bin\$Configuration\net8.0-windows"
 $transactionId = [Guid]::NewGuid().ToString('N')
 $transactionRoot = Join-Path ([IO.Path]::GetTempPath()) "HistoryMercury.Package.$transactionId"
@@ -27,8 +23,7 @@ $backup = Join-Path $transactionRoot 'previous'
 function Assert-ModulePackage {
     param([string]$Root, [string]$ExpectedVersion)
 
-    $expectedFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json', 'SHA256SUMS') +
-        @($packageDocuments | ForEach-Object { "docs/$($_.Name)" }) | Sort-Object
+    $expectedFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json', 'SHA256SUMS') | Sort-Object
     $rootPrefix = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
     $historyPrefix = $rootPrefix + 'history\'
     $actualFiles = @(Get-ChildItem -LiteralPath $Root -File -Recurse |
@@ -113,13 +108,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $releaseRoot 'HistoryMercury.dll') -Destination $stage
     Copy-Item -LiteralPath (Join-Path $releaseRoot 'HistoryMercury.xml') -Destination $stage
     Copy-Item -LiteralPath $manifestSource -Destination (Join-Path $stage 'module.manifest.json')
-    $docsRoot = Join-Path $stage 'docs'
-    New-Item -ItemType Directory -Force -Path $docsRoot | Out-Null
-    foreach ($document in $packageDocuments) {
-        Copy-Item -LiteralPath $document.FullName -Destination (Join-Path $docsRoot $document.Name)
-    }
-    $relativeFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json') +
-        @($packageDocuments | ForEach-Object { "docs/$($_.Name)" })
+    # 宿主 6.1.0（DEC-072）起包里不带 docs/：说明书只来自指令注册时的自描述。
+    $relativeFiles = @('HistoryMercury.dll', 'HistoryMercury.xml', 'module.manifest.json')
     $checksumLines = foreach ($file in $relativeFiles) {
         "$((Get-FileHash -LiteralPath (Join-Path $stage $file.Replace('/', '\')) -Algorithm SHA256).Hash)  $file"
     }

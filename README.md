@@ -20,7 +20,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | 指令域 | `mercury`（代码命名空间 `Mercury`，模块身份 `HistoryMercury`） |
 | 界面 | 桌面坞（自有窗口）+ Aurora 描述化页面「扩展坞管理」 |
 | MCP 投影 | `standard` |
-| 版本与宿主下限 | [`HistoryMercury.csproj`](./b-Code-MercuryDock/HistoryMercury.csproj)；宿主下限见 [模块 API](./b-Office/package/模块API.md) |
+| 版本与宿主下限 | [`HistoryMercury.csproj`](./b-Code-MercuryDock/HistoryMercury.csproj)；最低宿主 HistoryVulcan 6.0.0（[有效决策](./b-Office/current/有效决策.md) DEC-023） |
 
 ## 能力
 
@@ -34,7 +34,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | `usage` | `list` / `forget` | 使用历史 |
 | — | `mercury.go` | 控制台域聚焦（转发 `aurora.log.source`） |
 
-完整参数与返回见 [模块 API](./b-Office/package/模块API.md)。
+完整命令目录与参数是注册时的自描述：`diana.docs.read domain=mercury`（宿主 6.1.0 起没有消费文档）。
 
 ## 入口
 
@@ -47,7 +47,6 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | [技术合同](./b-Office/current/技术合同.md) | 现行需求与架构 |
 | [有效决策](./b-Office/current/有效决策.md) | 仍然有效的关键决策 |
 | [验证合同](./b-Office/current/验证合同.md) | 验证层级、命令与证据 |
-| [模块 API](./b-Office/package/模块API.md) | 跨模块消费合同 |
 
 ## 目录
 
@@ -56,7 +55,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | `b-Code-MercuryDock/` | 模块源码：`Module`、`Commands`、`Dock`、`Explorer`、`State`、`Ui`、`Input`、`Diagnostics` |
 | `b-Code-Tests/` | `HistoryMercury.Smoke` |
 | `b-Code/` | 候选构建脚本 |
-| `b-Office/` | 项目文档：`current/` 现行合同、`package/` 消费合同、`history/` 只读归档 |
+| `b-Office/` | 项目文档：`current/` 现行合同、`history/` 只读归档 |
 | `z-Publish/` | 正式快照与 `history/` 归档，由宿主管线写入 |
 
 ## 构建与验证
