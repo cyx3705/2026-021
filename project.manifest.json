@@ -14,12 +14,11 @@
       "tooling"
     ],
     "status": "active",
-    "version": "5.2.0"
+    "version": "5.2.1"
   },
   "paths": {
     "activeRoots": [
       "b-Office/current",
-      "b-Office/package",
       "b-Code",
       "b-Code-MercuryDock",
       "b-Code-Tests"
@@ -51,7 +50,6 @@
   },
   "documents": {
     "center": "b-Office/文档中心.md",
-    "package": "b-Office/package/模块API.md",
     "structure": "b-Office/文档中心.md",
     "overview": "b-Office/current/项目概览.md",
     "technicalContract": "b-Office/current/技术合同.md",
