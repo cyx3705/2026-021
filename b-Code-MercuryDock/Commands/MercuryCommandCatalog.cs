@@ -30,6 +30,7 @@ internal static class MercuryCommandCatalog
         {
             Name = "mercury.go",
             Summary = "聚焦到指定指令域；省略 domain 则退出聚焦。",
+            Example = "mercury.go domain=janus",
             // 5.0 起本命令只是把域筛选转发给前端的 aurora.log.source，自己不碰任何界面对象；
             // 需要 UI 线程的是那一条，由它自己声明。这里再声明一次等于多编组一次。
             Parameters = [DomainParameter()],
@@ -41,8 +42,10 @@ internal static class MercuryCommandCatalog
         Async("mercury.shortcut.wakeconsole", "shortcut", "兼容入口：调用 Vulcan 语义命令唤出并聚焦控制台。",
             async _ => await MercuryCommands.WakeConsoleAsync().ConfigureAwait(false)),
         Result("mercury.shortcut.open", "shortcut", "打开快捷文件、普通文件或目录。",
+            @"mercury.shortcut.open path=C:\OneHistory\HistoryClio",
             context => MercuryCommands.OpenShortcut(context.GetString("path")), ShortcutPathParameter()),
         Result("mercury.shortcut.add", "shortcut", "把快捷文件注册为扩展坞常驻项。",
+            @"mercury.shortcut.add path=D:\Tools\notepad.lnk",
             context => MercuryCommands.AddShortcut(context.GetString("path")), ShortcutPathParameter()),
         new CommandDescriptor
         {
@@ -59,17 +62,17 @@ internal static class MercuryCommandCatalog
             _ => MercuryCommands.RemoveExplorer(), "确定移除托管的资源管理器入口？"),
         Readonly("mercury.proj.list", "proj", "列出活动项目。",
             _ => MercuryCommands.ListProjects()),
-        ProjectWrite("mercury.proj.pin", "置顶活动项目。",
+        ProjectWrite("mercury.proj.pin", "置顶活动项目。", "mercury.proj.pin 2026-021-HistoryMercury",
             context => MercuryCommands.PinProject(context.RequireString("name"))),
-        ProjectWrite("mercury.proj.unpin", "取消置顶活动项目。",
+        ProjectWrite("mercury.proj.unpin", "取消置顶活动项目。", "mercury.proj.unpin 2026-021-HistoryMercury",
             context => MercuryCommands.UnpinProject(context.RequireString("name"))),
-        ProjectWrite("mercury.proj.add", "添加并置顶项目。",
+        ProjectWrite("mercury.proj.add", "添加并置顶项目。", "mercury.proj.add 2026-021-HistoryMercury",
             context => MercuryCommands.AddProject(context.RequireString("name"))),
         Async("mercury.proj.refresh", "proj", "重新扫描活动项目。",
             async _ => await MercuryCommands.RefreshProjectsAsync().ConfigureAwait(false)),
-        ProjectWrite("mercury.proj.exclude", "从项目坞排除项目。",
+        ProjectWrite("mercury.proj.exclude", "从项目坞排除项目。", "mercury.proj.exclude 2026-021-HistoryMercury",
             context => MercuryCommands.ExcludeProject(context.RequireString("name"))),
-        ProjectWrite("mercury.proj.include", "将项目重新纳入项目坞。",
+        ProjectWrite("mercury.proj.include", "将项目重新纳入项目坞。", "mercury.proj.include 2026-021-HistoryMercury",
             context => MercuryCommands.IncludeProject(context.RequireString("name"))),
         new CommandDescriptor
         {
@@ -83,13 +86,18 @@ internal static class MercuryCommandCatalog
         },
         Write("mercury.dock.hide", "dock", "隐藏项目坞。", _ => MercuryCommands.HideDock()),
         Write("mercury.dock.show", "dock", "显示项目坞。", _ => MercuryCommands.ShowDock()),
-        Write("mercury.dock.policy", "dock", "查看或更新项目坞策略。",
+        WriteWith("mercury.dock.policy", "dock", "查看或更新项目坞策略；不带参数只查看。",
+            "mercury.dock.policy min=6 max=12 halflife=7",
             context => MercuryCommands.SetDockPolicy(
                 context.Has("min") ? context.GetInt("min") : null,
                 context.Has("max") ? context.GetInt("max") : null,
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
-            OptionalIntParameter("min"), OptionalIntParameter("max"), OptionalDoubleParameter("halflife")),
+            null,
+            OptionalIntParameter("min", "显示条数下限（1-24，出厂 6）：候选不足时也补足到这么多条；省略则不改。"),
+            OptionalIntParameter("max", "显示条数上限（1-24，出厂 12）；省略则不改。"),
+            OptionalDoubleParameter("halflife", "使用记录的半衰期，单位天（0.5-90，出厂 7）；省略则不改。")),
         Result("mercury.dock.add", "dock", "把任意总线指令注册为扩展坞常驻项。",
+            "mercury.dock.add command=\"janus.proj.list\" label=项目清单",
             context => MercuryCommands.AddDockCommand(
                 context.GetString("command"),
                 context.GetString("label")),
@@ -99,6 +107,7 @@ internal static class MercuryCommandCatalog
             Name = "mercury.dock.remove",
             CommandClass = "dock",
             Summary = "移除扩展坞中的常驻指令项。",
+            Example = "mercury.dock.remove command=\"janus.proj.list\"",
             Parameters = [DockCommandParameter()],
             Annotations = CompletionProvider("command", "mercury.dock.commands"),
             Handler = context => Task.FromResult(
@@ -107,24 +116,29 @@ internal static class MercuryCommandCatalog
         Async("mercury.app.open", "app", "显示或启动 HistoryVulcan 前端。",
             async _ => await MercuryCommands.ShowHostAsync().ConfigureAwait(false)),
         Readonly("mercury.usage.list", "usage", "列出项目使用记录。", _ => MercuryCommands.ListUsage()),
-        Write("mercury.usage.forget", "usage", "清除项目使用历史。",
+        WriteWith("mercury.usage.forget", "usage", "清除项目使用历史。",
+            "mercury.usage.forget 2026-021-HistoryMercury",
             context => MercuryCommands.ForgetUsage(context.GetString("name")), "确定清除所选使用历史？", OptionalNameParameter()),
 
         // 全局快捷键改由命令暴露：调用方只需知道命令名与参数名，不引用任何 CLR 契约，
         // 因此 Mercury 可以自由重构快捷键实现而不触动宿主公开面。
         Readonly("mercury.hotkey.list", "hotkey", "列出当前生效的全局快捷键注册。",
             _ => Input.HotkeyCommands.List()),
-        Write("mercury.hotkey.register", "hotkey", "注册「按键序列 → 命令」的全局快捷键。",
+        WriteWith("mercury.hotkey.register", "hotkey", "注册「按键序列 → 命令」的全局快捷键。",
+            "mercury.hotkey.register id=focus-console stroke=Ctrl+Alt+M command=\"vulcan.app.focusconsole\"",
             context => Input.HotkeyCommands.Register(
                 context.RequireString("id"),
                 context.RequireString("stroke"),
                 context.RequireString("command"),
                 context.GetString("owner"),
                 context.Has("interval") ? (int)context.GetDouble("interval") : null),
+            null,
             HotkeyIdParameter(), HotkeyStrokeParameter(), HotkeyCommandParameter(),
             HotkeyOwnerParameter(), HotkeyIntervalParameter()),
-        Write("mercury.hotkey.unregister", "hotkey", "注销此前注册的全局快捷键。",
+        WriteWith("mercury.hotkey.unregister", "hotkey", "注销此前注册的全局快捷键。",
+            "mercury.hotkey.unregister focus-console",
             context => Input.HotkeyCommands.Unregister(context.RequireString("id")),
+            null,
             HotkeyIdParameter()),
 
         // 页面注册协议 V1：描述 / 动作 / 取数三条。它们是模块与前端之间的内部协议，
@@ -135,6 +149,7 @@ internal static class MercuryCommandCatalog
         Internal("mercury.ui.actions", "ui", "返回本模块可被按钮绑定的动作声明。",
             _ => Task.FromResult(Payload(MercuryPages.ActionsJson()))),
         Internal(MercuryUiData.DataCommandName, "ui", "按视图返回页面组件所需的行数据。",
+            "mercury.ui.data view=entries",
             context => Task.FromResult(MercuryUiData.Read(context.GetString("view"))),
             ViewParameter()),
 
@@ -162,6 +177,14 @@ internal static class MercuryCommandCatalog
         string name,
         string commandClass,
         string summary,
+        Func<CommandContext, Task<CommandResult>> handler)
+        => Internal(name, commandClass, summary, null, handler);
+
+    private static CommandDescriptor Internal(
+        string name,
+        string commandClass,
+        string summary,
+        string? example,
         Func<CommandContext, Task<CommandResult>> handler,
         params ParameterSpec[] parameters)
         => new()
@@ -169,6 +192,7 @@ internal static class MercuryCommandCatalog
             Name = name,
             CommandClass = commandClass,
             Summary = summary,
+            Example = example,
             Readonly = true,
             HiddenReason = "界面内部协议，对模型无意义",
             Parameters = parameters,
@@ -178,8 +202,10 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec ViewParameter() => new()
     {
         Name = "view",
-        Description = "取数视图：entries（扩展坞条目）；省略为 entries。",
+        Description = "取数视图：entries 为扩展坞条目。",
         Required = false,
+        Default = MercuryUiData.EntriesView,
+        AllowedValues = [MercuryUiData.EntriesView],
         Position = 0,
     };
 
@@ -194,7 +220,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec HotkeyIdParameter() => new()
     {
         Name = "id",
-        Description = "快捷键标识；同 id 重复注册会覆盖旧的。",
+        Description = "快捷键标识，自取的短名，例如 focus-console；同 id 重复注册会覆盖旧的。",
         Required = true,
         Position = 0,
     };
@@ -211,7 +237,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec HotkeyCommandParameter() => new()
     {
         Name = "command",
-        Description = "命中后要执行的指令文本。",
+        Description = "命中后要执行的完整指令文本，例如 vulcan.app.focusconsole；含空格时整段加引号。",
         Required = true,
         Position = 2,
     };
@@ -273,7 +299,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec ShortcutPathParameter() => new()
     {
         Name = "path",
-        Description = "快捷文件、普通文件或目录路径。",
+        Description = "快捷文件（.lnk / .url）、普通文件或目录的绝对路径；含空格时整段加引号。",
         Required = true,
         Position = 0,
     };
@@ -281,7 +307,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec DockCommandParameter() => new()
     {
         Name = "command",
-        Description = "要常驻或移除的完整总线指令文本。",
+        Description = "要常驻或移除的完整总线指令文本，例如 janus.proj.list；含空格时整段加引号。",
         Required = true,
         Position = 0,
     };
@@ -313,12 +339,14 @@ internal static class MercuryCommandCatalog
     private static CommandDescriptor ProjectWrite(
         string name,
         string summary,
+        string example,
         Func<CommandContext, string> handler)
         => new()
         {
             Name = name,
             CommandClass = "proj",
             Summary = summary,
+            Example = example,
             Parameters = [NameParameter()],
             Annotations = ProjectCompletionProvider(),
             Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
@@ -349,11 +377,23 @@ internal static class MercuryCommandCatalog
         Func<CommandContext, string> handler,
         string? confirm,
         params ParameterSpec[] parameters)
+        => WriteWith(name, commandClass, summary, null, handler, confirm, parameters);
+
+    /// <summary>带参数的写指令必须给示例：说明书就是这份自描述（宿主 6.1.0 起没有消费文档）。</summary>
+    private static CommandDescriptor WriteWith(
+        string name,
+        string commandClass,
+        string summary,
+        string? example,
+        Func<CommandContext, string> handler,
+        string? confirm,
+        params ParameterSpec[] parameters)
         => new()
         {
             Name = name,
             CommandClass = commandClass,
             Summary = summary,
+            Example = example,
             Parameters = parameters,
             Level = confirm == null ? CommandLevel.Run : CommandLevel.Ask,
             ConfirmPrompt = confirm == null ? null : _ => confirm,
@@ -364,6 +404,7 @@ internal static class MercuryCommandCatalog
         string name,
         string commandClass,
         string summary,
+        string example,
         Func<CommandContext, CommandResult> handler,
         params ParameterSpec[] parameters)
         => new()
@@ -371,6 +412,7 @@ internal static class MercuryCommandCatalog
             Name = name,
             CommandClass = commandClass,
             Summary = summary,
+            Example = example,
             Parameters = parameters,
             Handler = context => Task.FromResult(handler(context)),
         };
@@ -387,7 +429,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec NameParameter() => new()
     {
         Name = "name",
-        Description = "项目名称或序号。",
+        Description = "活动项目的工作树名称或 mercury.proj.list 里的序号，例如 2026-021-HistoryMercury 或 3。",
         Required = true,
         Position = 0,
     };
@@ -395,23 +437,23 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec OptionalNameParameter() => new()
     {
         Name = "name",
-        Description = "项目名称或序号；省略则清除全部。",
+        Description = "活动项目的工作树名称或 mercury.proj.list 里的序号；省略则清除全部使用历史。",
         Required = false,
         Position = 0,
     };
 
-    private static ParameterSpec OptionalIntParameter(string name) => new()
+    private static ParameterSpec OptionalIntParameter(string name, string description) => new()
     {
         Name = name,
-        Description = "可选整数策略值。",
+        Description = description,
         Type = ParamType.Int,
         Required = false,
     };
 
-    private static ParameterSpec OptionalDoubleParameter(string name) => new()
+    private static ParameterSpec OptionalDoubleParameter(string name, string description) => new()
     {
         Name = name,
-        Description = "可选小数策略值。",
+        Description = description,
         Type = ParamType.Double,
         Required = false,
     };
