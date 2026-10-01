@@ -26,18 +26,13 @@ internal static class MercuryState
     private static readonly object Gate = new();
     private static FileSystemWatcher? _watcher;
     /// <summary>
-    /// 状态目录可用 MERCURY_STATE_DIRECTORY 整体改向（烟测隔离用），此时旧版迁移自动跳过。
+    /// 状态目录可用 MERCURY_STATE_DIRECTORY 整体改向（烟测隔离用）。
     /// </summary>
     private static readonly string DockRoot =
         Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
             ? overrideRoot
             : MercuryPaths.DataRoot;
-    private static readonly string PreviousMercuryDockRoot = MercuryPaths.PreviousDataRoot;
-    private static readonly string LegacyMercuryDockRoot = MercuryPaths.LegacyMercuryDockDataRoot;
-    private static readonly string LegacyActiveDockRoot = MercuryPaths.LegacyActiveDockDataRoot;
     private static readonly string StatePath = Path.Combine(DockRoot, "state.json");
-    private static readonly string SettingsPath = MercuryPaths.SettingsPath;
-    private static readonly string LegacySettingsPath = MercuryPaths.LegacySettingsPath;
 
     /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
     private const string DefaultWorktreeRoot = MercuryLibraryRoot.Default;
@@ -754,41 +749,14 @@ internal static class MercuryState
         return selected;
     }
 
+    /// <summary>
+    /// 项目库根取宿主报告的值（宿主 5.9.0 起经 <c>vulcan.host.info</c> 在 Attach 时拿到），
+    /// 不再直接读宿主的设置文件。只认磁盘上仍存在的目录，否则回退缺省。
+    /// </summary>
     private static string ReadWorktreeRoot()
-    {
-        foreach (var settingsPath in new[] { SettingsPath, LegacySettingsPath })
-        {
-            try
-            {
-                if (!File.Exists(settingsPath))
-                    continue;
-                using var doc = JsonDocument.Parse(File.ReadAllText(settingsPath));
-                // 优先 proj.libraryroot，其次旧 proj.worktreeroot；只认磁盘上仍存在的目录。
-                // 配置值必须真实存在，否则扫描结果恒空、活动坞只剩"暂无活动项目"。
-                var library = ReadSetting(doc, "proj.libraryroot");
-                var worktree = ReadSetting(doc, "proj.worktreeroot");
-                if (library != null || worktree != null)
-                    return MercuryLibraryRoot.Resolve(library, worktree);
-            }
-            catch (JsonException)
-            {
-            }
-        }
-
-        return DefaultWorktreeRoot;
-    }
-
-    internal static string? ReadSetting(JsonDocument doc, string name)
-    {
-        if (!doc.RootElement.TryGetProperty(name, out var value)
-            || value.ValueKind != JsonValueKind.String)
-        {
-            return null;
-        }
-
-        var text = value.GetString();
-        return string.IsNullOrWhiteSpace(text) ? null : text;
-    }
+        => MercuryPaths.LibraryRoot is { } library
+            ? MercuryLibraryRoot.Resolve(library)
+            : DefaultWorktreeRoot;
 
     private static bool TryGetWorktreeProjectName(string target, out string name)
     {
@@ -851,7 +819,6 @@ internal static class MercuryState
     private static DockPreferences LoadPreferences()
     {
         Directory.CreateDirectory(DockRoot);
-        MigrateLegacyState();
         try
         {
             if (File.Exists(StatePath))
@@ -875,33 +842,6 @@ internal static class MercuryState
         }
 
         return new DockPreferences();
-    }
-
-    /// <summary>
-    /// HistoryVulcan 数据根首次启用时，优先迁移旧 MercuryDock 偏好，再兼容更早的 ActiveDock 偏好。
-    /// 保留固定项、排除名单、使用记录与策略。旧文件保留不删，便于回退对照。
-    /// </summary>
-    private static void MigrateLegacyState()
-    {
-        try
-        {
-            if (Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 })
-                return;
-            if (File.Exists(StatePath))
-                return;
-            foreach (var root in new[] { PreviousMercuryDockRoot, LegacyMercuryDockRoot, LegacyActiveDockRoot })
-            {
-                var legacy = Path.Combine(root, "state.json");
-                if (!File.Exists(legacy))
-                    continue;
-                File.Copy(legacy, StatePath);
-                return;
-            }
-        }
-        catch (Exception)
-        {
-            // 迁移失败时按全新偏好启动，不得影响模块加载。
-        }
     }
 
     /// <summary>

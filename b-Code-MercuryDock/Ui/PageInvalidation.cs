@@ -30,9 +30,9 @@ internal static class PageInvalidation
 
     private static Timer? _timer;
 
-    private static CommandBus? _bus;
+    private static ICommandBus? _bus;
 
-    public static void Start(CommandBus bus)
+    public static void Start(ICommandBus bus)
     {
         lock (Gate)
         {
@@ -65,7 +65,7 @@ internal static class PageInvalidation
 
     private static void Send()
     {
-        CommandBus? bus;
+        ICommandBus? bus;
         lock (Gate)
             bus = _bus;
         if (bus == null)

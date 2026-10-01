@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
 using HistoryVulcan.Core.Commands;
-using HistoryVulcan.Services.Commands;
 
 namespace Mercury.Ui;
 
@@ -91,7 +90,7 @@ internal static class MercuryUiData
     /// <c>key</c> 递进来，这里再去状态里查一次——否则这条命令就成了「代为执行任意指令」的
     /// 旁路，逐条排除的远端策略会被它整个绕开。同理它自己也带 <c>HiddenReason</c>。
     /// </remarks>
-    public static async Task<CommandResult> RunEntryAsync(string? key, CommandBus? bus)
+    public static async Task<CommandResult> RunEntryAsync(string? key, ICommandBus? bus)
     {
         var value = (key ?? string.Empty).Trim();
         if (value.Length == 0)

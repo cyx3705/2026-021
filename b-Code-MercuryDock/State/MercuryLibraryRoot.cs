@@ -10,17 +10,10 @@ public static class MercuryLibraryRoot
     public const string Default = @"C:\OneHistory\HistoryClio";
 
     /// <summary>
-    /// 优先 <c>proj.libraryroot</c>，其次仍存在的 <c>proj.worktreeroot</c>，最后缺省 Clio。
-    /// 只接受磁盘上存在的目录，返回去掉末尾分隔符的完整路径。
+    /// 取宿主报告的项目库根；只接受磁盘上存在的目录，返回去掉末尾分隔符的完整路径，否则缺省 Clio。
     /// </summary>
-    public static string Resolve(string? libraryRoot, string? worktreeRoot)
-    {
-        if (TryExisting(libraryRoot, out var fromLibrary))
-            return fromLibrary;
-        if (TryExisting(worktreeRoot, out var fromWorktree))
-            return fromWorktree;
-        return Default;
-    }
+    public static string Resolve(string? libraryRoot)
+        => TryExisting(libraryRoot, out var full) ? full : Default;
 
     private static bool TryExisting(string? path, out string full)
     {

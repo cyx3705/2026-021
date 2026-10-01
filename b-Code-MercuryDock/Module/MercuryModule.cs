@@ -47,7 +47,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
     private bool _disposed;
 
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
-    internal static CommandBus? Bus { get; private set; }
+    internal static ICommandBus? Bus { get; private set; }
 
     /// <summary>
     /// 桌面坞是否在跑。供烟测断言坞只归 <see cref="Attach"/>——
@@ -59,10 +59,12 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
     /// 模块日志。宿主 5.0 不再注入日志，这里换成 Mercury 自持的实例；
     /// 调用点写法不变，落点从宿主控制台变成模块数据根下的 <c>logs/</c>。
     /// </summary>
-    internal static IShellLog Log { get; } = MercuryLog.Shared;
+    internal static IModuleLog Log { get; } = MercuryLog.Shared;
 
     public void Attach(IModuleContext context)
     {
+        // 5.1.0（宿主 5.9.0 统一契约）：必须第一步。MercuryState 的静态字段在类型初始化时就取数据根。
+        ConfigureFromHost(context);
         Bus = context.Bus;
         context.RegisterCommands(MercuryCommandCatalog.Register);
 
@@ -93,6 +95,33 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
     /// Mercury 自有的快捷键同样经命令层注册，而不是走内部特殊路径——它和任何第三方模块
     /// 用的是同一条通道，能力缺失时也会以同样的方式暴露出来。
     /// </summary>
+    /// <summary>
+    /// 数据目录取宿主给的 <c>Environment.DataDirectory</c>；项目库根与宿主可执行文件问 <c>vulcan.host.info</c>，
+    /// 按 JSON 字段名读（契约是 JSON 形状，不是宿主的 C# 类型）。问不到时只是少了这两项，不影响装载。
+    /// </summary>
+    private static void ConfigureFromHost(IModuleContext context)
+    {
+        string? libraryRoot = null;
+        string? hostExecutable = null;
+        try
+        {
+            var info = context.Bus.ExecuteAsync("vulcan.host.info", "module:HistoryMercury")
+                .ConfigureAwait(false).GetAwaiter().GetResult();
+            if (info.Success && info.Data != null)
+            {
+                var data = System.Text.Json.JsonSerializer.SerializeToElement(info.Data);
+                libraryRoot = data.TryGetProperty("libraryRoot", out var library) ? library.GetString() : null;
+                hostExecutable = data.TryGetProperty("hostExecutable", out var host) ? host.GetString() : null;
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or System.Text.Json.JsonException)
+        {
+            MercuryLog.Shared.Warn("host", $"读取 vulcan.host.info 失败，项目库根回退缺省：{ex.Message}");
+        }
+
+        MercuryPaths.Configure(context.Environment.DataDirectory, libraryRoot, hostExecutable);
+    }
+
     private static void RegisterOwnShortcuts()
     {
         try

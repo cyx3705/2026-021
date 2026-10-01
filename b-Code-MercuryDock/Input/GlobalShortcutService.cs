@@ -29,8 +29,8 @@ internal sealed class GlobalShortcutService : IDisposable
     private const int VkLWin = 0x5B;
     private const int VkRWin = 0x5C;
 
-    private readonly CommandBus _bus;
-    private readonly IShellLog _log;
+    private readonly ICommandBus _bus;
+    private readonly IModuleLog _log;
     private readonly object _sync = new();
     private readonly Dictionary<string, Registration> _registrations =
         new(StringComparer.OrdinalIgnoreCase);
@@ -52,7 +52,7 @@ internal sealed class GlobalShortcutService : IDisposable
     private int _disposed;
 
     /// <summary>Creates a global shortcut host bound to the given command bus.</summary>
-    public GlobalShortcutService(CommandBus bus, IShellLog log)
+    public GlobalShortcutService(ICommandBus bus, IModuleLog log)
     {
         _bus = bus;
         _log = log;
