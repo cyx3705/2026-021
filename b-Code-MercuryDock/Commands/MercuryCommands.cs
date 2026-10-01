@@ -10,6 +10,12 @@ public static class MercuryCommands
         => new(ExplorerNamespaceRegistration.IsRegistered(), DockShortcutFolder.Path);
 
     /// <summary>
+    /// 控制台域筛选里「不聚焦」的值（<c>aurora.log.source</c> 的约定）。宿主 6.0.0 起
+    /// <c>DomainFocus</c> 是宿主内部类型，这里只需要它的这一个取值。
+    /// </summary>
+    private const string AllDomains = "全部";
+
+    /// <summary>
     /// 切换控制台的域聚焦。
     /// </summary>
     /// <remarks>
@@ -27,14 +33,14 @@ public static class MercuryCommands
         if (bus == null)
             return CommandResult.Fail("指令总线未就绪。");
 
-        var requested = string.IsNullOrWhiteSpace(domain) ? DomainFocus.All : domain.Trim();
+        var requested = string.IsNullOrWhiteSpace(domain) ? AllDomains : domain.Trim();
         var result = await bus
             .ExecuteAsync("aurora.log.source " + CommandParser.QuoteArg(requested), "Mercury")
             .ConfigureAwait(false);
         if (!result.Success)
             return result;
 
-        return CommandResult.Ok(DomainFocus.IsUnfocused(requested)
+        return CommandResult.Ok(requested == AllDomains
             ? "已退出域聚焦，恢复全部指令域。"
             : $"已聚焦到 {requested} 域；之后只需输入「类.方法」，"
               + "输入其他已注册域的完整名仍可直接执行。");

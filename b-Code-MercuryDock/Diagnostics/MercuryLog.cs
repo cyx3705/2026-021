@@ -12,17 +12,17 @@ namespace Mercury.Diagnostics;
 /// 自己记下来。总线上也没有写日志的指令（<c>vulcan.log.*</c> 全是控制台的显示过滤），
 /// 所以这里落到自己的数据根，而不是试图把条目塞回宿主控制台。
 ///
-/// <see cref="IShellLog"/> 仍然是 Core 的公开契约（宿主的 <c>CommandBus</c> 构造函数就要它），
-/// 因此本类实现它而不是另造一个接口：调用点的写法与 4.x 完全一致，变的只是谁来提供实例。
+/// 5.2.0 起实现宿主 6.0.0 契约里的只写日志 <see cref="IModuleLog"/>：调用点写法不变，
+/// 缓冲只供本类落盘，不再对外提供快照与新纪录事件（没有人读）。
 /// </remarks>
-internal sealed class MercuryLog : IShellLog
+internal sealed class MercuryLog : IModuleLog
 {
     /// <summary>内存环形缓冲上限。坞是长期驻留进程，条目不设上限就是慢性泄漏。</summary>
     private const int Capacity = 512;
 
     private static readonly object Gate = new();
 
-    private readonly Queue<ShellLogEntry> _entries = new();
+    private readonly Queue<Entry> _entries = new();
     private readonly string? _file;
 
     public MercuryLog()
@@ -36,11 +36,9 @@ internal sealed class MercuryLog : IShellLog
     /// <summary>模块共用的实例。装载期任何一段代码都可能先于 <c>Attach</c> 需要记一行。</summary>
     public static MercuryLog Shared { get; } = new();
 
-    public event EventHandler<ShellLogEntry>? EntryAdded;
-
     public void Log(ShellLogLevel level, string category, string message)
     {
-        var entry = new ShellLogEntry(DateTime.Now, level, category, message);
+        var entry = new Entry(DateTime.Now, level, category, message);
         lock (Gate)
         {
             _entries.Enqueue(entry);
@@ -50,19 +48,12 @@ internal sealed class MercuryLog : IShellLog
 
         Append(entry);
         System.Diagnostics.Debug.WriteLine($"[mercury/{category}] {message}");
-        EntryAdded?.Invoke(this, entry);
-    }
-
-    public IReadOnlyList<ShellLogEntry> Snapshot()
-    {
-        lock (Gate)
-            return _entries.ToList();
     }
 
     /// <summary>
     /// 落盘失败一律吞掉：记不下日志是小事，为记日志把桌面坞或模块装载带崩不是。
     /// </summary>
-    private void Append(ShellLogEntry entry)
+    private void Append(Entry entry)
     {
         if (_file == null)
             return;
@@ -91,4 +82,6 @@ internal sealed class MercuryLog : IShellLog
             return null;
         }
     }
+
+    private sealed record Entry(DateTime Time, ShellLogLevel Level, string Category, string Message);
 }

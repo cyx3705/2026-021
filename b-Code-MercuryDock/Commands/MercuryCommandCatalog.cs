@@ -9,7 +9,7 @@ internal static class MercuryCommandCatalog
     public const string ProjectOpenCommandName = "mercury.proj.open";
     public const string ShortcutOpenCommandName = "mercury.shortcut.open";
 
-    public static void Register(CommandRegistry registry)
+    public static void Register(ICommandRegistrar registry)
     {
         foreach (var command in CreateDescriptors())
             registry.Register(command);

@@ -47,7 +47,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
     private bool _disposed;
 
     /// <summary>宿主注入的指令总线；Shell 进程中自带远程转发。宿主不注入时（旧宿主/烟测）为 null。</summary>
-    internal static CommandBus? Bus { get; private set; }
+    internal static ICommandBus? Bus { get; private set; }
 
     /// <summary>
     /// 桌面坞是否在跑。供烟测断言坞只归 <see cref="Attach"/>——
@@ -59,7 +59,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
     /// 模块日志。宿主 5.0 不再注入日志，这里换成 Mercury 自持的实例；
     /// 调用点写法不变，落点从宿主控制台变成模块数据根下的 <c>logs/</c>。
     /// </summary>
-    internal static IShellLog Log { get; } = MercuryLog.Shared;
+    internal static IModuleLog Log { get; } = MercuryLog.Shared;
 
     public void Attach(IModuleContext context)
     {

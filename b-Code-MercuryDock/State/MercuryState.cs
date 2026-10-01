@@ -26,16 +26,12 @@ internal static class MercuryState
     private static readonly object Gate = new();
     private static FileSystemWatcher? _watcher;
     /// <summary>
-    /// 状态目录可用 MERCURY_STATE_DIRECTORY 整体改向（烟测隔离用），此时旧版迁移自动跳过。
+    /// 状态目录可用 MERCURY_STATE_DIRECTORY 整体改向（烟测隔离用）。
     /// </summary>
     private static readonly string DockRoot =
         Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 } overrideRoot
             ? overrideRoot
             : MercuryPaths.DataRoot;
-    private static readonly string PreviousHistoryVulcanRoot = MercuryPaths.PreviousHistoryVulcanDataRoot;
-    private static readonly string PreviousMercuryDockRoot = MercuryPaths.PreviousDataRoot;
-    private static readonly string LegacyMercuryDockRoot = MercuryPaths.LegacyMercuryDockDataRoot;
-    private static readonly string LegacyActiveDockRoot = MercuryPaths.LegacyActiveDockDataRoot;
     private static readonly string StatePath = Path.Combine(DockRoot, "state.json");
 
     /// <summary>项目库缺省根；配置值失效（如整库改名后）时回退到 HistoryClio。</summary>
@@ -759,20 +755,8 @@ internal static class MercuryState
     /// </summary>
     private static string ReadWorktreeRoot()
         => MercuryPaths.LibraryRoot is { } library
-            ? MercuryLibraryRoot.Resolve(library, null)
+            ? MercuryLibraryRoot.Resolve(library)
             : DefaultWorktreeRoot;
-
-    internal static string? ReadSetting(JsonDocument doc, string name)
-    {
-        if (!doc.RootElement.TryGetProperty(name, out var value)
-            || value.ValueKind != JsonValueKind.String)
-        {
-            return null;
-        }
-
-        var text = value.GetString();
-        return string.IsNullOrWhiteSpace(text) ? null : text;
-    }
 
     private static bool TryGetWorktreeProjectName(string target, out string name)
     {
@@ -835,7 +819,6 @@ internal static class MercuryState
     private static DockPreferences LoadPreferences()
     {
         Directory.CreateDirectory(DockRoot);
-        MigrateLegacyState();
         try
         {
             if (File.Exists(StatePath))
@@ -859,33 +842,6 @@ internal static class MercuryState
         }
 
         return new DockPreferences();
-    }
-
-    /// <summary>
-    /// HistoryVulcan 数据根首次启用时，优先迁移旧 MercuryDock 偏好，再兼容更早的 ActiveDock 偏好。
-    /// 保留固定项、排除名单、使用记录与策略。旧文件保留不删，便于回退对照。
-    /// </summary>
-    private static void MigrateLegacyState()
-    {
-        try
-        {
-            if (Environment.GetEnvironmentVariable("MERCURY_STATE_DIRECTORY") is { Length: > 0 })
-                return;
-            if (File.Exists(StatePath))
-                return;
-            foreach (var root in new[] { PreviousHistoryVulcanRoot, PreviousMercuryDockRoot, LegacyMercuryDockRoot, LegacyActiveDockRoot })
-            {
-                var legacy = Path.Combine(root, "state.json");
-                if (!File.Exists(legacy))
-                    continue;
-                File.Copy(legacy, StatePath);
-                return;
-            }
-        }
-        catch (Exception)
-        {
-            // 迁移失败时按全新偏好启动，不得影响模块加载。
-        }
     }
 
     /// <summary>

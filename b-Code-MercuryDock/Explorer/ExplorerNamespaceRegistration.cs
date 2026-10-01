@@ -17,8 +17,6 @@ public static class ExplorerNamespaceRegistration
     private const string MyComputerNamespace =
         @"Software\Microsoft\Windows\CurrentVersion\Explorer\MyComputer\NameSpace\";
     private const string ManagedValue = "HistoryMercury.Managed";
-    private const string PreviousManagedValue = "MercuryDock.Managed";
-    private const string LegacyManagedValue = "ActiveDock.Managed";
     private const int ShellFolderAttributes = unchecked((int)0xF080004D);
     private const string IconValue = "%SystemRoot%\\System32\\shell32.dll,-4";
     private const string InProcServerValue = "%SystemRoot%\\System32\\shell32.dll";
@@ -31,15 +29,6 @@ public static class ExplorerNamespaceRegistration
     private const uint ShcnfPathW = 0x0005;
     private static readonly string BackupPath = Path.Combine(
         MercuryPaths.DataRoot, "explorer-registration-backup.json");
-    // 5.1.0：数据目录迁到宿主给的 ModuleData 后，5.0.x 的备份在旧数据根，作为第一个迁移来源。
-    private static readonly string PreviousHistoryVulcanBackupPath = Path.Combine(
-        MercuryPaths.PreviousHistoryVulcanDataRoot, "explorer-registration-backup.json");
-    private static readonly string PreviousBackupPath = Path.Combine(
-        MercuryPaths.PreviousDataRoot, "explorer-registration-backup.json");
-    private static readonly string LegacyMercuryDockBackupPath = Path.Combine(
-        MercuryPaths.LegacyMercuryDockDataRoot, "explorer-registration-backup.json");
-    private static readonly string LegacyActiveDockBackupPath = Path.Combine(
-        MercuryPaths.LegacyActiveDockDataRoot, "explorer-registration-backup.json");
 
     public static bool IsRegistered()
     {
@@ -77,7 +66,6 @@ public static class ExplorerNamespaceRegistration
             if (root == null)
                 return RegistrationResult.Failed("无法打开每用户 CLSID 注册表项。");
 
-            MigrateLegacyBackup();
             CapturePreviousRegistration(root);
             root.SetValue(null, DisplayName, RegistryValueKind.String);
             root.SetValue("System.IsPinnedToNameSpaceTree", PinnedValue, RegistryValueKind.DWord);
@@ -233,9 +221,7 @@ public static class ExplorerNamespaceRegistration
 
     private static void CapturePreviousRegistration(RegistryKey root)
     {
-        if ((root.GetValue(ManagedValue) is int managed && managed == 1)
-            || (root.GetValue(PreviousManagedValue) is int previousManaged && previousManaged == 1)
-            || (root.GetValue(LegacyManagedValue) is int legacyManaged && legacyManaged == 1))
+        if (root.GetValue(ManagedValue) is int managed && managed == 1)
             return;
         if (File.Exists(BackupPath))
             return;
@@ -245,25 +231,6 @@ public static class ExplorerNamespaceRegistration
         var previousName = root.GetValue(null) as string;
         Directory.CreateDirectory(Path.GetDirectoryName(BackupPath)!);
         File.WriteAllText(BackupPath, JsonSerializer.Serialize(new RegistrationBackup(previousName, previousPath)));
-    }
-
-    private static void MigrateLegacyBackup()
-    {
-        try
-        {
-            if (File.Exists(BackupPath))
-                return;
-            var source = new[] { PreviousHistoryVulcanBackupPath, PreviousBackupPath, LegacyMercuryDockBackupPath, LegacyActiveDockBackupPath }
-                .FirstOrDefault(File.Exists);
-            if (source == null || !File.Exists(source))
-                return;
-            Directory.CreateDirectory(Path.GetDirectoryName(BackupPath)!);
-            File.Copy(source, BackupPath);
-        }
-        catch (Exception)
-        {
-            // A missing historical backup must not prevent the current registration.
-        }
     }
 
     private static void RestorePreviousRegistration()

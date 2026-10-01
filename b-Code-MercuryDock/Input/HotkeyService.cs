@@ -40,7 +40,7 @@ internal static class HotkeyService
     /// 在模块上下文接入时构造并启动。重复调用是幂等的:热重载会重新 Attach,
     /// 但键盘钩子必须唯一,否则同一组按键会触发两次。
     /// </summary>
-    internal static void Start(CommandBus bus, IShellLog log)
+    internal static void Start(ICommandBus bus, IModuleLog log)
     {
         if (!OperatingSystem.IsWindows())
             return;

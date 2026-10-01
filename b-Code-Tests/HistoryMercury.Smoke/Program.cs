@@ -62,7 +62,7 @@ Equal("Mercury", ProjectIconGenerator.ShortLabel("2026-021-HistoryMercury"),
 True(ProjectIconGenerator.FitFontSize("A very long project suffix", 44) >= 6,
     "Project tile font remains a complete, non-ellipsis rendering path.");
 
-var registry = new CommandRegistry();
+var registry = new TestRegistrar();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
 // 31 = 4.8.1 的 26 条 + 页面协议三条（ui.describe / ui.actions / ui.data）+ dock.run + shortcut.pick。
@@ -133,19 +133,6 @@ True(MercuryCommandCatalog.CreateDescriptors().Select(command => command.Name)
     .OrderBy(name => name, StringComparer.Ordinal)
     .SequenceEqual(commands.Select(command => command.Name).OrderBy(name => name, StringComparer.Ordinal)),
     "The registry must contain exactly the declared descriptors.");
-
-// 配置值来自用户设置文件，非字符串值必须按缺失处理，不能让活动坞扫描路径抛异常。
-using (var malformedSettings = JsonDocument.Parse("""
-{"proj.libraryroot": 42, "proj.worktreeroot": true, "proj.other": null}
-"""))
-{
-    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.libraryroot"),
-        "Non-string library roots must be ignored.");
-    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.worktreeroot"),
-        "Non-string worktree roots must be ignored.");
-    Equal(null, MercuryState.ReadSetting(malformedSettings, "proj.other"),
-        "Null settings must be ignored.");
-}
 
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding a dock command must succeed.");
 True(MercuryState.AddCommand("mercury.proj.list"), "Adding the same dock command is idempotent.");
@@ -241,13 +228,9 @@ True(
         Path.DirectorySeparatorChar + "Modules" + Path.DirectorySeparatorChar,
         StringComparison.OrdinalIgnoreCase),
     "Shortcut files must never mutate the manifest-verified runtime package.");
-Equal(
-    Path.Combine(Path.GetFullPath(stateOverride), "HistoryMercury"),
-    MercuryPaths.PreviousHistoryVulcanDataRoot,
-    "The pre-5.1 data root is the one-time migration source.");
 Equal("HistoryClio 项目", ExplorerNamespaceRegistration.DisplayName, "Explorer entry name");
 Equal(@"C:\OneHistory\HistoryClio", MercuryLibraryRoot.Default, "Default project library is HistoryClio");
-Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Resolve(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")), null),
+Equal(MercuryLibraryRoot.Default, MercuryLibraryRoot.Resolve(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))),
     "A configured library root that no longer exists falls back to HistoryClio.");
 True(Guid.TryParse(ExplorerNamespaceRegistration.EntryClsid, out _), "Explorer CLSID must be valid.");
 
@@ -335,7 +318,7 @@ finally
 // mercury.hotkey.* 命令暴露。这里改为断言命令面存在且按键文法可往返，
 // 因为「命令名 + 参数名」现在就是这项能力的全部对外契约。
 {
-    var hotkeyRegistry = new CommandRegistry();
+    var hotkeyRegistry = new TestRegistrar();
     MercuryCommandCatalog.Register(hotkeyRegistry);
     foreach (var name in new[] { "mercury.hotkey.register", "mercury.hotkey.unregister", "mercury.hotkey.list" })
         True(hotkeyRegistry.TryGet(name, out _), $"Hotkey command must be registered: {name}.");
@@ -347,7 +330,7 @@ finally
 }
 
 using (var shortcuts = new Mercury.Input.GlobalShortcutService(
-           new CommandBus(new CommandRegistry(), new NullShellLog()),
+           new TestCommandBus(new TestRegistrar()),
            new NullShellLog()))
 {
     using var first = shortcuts.Register(
@@ -399,7 +382,7 @@ using (var shortcuts = new Mercury.Input.GlobalShortcutService(
 }
 
 using (var shortcuts = new Mercury.Input.GlobalShortcutService(
-           new CommandBus(new CommandRegistry(), new NullShellLog()),
+           new TestCommandBus(new TestRegistrar()),
            new NullShellLog()))
 {
     using (var owner = shortcuts.CreateOwnerRegistrar("module:test"))
@@ -861,15 +844,7 @@ static void CollectActions(JsonElement node, List<string> found)
     }
 }
 
-file sealed class NullShellLog : HistoryVulcan.Core.Logging.IShellLog
+file sealed class NullShellLog : HistoryVulcan.Core.Logging.IModuleLog
 {
     public void Log(HistoryVulcan.Core.Logging.ShellLogLevel level, string category, string message) { }
-
-    public event EventHandler<HistoryVulcan.Core.Logging.ShellLogEntry>? EntryAdded
-    {
-        add { }
-        remove { }
-    }
-
-    public IReadOnlyList<HistoryVulcan.Core.Logging.ShellLogEntry> Snapshot() => [];
 }
