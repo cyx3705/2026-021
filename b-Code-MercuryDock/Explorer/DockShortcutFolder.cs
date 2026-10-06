@@ -290,6 +290,7 @@ public static class DockShortcutFolder
         return links;
     }
 
+    /// <summary>一次快捷方式同步写了、删了、没动各多少。只有真的动过磁盘才通知外壳。</summary>
     public readonly record struct ShortcutSyncResult(
         string Folder,
         int Written,
@@ -300,6 +301,7 @@ public static class DockShortcutFolder
         public bool Changed => Written != 0 || Removed != 0;
     }
 
+    /// <summary>快捷方式文件夹相对上一轮消失和出现的目标路径。</summary>
     public sealed record ShortcutFolderDelta(
         IReadOnlyList<string> RemovedTargets,
         IReadOnlyList<string> AddedTargets)

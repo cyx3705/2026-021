@@ -4,6 +4,9 @@ using HistoryVulcan.Core.Commands;
 
 namespace Mercury;
 
+/// <summary>
+/// <c>mercury.*</c> 指令的处理函数。总线与页面动作都调用这里，不另建第二套入口。
+/// </summary>
 public static class MercuryCommands
 {
     public static ExplorerEntryStatus Status()
@@ -234,6 +237,7 @@ public static class MercuryCommands
     }
 }
 
+/// <summary><c>mercury.usage.list</c> 的一行：权重、点击、最近打开、置顶与排除。</summary>
 public sealed record DockUsageRow(
     string Name,
     double Weight,
@@ -242,4 +246,5 @@ public sealed record DockUsageRow(
     bool Pinned,
     bool Excluded);
 
+/// <summary><c>mercury.app.status</c> 的回执：资源管理器入口是否已注册，以及快捷方式目录在哪。</summary>
 public sealed record ExplorerEntryStatus(bool Registered, string Path);

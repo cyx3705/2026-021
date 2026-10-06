@@ -20,7 +20,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | 指令域 | `mercury`（代码命名空间 `Mercury`，模块身份 `HistoryMercury`） |
 | 界面 | 桌面坞（自有窗口）+ Aurora 描述化页面「扩展坞管理」 |
 | MCP 投影 | `standard` |
-| 版本与宿主下限 | [`HistoryMercury.csproj`](./b-Code-MercuryDock/HistoryMercury.csproj)；最低宿主 HistoryVulcan 6.0.0（[有效决策](./b-Office/current/有效决策.md) DEC-023） |
+| 版本与宿主下限 | [`HistoryMercury.csproj`](./b-Code-MercuryDock/HistoryMercury.csproj)；最低宿主 HistoryVulcan 6.0.0（见[现行约定](./b-Office/current/现行约定.md)） |
 
 ## 能力
 
@@ -42,11 +42,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | --- | --- |
 | [`AGENTS.md`](./AGENTS.md) | AI 工作合同：读取顺序、真值判定、边界 |
 | [`project.manifest.json`](./project.manifest.json) | 项目身份、活动目录、文档与命令 |
-| [文档中心](./b-Office/文档中心.md) | 文档索引与读取顺序 |
-| [项目概览](./b-Office/current/项目概览.md) | 目标、范围与状态 |
-| [技术合同](./b-Office/current/技术合同.md) | 现行需求与架构 |
-| [有效决策](./b-Office/current/有效决策.md) | 仍然有效的关键决策 |
-| [验证合同](./b-Office/current/验证合同.md) | 验证层级、命令与证据 |
+| [现行约定](./b-Office/current/现行约定.md) | 唯一的长期文档：真相在哪、取舍、真机才知道的、工程约定 |
 
 ## 目录
 
@@ -55,7 +51,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | `b-Code-MercuryDock/` | 模块源码：`Module`、`Commands`、`Dock`、`Explorer`、`State`、`Ui`、`Input`、`Diagnostics` |
 | `b-Code-Tests/` | `HistoryMercury.Smoke` |
 | `b-Code/` | 候选构建脚本 |
-| `b-Office/` | 项目文档：`current/` 现行合同、`history/` 只读归档 |
+| `b-Office/` | `current/现行约定.md`，仅此一份 |
 | `z-Publish/` | 正式快照与 `history/` 归档，由宿主管线写入 |
 
 ## 构建与验证

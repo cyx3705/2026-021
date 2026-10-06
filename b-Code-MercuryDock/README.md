@@ -26,5 +26,5 @@ The source manifest is `module.manifest.json`. `z-Publish` is the formal consume
 - `Ui/`: page descriptions, action declarations, and page data — JSON only, no controls.
 - `Input/`, `Diagnostics/`, `Properties/`: global input, the module-owned log, and assembly metadata.
 
-Smoke tests live in `../b-Code-Tests/HistoryMercury.Smoke`; historical version documents live directly in
-`../b-Office/history`. Production source directories do not own tests or project history.
+Smoke tests live in `../b-Code-Tests/HistoryMercury.Smoke`. Production source directories do not own tests.
+The only long-lived document is `../b-Office/current/现行约定.md`.

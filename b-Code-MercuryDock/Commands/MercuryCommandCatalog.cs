@@ -212,7 +212,7 @@ internal static class MercuryCommandCatalog
     private static ParameterSpec EntryKeyParameter() => new()
     {
         Name = "key",
-        Description = "行键：proj:<项目名> 或 cmd:<指令文本>。",
+        Description = "当前扩展坞里已有的行键，只能是 proj:<项目名> 或 cmd:<已登记的指令文本>，例如 proj:2026-021-HistoryMercury。不在坞里的键和裸指令文本都会拒绝。",
         Required = true,
         Position = 0,
     };

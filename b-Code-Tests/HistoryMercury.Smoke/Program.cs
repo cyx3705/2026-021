@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Text.Json;
 using System.IO;
+using System.Xml.Linq;
 using BaseVariable;
 using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Modules;
@@ -453,6 +454,20 @@ using (var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath)))
         "manifest name must equal ModuleInfo.ModuleName");
 }
 
+// 第三处版本在仓库根 project.manifest.json。csproj 的 Version 经程序集进 ModuleInfo，
+// 所以这里再对上根清单，三处就锁在同一个字上。漏改根清单不会让宿主跳过模块，
+// 但会让发布登记和源码各说一个版本。
+var projectManifestPath = Path.GetFullPath(Path.Combine(
+    Path.GetDirectoryName(manifestPath)!, "..", "project.manifest.json"));
+True(File.Exists(projectManifestPath), $"project.manifest.json must be locatable at {projectManifestPath}.");
+using (var projectDoc = JsonDocument.Parse(File.ReadAllText(projectManifestPath)))
+{
+    Equal(
+        projectDoc.RootElement.GetProperty("project").GetProperty("version").GetString(),
+        moduleInfo.Version,
+        "project.manifest.json version must equal ModuleInfo.Version");
+}
+
 // 页面注册协议 V1：描述、动作声明与取数三条命令是本模块唯一的前端接口。
 // 命令目录里必须有它们，且一律不对远端暴露——5.0 之后远端可见性只看 HiddenReason，
 // 宿主不再替模块判断这类"界面内部协议"。
@@ -479,7 +494,8 @@ var rowActions = new List<string>();
     Equal(1, root.GetProperty("schemaVersion").GetInt32(), "Page description schema version");
     Equal("HistoryMercury", root.GetProperty("owner").GetString(), "Page description owner");
     var pages = root.GetProperty("pages").EnumerateArray().ToList();
-    True(pages.Count >= 1, "The module must describe at least one page.");
+    Equal(1, pages.Count,
+        "Mercury declares only the dock manager page; the command catalog belongs to Aurora.");
     var ids = pages.Select(page => page.GetProperty("id").GetString() ?? "").ToList();
     True(ids.Contains(MercuryPages.ManagerPageId), "The dock manager page must stay declared.");
     // 命令集页归 Aurora（DEC-018 / DEC-021）。5.0.0–5.0.2 本模块也声明过一页，前端里出现两份。
@@ -492,6 +508,9 @@ var rowActions = new List<string>();
     {
         True(!string.IsNullOrWhiteSpace(page.GetProperty("title").GetString()), "Every page needs a title.");
         True(page.TryGetProperty("content", out _), "Every page needs content.");
+        // 注册初值只进本模块场景。不写 scene 时，刷新会把页面塞进当前场景，改写别人保存的布局。
+        Equal("HistoryMercury", page.TryGetProperty("scene", out var scene) ? scene.GetString() : null,
+            "Each page must declare scene=HistoryMercury (REQ-SCENE-REG).");
     }
 
     using var declared = JsonDocument.Parse(MercuryPages.ActionsJson());
@@ -625,7 +644,38 @@ True(DockTheme.TileBackground(0.5).Color.B < coldTile.Color.B
 True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 0x12),
     "Tile text uses the documented deep-yellow accent.");
 
+// 代码面的说明书是随包的 HistoryMercury.xml，不是手写文档。
+// 每个公开类型都必须有 summary——加一个类型不写注释，这条就失败。
+AssertPublicTypeSummaries(assembly);
+
 Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, described pages, Explorer shortcut folder, global shortcuts, domain focus).");
+
+/// <summary>
+/// 随包 XML 必须给每个公开类型一句 summary。属性逐个补不强求，类型级说清楚它是什么、谁用它就够。
+/// </summary>
+static void AssertPublicTypeSummaries(Assembly assembly)
+{
+    var beside = Path.ChangeExtension(assembly.Location, ".xml");
+    // ProjectReference 不把 XML 复制到 Smoke 输出。管线取的是模块自己的输出目录，就验那一份。
+    var xmlPath = File.Exists(beside)
+        ? beside
+        : beside.Replace(
+            $"{Path.DirectorySeparatorChar}b-Code-Tests{Path.DirectorySeparatorChar}HistoryMercury.Smoke{Path.DirectorySeparatorChar}",
+            $"{Path.DirectorySeparatorChar}b-Code-MercuryDock{Path.DirectorySeparatorChar}",
+            StringComparison.OrdinalIgnoreCase);
+    True(File.Exists(xmlPath), "HistoryMercury.xml must be generated beside the module assembly: " + xmlPath);
+    var documented = XDocument.Load(xmlPath)
+        .Descendants("member")
+        .Where(member => member.Element("summary") is { } summary && !string.IsNullOrWhiteSpace(summary.Value))
+        .Select(member => (string?)member.Attribute("name"))
+        .ToHashSet(StringComparer.Ordinal);
+    var missing = assembly.GetExportedTypes()
+        .Select(type => "T:" + type.FullName!.Replace('+', '.'))
+        .Where(id => !documented.Contains(id))
+        .OrderBy(id => id, StringComparer.Ordinal)
+        .ToList();
+    True(missing.Count == 0, "Public types missing summary: " + string.Join(", ", missing));
+}
 
 static void True(bool condition, string message)
 {

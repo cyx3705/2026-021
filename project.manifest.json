@@ -14,7 +14,7 @@
       "tooling"
     ],
     "status": "active",
-    "version": "5.2.1"
+    "version": "5.2.2"
   },
   "paths": {
     "activeRoots": [
@@ -36,7 +36,6 @@
       "z-Publish"
     ],
     "archiveRoots": [
-      "b-Office/history",
       "z-Publish/history"
     ],
     "releaseRoots": [
@@ -49,13 +48,7 @@
     ]
   },
   "documents": {
-    "center": "b-Office/文档中心.md",
-    "structure": "b-Office/文档中心.md",
-    "overview": "b-Office/current/项目概览.md",
-    "technicalContract": "b-Office/current/技术合同.md",
-    "decisions": "b-Office/current/有效决策.md",
-    "verification": "b-Office/current/验证合同.md",
-    "historyBoundary": "b-Office/history/历史资料说明.md"
+    "conventions": "b-Office/current/现行约定.md"
   },
   "commands": {
     "setup": null,
@@ -66,11 +59,10 @@
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\b-Code\\Build-HistoryMercuryPackage.ps1"
   },
   "externalDependencies": [
-    "HistoryVulcan.Core / HistoryVulcan.Services from 2026-023-HistoryVulcan/z-Publish/host (>= 5.1.0)",
-    "HistoryAurora from 2026-026-HistoryAurora (>= 1.9.2, runtime only, hard): renders the described pages. The dock manager page uses panel protocol V3 rows (Aurora REQ-UI-060) and popup trigger=context (REQ-UI-056); an Aurora below 1.9.2 reads no rows and draws both panels as empty boards."
+    "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-Publish/host (>= 6.0.0)",
+    "HistoryAurora from 2026-026-HistoryAurora (>= 1.21.1, runtime only, hard): renders the described page. The dock manager declares scene=HistoryMercury and panel protocol V3 rows; an Aurora below 1.9.2 reads no rows and draws both panels as empty boards, and scene isolation needs 1.21.1."
   ],
   "contextExclusions": [
-    "b-Office/history/**",
     "z-Publish/**",
     "**/bin/**",
     "**/obj/**",

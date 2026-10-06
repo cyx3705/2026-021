@@ -7,6 +7,9 @@ using System.Threading;
 
 namespace Mercury;
 
+/// <summary>
+/// 活动坞里的一个项目：目录、置顶、权重和最近打开。快捷方式文件夹与管理页取数都用这一行。
+/// </summary>
 public sealed record DockProject(
     string Name,
     string Number,

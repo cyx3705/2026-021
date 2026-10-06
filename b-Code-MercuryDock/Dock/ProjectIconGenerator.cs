@@ -8,6 +8,9 @@ using System.Windows.Media.Imaging;
 
 namespace Mercury;
 
+/// <summary>
+/// 资源管理器快捷方式用的项目图标。桌面坞磁贴不走这里：磁贴底色要随使用频率变，缓存位图表达不了。
+/// </summary>
 public static class ProjectIconGenerator
 {
     private static readonly Color[] Palette =
