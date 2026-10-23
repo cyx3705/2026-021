@@ -78,6 +78,27 @@ public static class DesktopLayer
     }
 
     /// <summary>
+    /// 把弹出窗口贴在锚点窗口上方、右边对齐；上方放不下就贴工作区顶边。同样全程物理像素，理由同上。
+    /// </summary>
+    public static bool PlaceAbove(IntPtr hwnd, IntPtr anchor, int gap)
+    {
+        if (hwnd == IntPtr.Zero || anchor == IntPtr.Zero
+            || !GetWindowRect(hwnd, out var window) || !GetWindowRect(anchor, out var dock))
+            return false;
+
+        var monitor = MonitorFromWindow(anchor, MonitorDefaultToPrimary);
+        var monitorInfo = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+        if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref monitorInfo))
+            return false;
+
+        var width = window.Right - window.Left;
+        var height = window.Bottom - window.Top;
+        var left = Math.Max(monitorInfo.WorkArea.Left, dock.Right - width);
+        var top = Math.Max(monitorInfo.WorkArea.Top, dock.Top - height - gap);
+        return SetWindowPos(hwnd, IntPtr.Zero, left, top, 0, 0, SwpNoSize | SwpNoZOrder | SwpNoActivate);
+    }
+
+    /// <summary>
     /// 在 WM_WINDOWPOSCHANGING 里把插入位置改写为 HWND_BOTTOM。
     /// 相比在 WM_WINDOWPOSCHANGED 里再调一次 SetWindowPos，这里不会引发递归。
     /// </summary>

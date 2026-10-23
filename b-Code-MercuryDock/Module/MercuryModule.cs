@@ -9,7 +9,6 @@ using HistoryVulcan.Core.Commands;
 using HistoryVulcan.Core.Logging;
 using HistoryVulcan.Core.Modules;
 using Mercury.Diagnostics;
-using Mercury.Ui;
 
 namespace Mercury;
 
@@ -21,10 +20,8 @@ namespace Mercury;
 /// 本模块自有的 STA 线程上，只要模块装载就存在，前端在不在、开没开都与它无关。
 /// 桌面坞是唤起前端的入口，若它反过来依赖前端，前端一关就再也叫不回来。
 ///
-/// 前端里的页则相反：宿主 5.0 起不再提供界面生命周期（<c>IUiModule</c>、<c>CreateUi</c> /
-/// <c>DestroyUi</c> 与整套停靠 SDK 都已删除），本模块**不再构造任何前端控件**，改用
-/// <c>mercury.ui.describe</c> / <c>mercury.ui.actions</c> / <c>mercury.ui.data</c>
-/// 把页面描述成数据，由 HistoryAurora 拉取并渲染（见 <see cref="Ui.MercuryPages"/>）。
+/// 5.3.0 起本模块**不再往前端注册任何页面或场景**（用户定）：原来 Aurora 里的「扩展坞管理」页
+/// 整个删掉，加项目改成坞上最后一格「+」弹出的项目列表（<see cref="ProjectPickerWindow"/>）。
 ///
 /// 于是本类的生命周期只剩两个点：<see cref="Attach"/> 与 <see cref="Dispose"/>。
 /// 宿主在拆除阶段按 <see cref="IDisposable"/> 回收实例，桌面坞的线程必须在那时收干净，
@@ -72,10 +69,6 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
         // 服务侧的偏好副本会永远停在进程启动那一刻，下一次保存就用旧值盖掉界面侧的改动，
         // 两侧算出的收录列表也会不一致，进而互相把对方写的快捷方式当成用户增删。
         MercuryState.StartWatching();
-
-        // 页面是派生状态：坞的内容一变，前端那两页就旧了。模块只负责说「我变了」，
-        // 由 Aurora 决定怎么重建（协议 §1.3）。前端不在时这条指令不存在，失败即静默。
-        PageInvalidation.Start(context.Bus);
 
         // 全局快捷键完全由 Mercury 自持：服务在此构造并启动，能力经 mercury.hotkey.* 命令暴露。
         // 宿主不再预扫描模块 DLL 去寻找 IGlobalShortcutHost 实现，也不再驱动注册。
@@ -269,7 +262,6 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             return;
         _disposed = true;
 
-        PageInvalidation.Stop();
         DockShortcutFolder.StopWatching();
         MercuryState.StopWatching();
         if (OperatingSystem.IsWindows())
@@ -467,17 +459,72 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             foreach (var entry in MercuryState.CommandEntries)
                 _items.Children.Add(CommandButton(entry));
 
-            if (projects.Count == 0 && MercuryState.CommandEntries.Count == 0)
+            // 「+」恒在最后一格：项目列表从这里打开，坞上不留空状态提示。
+            _items.Children.Add(AddButton());
+        }
+
+        /// <summary>坞上最后一格：点开项目列表，搜索并固定到坞上。再点一次收起。</summary>
+        private Button AddButton()
+        {
+            var glyph = new Border
             {
-                _items.Children.Add(new TextBlock
+                Width = 52,
+                Height = 52,
+                CornerRadius = new CornerRadius(8),
+                Background = DockTheme.SurfaceAlt,
+                BorderBrush = DockTheme.AccentSoft,
+                BorderThickness = new Thickness(1),
+                Child = new TextBlock
                 {
-                    Text = "暂无活动项目",
-                    Foreground = DockTheme.Muted,
+                    Text = "+",
                     FontFamily = DockTheme.FontFamily,
-                    FontSize = DockTheme.BodyFontSize,
-                    Margin = new Thickness(12),
-                });
+                    FontSize = 28,
+                    Foreground = DockTheme.Accent,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 3),
+                },
+            };
+            var stack = new StackPanel { Width = 68 };
+            stack.Children.Add(glyph);
+            stack.Children.Add(new TextBlock
+            {
+                Text = "添加",
+                FontFamily = DockTheme.FontFamily,
+                FontSize = DockTheme.SmallFontSize,
+                Foreground = DockTheme.Label,
+                HorizontalAlignment = HorizontalAlignment.Center,
+            });
+            var button = NakedButton(stack, "从项目列表搜索并固定到扩展坞");
+            button.Click += (_, _) => TogglePicker();
+            return button;
+        }
+
+        private ProjectPickerWindow? _picker;
+
+        /// <summary>
+        /// 列表开着时点「+」：鼠标按下那一刻列表已因失去激活自己关了，再开一个就成了「关不掉」。
+        /// 所以刚关不到半秒的那次点击当作「收起」，不再重开。
+        /// </summary>
+        private DateTime _pickerClosedAt;
+
+        private void TogglePicker()
+        {
+            if (_picker != null)
+            {
+                _picker.Close();
+                return;
             }
+            if (DateTime.UtcNow - _pickerClosedAt < TimeSpan.FromMilliseconds(500))
+                return;
+            if (_source == null)
+                return;
+            _picker = ProjectPickerWindow.Open(_source.Handle);
+            _picker.Closed += (_, _) =>
+            {
+                _picker = null;
+                _pickerClosedAt = DateTime.UtcNow;
+            };
         }
 
         /// <summary>HistoryClio 入口：不参与排序、不发光、不可取消。唤起的仍是 HistoryVulcan 宿主窗口。</summary>
@@ -567,7 +614,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             var button = NakedButton(stack, project.Name);
             button.Click += (_, _) => OpenProject(project);
             var menu = StyledMenu();
-            var pin = new MenuItem { Header = project.Pinned ? "取消置顶" : "置顶" };
+            var pin = new MenuItem { Header = project.Pinned ? "取消固定" : "固定" };
             pin.Click += (_, _) => MercuryState.Pin(project.Name, !project.Pinned);
             var refresh = new MenuItem { Header = "刷新" };
             refresh.Click += async (_, _) => await MercuryState.RefreshAsync();

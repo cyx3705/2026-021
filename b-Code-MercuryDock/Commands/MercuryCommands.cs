@@ -5,7 +5,7 @@ using HistoryVulcan.Core.Commands;
 namespace Mercury;
 
 /// <summary>
-/// <c>mercury.*</c> 指令的处理函数。总线与页面动作都调用这里，不另建第二套入口。
+/// <c>mercury.*</c> 指令的处理函数。总线与桌面坞都调用这里，不另建第二套入口。
 /// </summary>
 public static class MercuryCommands
 {
@@ -64,14 +64,22 @@ public static class MercuryCommands
 
     public static IReadOnlyList<DockProject> ListProjects() => MercuryState.Projects;
 
-    public static string PinProject(string name)
-        => MercuryState.Pin(name, pinned: true) ? $"已置顶 {name}。" : $"未找到项目：{name}。";
+    public static CommandResult PinProject(string name)
+        => PinResult(MercuryState.Pin(name, pinned: true), name, $"已固定 {name}。");
 
-    public static string UnpinProject(string name)
-        => MercuryState.Pin(name, pinned: false) ? $"已取消置顶 {name}。" : $"未找到项目：{name}。";
+    public static CommandResult UnpinProject(string name)
+        => PinResult(MercuryState.Pin(name, pinned: false), name, $"已取消固定 {name}。");
 
-    public static string AddProject(string name)
-        => MercuryState.AddToDock(name) ? $"已添加并置顶 {name}。" : $"未找到项目：{name}。";
+    public static CommandResult AddProject(string name)
+        => PinResult(MercuryState.AddToDock(name), name, $"已加入并固定 {name}。");
+
+    private static CommandResult PinResult(PinOutcome outcome, string name, string done) => outcome switch
+    {
+        PinOutcome.Done => CommandResult.Ok(done),
+        PinOutcome.Full => CommandResult.Fail(
+            $"扩展坞已固定满 {DockPolicy.ItemCount} 个项目，先取消固定一个再加 {name}。"),
+        _ => CommandResult.Fail($"未找到项目：{name}。"),
+    };
 
     public static Task<IReadOnlyList<DockProject>> RefreshProjectsAsync()
         => MercuryState.RefreshAsync();
@@ -210,12 +218,11 @@ public static class MercuryCommands
         return $"已重新纳入 {name}。";
     }
 
-    public static string SetDockPolicy(int? min = null, int? max = null, double? halflife = null)
+    public static string SetDockPolicy(double? halflife = null)
     {
-        if (min != null || max != null || halflife != null)
-            MercuryState.SetPolicy(min, max, halflife);
-        var current = MercuryState.Policy;
-        return $"策略：min={current.MinItems}，max={current.MaxItems}，halflife={current.HalfLifeDays}。";
+        if (halflife != null)
+            MercuryState.SetHalfLife(halflife.Value);
+        return $"策略：项目数={DockPolicy.ItemCount}（固定），halflife={MercuryState.Policy.HalfLifeDays}。";
     }
 
     public static CommandResult OpenProject(string? name)

@@ -8,7 +8,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 资源管理器托管入口（`HistoryClio 项目`）与使用历史。
 
 - 桌面坞是 Mercury 自己的窗口，跑在模块自有的 STA 线程上，前端在不在都照常显示。
-- 模块不构造任何前端控件；「扩展坞管理」页以描述化协议声明，由 HistoryAurora 渲染。
+- 坞上恒为 12 个项目 + 「主界面」+「+」共 14 格；点「+」弹出项目列表，搜索后点一行即固定到坞上。不往 Aurora 注册页面或场景。
 - 不提供文件内容读写、Git 操作（归 Janus）或界面布局（归 Aurora）。
 
 ## 概况
@@ -18,7 +18,7 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 | 编号 | `2026-021` |
 | 角色 | 宿主模块（`kind=module`） |
 | 指令域 | `mercury`（代码命名空间 `Mercury`，模块身份 `HistoryMercury`） |
-| 界面 | 桌面坞（自有窗口）+ Aurora 描述化页面「扩展坞管理」 |
+| 界面 | 桌面坞与「+」项目列表（均为自有窗口） |
 | MCP 投影 | `standard` |
 | 版本与宿主下限 | [`HistoryMercury.csproj`](./b-Code-MercuryDock/HistoryMercury.csproj)；最低宿主 HistoryVulcan 6.0.0（见[现行约定](./b-Office/current/现行约定.md)） |
 
@@ -26,8 +26,8 @@ HistoryMercury 为 `C:\OneHistory\HistoryClio` 项目库提供桌面项目坞（
 
 | 类 | 指令 | 用途 |
 | --- | --- | --- |
-| `proj` | `list` / `open` / `pin` / `exclude` / `add` / `refresh` | 活动项目清单 |
-| `dock` | `show` / `add` / `remove` / `policy` / `run` | 项目坞与收录策略 |
+| `proj` | `list` / `open` / `pin` / `unpin` / `exclude` / `include` / `add` / `refresh` | 活动项目清单与固定（最多 12 个） |
+| `dock` | `show` / `hide` / `add` / `remove` / `policy` | 项目坞、常驻指令与半衰期 |
 | `shortcut` | `add` / `open` / `pick` / `wakeconsole` | 快捷文件与唤起控制台 |
 | `hotkey` | `list` / `register` / `unregister` | 全局快捷键 |
 | `app` / `explorer` | `app.open` / `app.status` / `explorer.register` / `explorer.remove` | 主程序与资源管理器入口 |
@@ -73,7 +73,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\b-Code\Build-HistoryMercur
 
 - 快捷方式、状态与日志放在 `%APPDATA%\HistoryVulcan\HistoryMercury`，运行包目录 `Modules\HistoryMercury` 只放不可变、可校验的文件。
 - 项目扫描优先 `proj.libraryroot`（默认 `C:\OneHistory\HistoryClio`）；配置的目录不存在时回落到缺省库根。
-- 管理页的行操作只在右键菜单里（`rowActions` 一律 `inline: false`），「加入扩展坞」也是右键弹出。
+- 坞上磁贴右键：固定 / 取消固定、刷新；其余管理走 `mercury.*` 指令。
 
 ## 保留内容
 

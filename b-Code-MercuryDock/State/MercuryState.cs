@@ -21,6 +21,14 @@ public sealed record DockProject(
     DateTimeOffset? LastOpened = null,
     bool Excluded = false);
 
+/// <summary>固定 / 加入扩展坞的结果：成功、没有这个项目、固定项已满。</summary>
+public enum PinOutcome
+{
+    Done,
+    NotFound,
+    Full,
+}
+
 /// <summary>手动加入扩展坞的总线指令项：常驻显示，点击即经指令总线执行 Command。</summary>
 public sealed record DockCommandEntry(string Command, string Label, DateTimeOffset Added);
 
@@ -56,7 +64,7 @@ internal static class MercuryState
         }
     }
 
-    /// <summary>管理页面使用的完整扫描结果：含被排除项，排除行沉底。</summary>
+    /// <summary>完整扫描结果：含被排除项，排除行沉底。坞上「+」的项目列表用它。</summary>
     public static IReadOnlyList<DockProject> AllProjects
     {
         get
@@ -206,7 +214,6 @@ internal static class MercuryState
     {
         lock (Gate)
         {
-            var policy = _preferences.Policy.Normalized();
             var pins = _preferences.Pins;
             var excluded = _preferences.Excluded;
             var all = _allProjects
@@ -217,7 +224,7 @@ internal static class MercuryState
                 })
                 .ToList();
             _allProjects = OrderAll(all);
-            _projects = SelectVisible(_allProjects, policy);
+            _projects = SelectVisible(_allProjects);
         }
     }
 
@@ -270,15 +277,11 @@ internal static class MercuryState
         _ = RefreshAsync();
     }
 
-    public static void SetPolicy(int? minItems, int? maxItems, double? halfLifeDays)
+    public static void SetHalfLife(double halfLifeDays)
     {
         lock (Gate)
         {
-            var policy = _preferences.Policy;
-            policy.MinItems = minItems ?? policy.MinItems;
-            policy.MaxItems = maxItems ?? policy.MaxItems;
-            policy.HalfLifeDays = halfLifeDays ?? policy.HalfLifeDays;
-            _preferences.Policy = policy.Normalized();
+            _preferences.Policy = new DockPolicy { HalfLifeDays = halfLifeDays }.Normalized();
             SavePreferences();
         }
 
@@ -424,7 +427,13 @@ internal static class MercuryState
         return names;
     }
 
-    public static bool Pin(string name, bool pinned)
+    /// <summary>
+    /// 固定或取消固定。固定同时解除排除（这是人明确点的），固定项满 <see cref="DockPolicy.ItemCount"/> 个时拒绝。
+    /// </summary>
+    /// <remarks>
+    /// 改完直接按缓存重算收录：只重排已显示的那几项的话，新固定的项目要等下一轮扫描才上坞。
+    /// </remarks>
+    public static PinOutcome Pin(string name, bool pinned)
     {
         lock (Gate)
         {
@@ -432,31 +441,40 @@ internal static class MercuryState
                 item.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
                 || item.Number.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (project == null)
-                return false;
+                return PinOutcome.NotFound;
             if (pinned)
+            {
+                if (!_preferences.Pins.Contains(project.Name) && PinnedCount() >= DockPolicy.ItemCount)
+                    return PinOutcome.Full;
                 _preferences.Pins.Add(project.Name);
+                _preferences.Excluded.Remove(project.Name);
+            }
             else
+            {
                 _preferences.Pins.Remove(project.Name);
+            }
             SavePreferences();
-            ApplyPinState(project.Name);
+            RecomputeSelectedFromCache();
         }
 
         if (!DockShortcutFolder.IsExplorerRegistrationDisabled)
             SynchronizeExplorerEntry(Projects);
         Changed?.Invoke();
-        return true;
+        return PinOutcome.Done;
     }
 
     /// <summary>
-    /// 手动把项目加入扩展坞：解除排除并固定。接受工作树根下真实存在的项目名或编号。
+    /// 手动把项目加入扩展坞：解除排除并固定。接受工作树根下真实存在的项目名或编号（扫描缓存里还没有也行）。
     /// </summary>
-    public static bool AddToDock(string name)
+    public static PinOutcome AddToDock(string name)
     {
         if (!TryResolveWorktreeProject(name, out var actual, out _))
-            return false;
+            return PinOutcome.NotFound;
 
         lock (Gate)
         {
+            if (!_preferences.Pins.Contains(actual) && PinnedCount() >= DockPolicy.ItemCount)
+                return PinOutcome.Full;
             _preferences.Excluded.Remove(actual);
             _preferences.Pins.Add(actual);
             SavePreferences();
@@ -464,8 +482,12 @@ internal static class MercuryState
 
         Changed?.Invoke();
         _ = RefreshAsync();
-        return true;
+        return PinOutcome.Done;
     }
+
+    /// <summary>调用方须已持有 <see cref="Gate"/>。只数未被排除的固定项：被排除的不占坞位。</summary>
+    private static int PinnedCount()
+        => _preferences.Pins.Count(pin => !_preferences.Excluded.Contains(pin));
 
     /// <summary>按名称或编号在工作树根解析项目目录；编号匹配取目录名中的数字段。</summary>
     internal static bool TryResolveWorktreeProject(string nameOrNumber, out string name, out string path)
@@ -639,24 +661,6 @@ internal static class MercuryState
         }
     }
 
-    /// <summary>调用方须已持有 <see cref="Gate"/>。把 Pin 结果同步进两个缓存列表并保持既有排序。</summary>
-    private static void ApplyPinState(string changedName)
-    {
-        _projects = OrderSelected(_projects
-            .Select(item => item with { Pinned = _preferences.Pins.Contains(item.Name) })
-            .ToList());
-        _allProjects = OrderAll(_allProjects
-            .Select(item => item with { Pinned = _preferences.Pins.Contains(item.Name) })
-            .ToList());
-    }
-
-    private static List<DockProject> OrderSelected(IEnumerable<DockProject> projects)
-        => projects
-            .OrderByDescending(item => item.Pinned)
-            .ThenByDescending(item => item.Weight)
-            .ThenByDescending(item => item.LastActivity)
-            .ToList();
-
     private static List<DockProject> OrderAll(IEnumerable<DockProject> projects)
         => projects
             .OrderBy(item => item.Excluded)
@@ -725,31 +729,24 @@ internal static class MercuryState
 
         // 固定项无视权重恒在最前；其余按加权频率降序，同分回退到 git 活动时间。
         var orderedAll = OrderAll(all);
-        return new ScanResult(SelectVisible(orderedAll, policy), orderedAll);
+        return new ScanResult(SelectVisible(orderedAll), orderedAll);
     }
 
-    private static List<DockProject> SelectVisible(IReadOnlyList<DockProject> all, DockPolicy policy)
+    /// <summary>
+    /// 恒取 <see cref="DockPolicy.ItemCount"/> 个：固定项在前（超出的按权重截掉），余下按权重补满。
+    /// 库里项目不够这么多时有几个显示几个。
+    /// </summary>
+    internal static List<DockProject> SelectVisible(IReadOnlyList<DockProject> all)
     {
         var pinned = all.Where(item => item.Pinned && !item.Excluded)
             .OrderByDescending(item => item.Weight)
             .ThenByDescending(item => item.LastActivity)
+            .Take(DockPolicy.ItemCount)
             .ToList();
         var rest = all.Where(item => !item.Pinned && !item.Excluded)
             .OrderByDescending(item => item.Weight)
-            .ThenByDescending(item => item.LastActivity)
-            .ToList();
-
-        // 条数：先按上限截断，再用排序结果补足到下限，避免长期不用后列表变空。
-        var quota = Math.Max(policy.MaxItems - pinned.Count, 0);
-        var selected = pinned.Concat(rest.Take(quota)).ToList();
-        if (selected.Count < policy.MinItems)
-        {
-            selected = pinned
-                .Concat(rest.Take(Math.Max(policy.MinItems - pinned.Count, 0)))
-                .ToList();
-        }
-
-        return selected;
+            .ThenByDescending(item => item.LastActivity);
+        return pinned.Concat(rest.Take(DockPolicy.ItemCount - pinned.Count)).ToList();
     }
 
     /// <summary>

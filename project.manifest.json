@@ -14,7 +14,7 @@
       "tooling"
     ],
     "status": "active",
-    "version": "5.2.2"
+    "version": "5.3.0"
   },
   "paths": {
     "activeRoots": [
@@ -60,7 +60,7 @@
   },
   "externalDependencies": [
     "HistoryVulcan.Core from 2026-023-HistoryVulcan/z-Publish/host (>= 6.0.0)",
-    "HistoryAurora from 2026-026-HistoryAurora (>= 1.21.1, runtime only, hard): renders the described page. The dock manager declares scene=HistoryMercury and panel protocol V3 rows; an Aurora below 1.9.2 reads no rows and draws both panels as empty boards, and scene isolation needs 1.21.1."
+    "HistoryAurora from 2026-026-HistoryAurora (optional, runtime only): since 5.3.0 Mercury registers no Aurora pages or scenes; only mercury.go (aurora.log.source) and mercury.shortcut.pick (aurora.ui.selectfile) call into it and fail cleanly when it is absent."
   ],
   "contextExclusions": [
     "z-Publish/**",

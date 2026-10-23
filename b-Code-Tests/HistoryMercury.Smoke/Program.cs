@@ -66,8 +66,8 @@ True(ProjectIconGenerator.FitFontSize("A very long project suffix", 44) >= 6,
 var registry = new TestRegistrar();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
-// 31 = 4.8.1 的 26 条 + 页面协议三条（ui.describe / ui.actions / ui.data）+ dock.run + shortcut.pick。
-Equal(31, commands.Count, "Command count");
+// 27 = 4.8.1 的 26 条 + shortcut.pick。5.3.0 删了页面协议三条与 dock.run（不再往 Aurora 注册页面）。
+Equal(27, commands.Count, "Command count");
 True(commands.All(command => System.Text.RegularExpressions.Regex.IsMatch(command.Name, "^[a-z]+(?:\\.[a-z0-9]+)+$")),
     "Commands must be lowercase dot-separated identifiers.");
 True(commands.All(command => command.Name.StartsWith("mercury.", StringComparison.Ordinal)),
@@ -468,164 +468,39 @@ using (var projectDoc = JsonDocument.Parse(File.ReadAllText(projectManifestPath)
         "project.manifest.json version must equal ModuleInfo.Version");
 }
 
-// 页面注册协议 V1：描述、动作声明与取数三条命令是本模块唯一的前端接口。
-// 命令目录里必须有它们，且一律不对远端暴露——5.0 之后远端可见性只看 HiddenReason，
-// 宿主不再替模块判断这类"界面内部协议"。
-foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercury.ui.data" })
+// 5.3.0：不再往 Aurora 注册页面或场景（用户定）。页面协议三条与只给管理页用的 dock.run 一起删掉；
+// 任何一条留着，Aurora 都会照旧拉出一页「扩展坞管理」、建出 HistoryMercury 场景。
+foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercury.ui.data", "mercury.dock.run" })
+    True(!registry.TryGet(name, out _), $"Mercury must not register Aurora page commands any more: {name}.");
+
+// 坞上项目定死 12 个（加「主界面」与「+」两格共 14 格）：固定项在前，余下按权重补满；固定项超出时只取 12 个。
 {
-    True(registry.TryGet(name, out var page), $"Page-protocol command must be registered: {name}.");
-    True(page.Readonly, $"{name} must be readonly.");
-    True(!string.IsNullOrWhiteSpace(page.HiddenReason),
-        $"{name} is an in-frontend protocol and must declare a HiddenReason.");
-}
-True(registry.TryGet("mercury.dock.run", out var dockRun)
-     && !string.IsNullOrWhiteSpace(dockRun.HiddenReason),
-    "mercury.dock.run relays a stored command text and must not be remotely visible.");
+    static DockProject Project(int index, bool pinned, double weight = 0, bool excluded = false)
+        => new($"2026-{index:000}-P{index}", $"2026-{index:000}", $"C:/x/{index}", DateTimeOffset.UnixEpoch, pinned, weight,
+            Excluded: excluded);
 
-// 描述与声明必须是合法 JSON，且满足 Aurora 的校验口径：schemaVersion 与 owner 对得上、
-// 页面 id 小写无空格、按钮绑的动作都在声明里。这三条 4.x 时代是编译器保证的，
-// 换成文本协议之后没有编译器，只能自己验。
+    Equal(12, DockPolicy.ItemCount, "The dock shows exactly 12 projects.");
+    var mixed = Enumerable.Range(1, 20).Select(index => Project(index, pinned: index <= 3, weight: index)).ToList();
+    var visible = MercuryState.SelectVisible(mixed);
+    Equal(12, visible.Count, "Twenty candidates fill exactly 12 slots.");
+    True(visible.Take(3).All(item => item.Pinned), "Pinned projects come first.");
+    Equal("2026-020-P20", visible[3].Name, "Unpinned slots are filled by weight.");
 
-// 描述块与取数块共用：占位符与列名的对齐要等取数真的产出一行才查得了。
-var rowActions = new List<string>();
-{
-    using var describe = JsonDocument.Parse(MercuryPages.DescribeJson());
-    var root = describe.RootElement;
-    Equal(1, root.GetProperty("schemaVersion").GetInt32(), "Page description schema version");
-    Equal("HistoryMercury", root.GetProperty("owner").GetString(), "Page description owner");
-    var pages = root.GetProperty("pages").EnumerateArray().ToList();
-    Equal(1, pages.Count,
-        "Mercury declares only the dock manager page; the command catalog belongs to Aurora.");
-    var ids = pages.Select(page => page.GetProperty("id").GetString() ?? "").ToList();
-    True(ids.Contains(MercuryPages.ManagerPageId), "The dock manager page must stay declared.");
-    // 命令集页归 Aurora（DEC-018 / DEC-021）。5.0.0–5.0.2 本模块也声明过一页，前端里出现两份。
-    True(!ids.Contains("mercury.commands"),
-        "The command-set page belongs to HistoryAurora; Mercury must not declare a duplicate.");
-    True(ids.All(id => id.Length > 0 && id == id.ToLowerInvariant() && !id.Contains(' ')),
-        "Page ids must be lowercase without spaces or Aurora discards the whole description.");
-    Equal(ids.Count, ids.Distinct(StringComparer.OrdinalIgnoreCase).Count(), "Page ids must be unique.");
-    foreach (var page in pages)
-    {
-        True(!string.IsNullOrWhiteSpace(page.GetProperty("title").GetString()), "Every page needs a title.");
-        True(page.TryGetProperty("content", out _), "Every page needs content.");
-        // 注册初值只进本模块场景。不写 scene 时，刷新会把页面塞进当前场景，改写别人保存的布局。
-        Equal("HistoryMercury", page.TryGetProperty("scene", out var scene) ? scene.GetString() : null,
-            "Each page must declare scene=HistoryMercury (REQ-SCENE-REG).");
-    }
+    var crowded = Enumerable.Range(1, 15).Select(index => Project(index, pinned: true)).ToList();
+    Equal(12, MercuryState.SelectVisible(crowded).Count, "More than 12 pins still show only 12.");
 
-    using var declared = JsonDocument.Parse(MercuryPages.ActionsJson());
-    Equal(1, declared.RootElement.GetProperty("schemaVersion").GetInt32(), "Action schema version");
-    Equal("HistoryMercury", declared.RootElement.GetProperty("owner").GetString(), "Action owner");
-    var actions = declared.RootElement.GetProperty("actions").EnumerateArray().ToList();
-    var actionIds = actions.Select(action => action.GetProperty("id").GetString() ?? "").ToList();
-    True(actionIds.All(id => id.Length > 0 && id == id.ToLowerInvariant() && !id.Contains(' ')),
-        "Action ids must be lowercase without spaces.");
-    Equal(actionIds.Count, actionIds.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-        "Action ids must be unique.");
+    var withExcluded = Enumerable.Range(1, 13).Select(index => Project(index, false, excluded: index == 1)).ToList();
+    True(MercuryState.SelectVisible(withExcluded).All(item => !item.Excluded), "Excluded projects never take a slot.");
+    Equal(5, MercuryState.SelectVisible(mixed.Take(5).ToList()).Count, "A small library shows what it has.");
 
-    // 动作指向的每一条指令都必须真的注册着。"改了指令名、按钮静默变哑"正是动作声明要消灭的形态，
-    // 而声明本身写错名字会得到一模一样的症状。
-    foreach (var action in actions)
-    {
-        var command = action.GetProperty("command").GetString() ?? "";
-        if (!command.StartsWith("mercury.", StringComparison.Ordinal))
-            continue;
-        True(registry.TryGet(command, out _), $"Declared action targets an unregistered command: {command}.");
-    }
-
-    // 页面里出现的每个动作 id 都必须已声明：Aurora 解析不到就把按钮渲染成显式占位。
-    var used = new List<string>();
-    CollectActions(root.GetProperty("pages"), used);
-    foreach (var id in used.Distinct(StringComparer.OrdinalIgnoreCase))
-        True(actionIds.Contains(id, StringComparer.OrdinalIgnoreCase), $"Page references an undeclared action: {id}.");
-    True(used.Count > 0, "The manager page must bind at least one action.");
-
-    // 描述必须跟着 Aurora 的规则走。下面三条各对应一次已经踩过的静默失效——
-    // 三种都不会让页面崩，只会让页面**看起来还在，点下去没有反应**。
-
-    // 一、退役的页面节点（Aurora 1.8.14）。button / input / select 只能出现在控制面板里，
-    //     写在页面这一层会渲染成一块写着退役原因的牌子。5.0.0 的管理页在表格下面排了
-    //     7 个 type:"button"，整排行操作因此全哑——而模块这边一个错误都没有。
-    var nodeTypes = new List<string>();
-    CollectNodeTypes(root.GetProperty("pages"), nodeTypes);
-    foreach (var retired in new[] { "button", "input", "select" })
-        True(!nodeTypes.Contains(retired, StringComparer.OrdinalIgnoreCase),
-            $"Retired page node type still in the description: {retired}. "
-            + "Small controls belong in a panel or popup (Aurora 1.8.14).");
-
-    // 二、表格的 view 是空转声明（Aurora REQ-UI-054）。解析得了、全仓没人读它，
-    //     留着只会让人以为这张表能筛能排。
-    True(!DeclaresTableViewOptions(root.GetProperty("pages")),
-        "Tables must not declare view: filterable / sortable / selection have no implementation "
-        + "in Aurora and are accounted for as a debt (REQ-UI-054).");
-
-    // 三、行操作必须真的声明出来。5.0.0 用的是表格下面一排页面按钮，1.8.14 之后那条路没了；
-    //     这条钉住的是"别再换回去"。占位符与取数列的对齐在下面的取数块里查。
-    CollectRowActions(root.GetProperty("pages"), rowActions);
-    True(rowActions.Count > 0,
-        "The dock manager table must declare rowActions: page-level buttons were retired in Aurora 1.8.14.");
-
-    // 四、5.0.2 的版面取舍（REQ-MERC-502）。三样东西一起从管理页上去掉，各有一条门禁：
-    //     Aurora 只在**有** inline 行操作时才建最右那个「操作」列（AuroraTable），
-    //     所以"那一列还在不在"在描述这一侧就是"还有没有一条 inline 行操作"。
-    var manager = pages.Single(page => page.GetProperty("id").GetString() == MercuryPages.ManagerPageId);
-
-    //     三条查的都是"某样东西不在了"，因此每条先证明自己认得出那样东西——
-    //     一个永远为真的门禁与没有门禁是一回事，而它还会让人以为这里有人看着。
-    using (var probe = JsonDocument.Parse("""{"rowActions":[{"action":"a","title":"t"}]}"""))
-        True(DeclaresInlineRowAction(probe.RootElement),
-            "The inline-row-action gate must recognise an inline action (inline defaults to true when omitted).");
-    True(DeclaresColumn(manager, "name"), "The column gate must find a column the manager table does declare.");
-
-    True(!DeclaresInlineRowAction(manager),
-        "Every row action must declare inline:false: the dock manager keeps no in-row button column (REQ-MERC-502).");
-    var managerTypes = new List<string>();
-    CollectNodeTypes(manager, managerTypes);
-    True(managerTypes.Contains("table", StringComparer.OrdinalIgnoreCase),
-        "The node-type gate must see the manager page's own nodes before it can prove a type is absent.");
-    True(!managerTypes.Contains("text", StringComparer.OrdinalIgnoreCase),
-        "The dock manager page must carry no caption text: the page does not scroll, and that line costs a table row "
-        + "(REQ-MERC-502).");
-    True(!DeclaresColumn(manager, "lastopened"),
-        "The dock manager table must not show the lastopened column; the entries view still produces it for "
-        + "row-action placeholders (REQ-MERC-502).");
-}
-
-// 取数：扩展坞条目视图的列必须与描述里声明的列对齐，否则表格会整列空着而不报错。
-{
-    True(MercuryState.AddCommand("mercury.proj.list", "取数烟测"), "Seeding a dock entry must succeed.");
-    var rows = MercuryUiData.Entries();
-    True(rows.Count > 0, "The entries view must return the seeded dock entry.");
-    foreach (var column in new[] { "key", "name", "type", "state", "command", "weight", "clicks", "lastopened" })
-        True(rows.All(row => row.ContainsKey(column)), $"Entry rows must carry the declared column: {column}.");
-
-    // 行操作的占位符按**被点那一行的同名列**取值（Aurora REQ-UI-011）。对不上不会报错，
-    // 只会把一个空值发上总线——症状是"点了一下，什么都没发生"，而两边都没有一条日志。
-    var entryColumns = rows.SelectMany(row => row.Keys).ToHashSet(StringComparer.OrdinalIgnoreCase);
-    using var declaredActions = JsonDocument.Parse(MercuryPages.ActionsJson());
-    foreach (var id in rowActions.Distinct(StringComparer.OrdinalIgnoreCase))
-    {
-        var action = declaredActions.RootElement.GetProperty("actions").EnumerateArray().Single(candidate =>
-            string.Equals(candidate.GetProperty("id").GetString(), id, StringComparison.OrdinalIgnoreCase));
-        if (!action.TryGetProperty("args", out var actionArgs) || actionArgs.ValueKind != JsonValueKind.Object)
-            continue;
-        foreach (var argument in actionArgs.EnumerateObject())
-        {
-            var value = argument.Value.GetString() ?? "";
-            if (value.Length < 3 || value[0] != '{' || value[^1] != '}')
-                continue;
-            True(entryColumns.Contains(value[1..^1]),
-                $"Row action {id} takes {value} from the clicked row, but the entries view has no such column.");
-        }
-    }
-    var seeded = rows.Single(row => row["command"] == "mercury.proj.list");
-    Equal("cmd:mercury.proj.list", seeded["key"], "Command entries use the cmd: row key.");
-
-    var missing = MercuryUiData.RunEntryAsync("cmd:mercury.does.not.exist", null).GetAwaiter().GetResult();
-    True(!missing.Success, "Running a key that is not in the dock must fail rather than execute it.");
-    var malformed = MercuryUiData.RunEntryAsync("mercury.proj.list", null).GetAwaiter().GetResult();
-    True(!malformed.Success, "Raw command text must not be accepted as a row key.");
-    True(MercuryState.RemoveCommand("mercury.proj.list"), "Entry-view seed cleanup");
+    // 「+」列表的搜索：空格切词、每个词都要命中、不分大小写；编号在目录名里，所以也能搜。
+    var library = new[] { Project(21, false) with { Name = "2026-021-HistoryMercury" },
+        Project(20, false) with { Name = "2026-020-HistoryJanus" } };
+    Equal(2, ProjectPickerWindow.Filter(library, "  ").Count, "An empty query lists every project.");
+    Equal("2026-021-HistoryMercury", ProjectPickerWindow.Filter(library, "")[0].Name, "Newest number first.");
+    Equal(1, ProjectPickerWindow.Filter(library, "mercury 021").Count, "All terms must match.");
+    Equal(0, ProjectPickerWindow.Filter(library, "mercury 020").Count, "A term that misses filters the row out.");
+    Equal(1, ProjectPickerWindow.Filter(library, "JANUS").Count, "Search ignores case.");
 }
 
 // 活动坞磁贴：底色随使用频率由纯白线性趋近柔和强调色，不再用光晕表达频率。
@@ -648,7 +523,7 @@ True(DockTheme.TileText.Color == System.Windows.Media.Color.FromRgb(0xA8, 0x7A, 
 // 每个公开类型都必须有 summary——加一个类型不写注释，这条就失败。
 AssertPublicTypeSummaries(assembly);
 
-Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, described pages, Explorer shortcut folder, global shortcuts, domain focus).");
+Console.WriteLine($"HistoryMercury.Smoke: PASS ({commands.Count} mercury commands, one direct registration source, immutable runtime package boundary, 12-slot dock with + picker, no Aurora pages, Explorer shortcut folder, global shortcuts, domain focus).");
 
 /// <summary>
 /// 随包 XML 必须给每个公开类型一句 summary。属性逐个补不强求，类型级说清楚它是什么、谁用它就够。
@@ -704,194 +579,6 @@ static void AssertNoCompiledXaml(System.Reflection.Assembly assembly)
     using var stream = assembly.GetManifestResourceStream("HistoryMercury.g.resources");
     True(stream == null,
         "The module must not ship compiled XAML: pages are described as data and rendered by HistoryAurora.");
-}
-
-/// <summary>递归收集页面描述里出现的全部节点 <c>type</c>。</summary>
-static void CollectNodeTypes(JsonElement node, List<string> found)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            foreach (var property in node.EnumerateObject())
-            {
-                if (property.NameEquals("type") && property.Value.ValueKind == JsonValueKind.String)
-                {
-                    found.Add(property.Value.GetString() ?? "");
-                    continue;
-                }
-
-                CollectNodeTypes(property.Value, found);
-            }
-
-            break;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                CollectNodeTypes(item, found);
-            break;
-    }
-}
-
-/// <summary>递归收集 <c>rowActions</c> 里出现的动作 id。</summary>
-static void CollectRowActions(JsonElement node, List<string> found)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            foreach (var property in node.EnumerateObject())
-            {
-                if (property.NameEquals("rowActions"))
-                {
-                    foreach (var entry in property.Value.EnumerateArray())
-                        if (entry.TryGetProperty("action", out var id) && id.ValueKind == JsonValueKind.String)
-                            found.Add(id.GetString() ?? "");
-                    continue;
-                }
-
-                CollectRowActions(property.Value, found);
-            }
-
-            break;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                CollectRowActions(item, found);
-            break;
-    }
-}
-
-/// <summary>描述里是否还有一条行操作要在行内放按钮。</summary>
-/// <remarks>
-/// Aurora 只在存在 inline 行操作时才建最右那个「操作」列，因此这一条查的就是「那一列还在不在」。
-/// <c>inline</c> 不写等于 true（默认值在 Aurora 那一侧，不归本仓控制），所以缺省也算违规。
-/// </remarks>
-static bool DeclaresInlineRowAction(JsonElement node)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            foreach (var property in node.EnumerateObject())
-            {
-                if (property.NameEquals("rowActions"))
-                {
-                    foreach (var entry in property.Value.EnumerateArray())
-                        if (!entry.TryGetProperty("inline", out var inline)
-                            || inline.ValueKind != JsonValueKind.False)
-                            return true;
-                    continue;
-                }
-
-                if (DeclaresInlineRowAction(property.Value))
-                    return true;
-            }
-
-            return false;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                if (DeclaresInlineRowAction(item))
-                    return true;
-            return false;
-
-        default:
-            return false;
-    }
-}
-
-/// <summary>描述里是否有表格列声明了这个取值键。取数产出该列不算——查的是"上不上表"。</summary>
-static bool DeclaresColumn(JsonElement node, string key)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            foreach (var property in node.EnumerateObject())
-            {
-                if (property.NameEquals("columns"))
-                {
-                    foreach (var column in property.Value.EnumerateArray())
-                        if (column.TryGetProperty("key", out var name)
-                            && string.Equals(name.GetString(), key, StringComparison.OrdinalIgnoreCase))
-                            return true;
-                    continue;
-                }
-
-                if (DeclaresColumn(property.Value, key))
-                    return true;
-            }
-
-            return false;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                if (DeclaresColumn(item, key))
-                    return true;
-            return false;
-
-        default:
-            return false;
-    }
-}
-
-/// <summary>
-/// 描述里是否还有表格声明了 <c>view</c>（Aurora REQ-UI-054 的空转声明）。
-/// </summary>
-/// <remarks>
-/// 只认**表格节点自己的** <c>view</c>。不能按属性名一路搜下去：取数参数里的
-/// <c>dataSource.args.view</c> 是本模块自己的视图名（entries / commands），
-/// 与它同名却毫无关系——按名搜会把一条正常声明报成违规，而误报的门禁最后一定被删掉。
-/// </remarks>
-static bool DeclaresTableViewOptions(JsonElement node)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            if (node.TryGetProperty("type", out var type)
-                && type.ValueKind == JsonValueKind.String
-                && string.Equals(type.GetString(), "table", StringComparison.OrdinalIgnoreCase)
-                && node.TryGetProperty("view", out _))
-                return true;
-
-            foreach (var property in node.EnumerateObject())
-                if (DeclaresTableViewOptions(property.Value))
-                    return true;
-
-            return false;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                if (DeclaresTableViewOptions(item))
-                    return true;
-            return false;
-
-        default:
-            return false;
-    }
-}
-
-/// <summary>递归收集页面描述里出现的全部动作 id。</summary>
-static void CollectActions(JsonElement node, List<string> found)
-{
-    switch (node.ValueKind)
-    {
-        case JsonValueKind.Object:
-            foreach (var property in node.EnumerateObject())
-            {
-                if (property.NameEquals("action") && property.Value.ValueKind == JsonValueKind.String)
-                {
-                    found.Add(property.Value.GetString() ?? "");
-                    continue;
-                }
-
-                CollectActions(property.Value, found);
-            }
-
-            break;
-
-        case JsonValueKind.Array:
-            foreach (var item in node.EnumerateArray())
-                CollectActions(item, found);
-            break;
-    }
 }
 
 file sealed class NullShellLog : HistoryVulcan.Core.Logging.IModuleLog

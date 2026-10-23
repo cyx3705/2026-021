@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>5.2.2</Version>
+    <Version>5.3.0</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>

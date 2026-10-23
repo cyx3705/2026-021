@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using HistoryVulcan.Core.Commands;
-using Mercury.Ui;
 
 namespace Mercury;
 
@@ -62,11 +61,11 @@ internal static class MercuryCommandCatalog
             _ => MercuryCommands.RemoveExplorer(), "确定移除托管的资源管理器入口？"),
         Readonly("mercury.proj.list", "proj", "列出活动项目。",
             _ => MercuryCommands.ListProjects()),
-        ProjectWrite("mercury.proj.pin", "置顶活动项目。", "mercury.proj.pin 2026-021-HistoryMercury",
+        ProjectResult("mercury.proj.pin", $"固定项目到桌面扩展坞（最多 {DockPolicy.ItemCount} 个）。", "mercury.proj.pin 2026-021-HistoryMercury",
             context => MercuryCommands.PinProject(context.RequireString("name"))),
-        ProjectWrite("mercury.proj.unpin", "取消置顶活动项目。", "mercury.proj.unpin 2026-021-HistoryMercury",
+        ProjectResult("mercury.proj.unpin", "取消固定项目。", "mercury.proj.unpin 2026-021-HistoryMercury",
             context => MercuryCommands.UnpinProject(context.RequireString("name"))),
-        ProjectWrite("mercury.proj.add", "添加并置顶项目。", "mercury.proj.add 2026-021-HistoryMercury",
+        ProjectResult("mercury.proj.add", "把库里任一项目加入扩展坞并固定。", "mercury.proj.add 2026-021-HistoryMercury",
             context => MercuryCommands.AddProject(context.RequireString("name"))),
         Async("mercury.proj.refresh", "proj", "重新扫描活动项目。",
             async _ => await MercuryCommands.RefreshProjectsAsync().ConfigureAwait(false)),
@@ -86,15 +85,11 @@ internal static class MercuryCommandCatalog
         },
         Write("mercury.dock.hide", "dock", "隐藏项目坞。", _ => MercuryCommands.HideDock()),
         Write("mercury.dock.show", "dock", "显示项目坞。", _ => MercuryCommands.ShowDock()),
-        WriteWith("mercury.dock.policy", "dock", "查看或更新项目坞策略；不带参数只查看。",
-            "mercury.dock.policy min=6 max=12 halflife=7",
+        WriteWith("mercury.dock.policy", "dock", $"查看或更新项目坞策略；项目数定死 {DockPolicy.ItemCount} 个，只有半衰期可调。不带参数只查看。",
+            "mercury.dock.policy halflife=7",
             context => MercuryCommands.SetDockPolicy(
-                context.Has("min") ? context.GetInt("min") : null,
-                context.Has("max") ? context.GetInt("max") : null,
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
             null,
-            OptionalIntParameter("min", "显示条数下限（1-24，出厂 6）：候选不足时也补足到这么多条；省略则不改。"),
-            OptionalIntParameter("max", "显示条数上限（1-24，出厂 12）；省略则不改。"),
             OptionalDoubleParameter("halflife", "使用记录的半衰期，单位天（0.5-90，出厂 7）；省略则不改。")),
         Result("mercury.dock.add", "dock", "把任意总线指令注册为扩展坞常驻项。",
             "mercury.dock.add command=\"janus.proj.list\" label=项目清单",
@@ -141,81 +136,7 @@ internal static class MercuryCommandCatalog
             null,
             HotkeyIdParameter()),
 
-        // 页面注册协议 V1：描述 / 动作 / 取数三条。它们是模块与前端之间的内部协议，
-        // 对模型没有意义（且 ui.data 会产生大量条目），因此一律声明 HiddenReason——
-        // 5.0 之后远端是否可见只看这个字段，宿主不再替模块判断。
-        Internal("mercury.ui.describe", "ui", "返回本模块的页面描述（页面注册协议 V1）。",
-            _ => Task.FromResult(Payload(MercuryPages.DescribeJson()))),
-        Internal("mercury.ui.actions", "ui", "返回本模块可被按钮绑定的动作声明。",
-            _ => Task.FromResult(Payload(MercuryPages.ActionsJson()))),
-        Internal(MercuryUiData.DataCommandName, "ui", "按视图返回页面组件所需的行数据。",
-            "mercury.ui.data view=entries",
-            context => Task.FromResult(MercuryUiData.Read(context.GetString("view"))),
-            ViewParameter()),
-
-        // 页面按钮的「打开」落点。只接受当前坞里确实存在的行键，不接受任意指令文本。
-        new CommandDescriptor
-        {
-            Name = "mercury.dock.run",
-            CommandClass = "dock",
-            Summary = "执行扩展坞中的一个条目：项目开目录，常驻项走总线。",
-            Example = "mercury.dock.run key=proj:2026-021-HistoryMercury",
-            HiddenReason = "会代为执行扩展坞条目登记的指令文本，远端应直接调用原指令",
-            Parameters = [EntryKeyParameter()],
-            Handler = context => MercuryUiData.RunEntryAsync(context.GetString("key"), MercuryModule.Bus),
-        },
     ];
-
-    /// <summary>
-    /// 同一份 JSON 同时放 Data 与 Message：<c>Data</c> 是 <c>object?</c>，跨进程中继后
-    /// 结构化载荷不保证存活，前端因此约定优先读 Data、回退 Message。
-    /// </summary>
-    private static CommandResult Payload(string json) => CommandResult.Ok(json, json);
-
-    /// <summary>界面内部协议命令：只读、且不对任何远端表面暴露。</summary>
-    private static CommandDescriptor Internal(
-        string name,
-        string commandClass,
-        string summary,
-        Func<CommandContext, Task<CommandResult>> handler)
-        => Internal(name, commandClass, summary, null, handler);
-
-    private static CommandDescriptor Internal(
-        string name,
-        string commandClass,
-        string summary,
-        string? example,
-        Func<CommandContext, Task<CommandResult>> handler,
-        params ParameterSpec[] parameters)
-        => new()
-        {
-            Name = name,
-            CommandClass = commandClass,
-            Summary = summary,
-            Example = example,
-            Readonly = true,
-            HiddenReason = "界面内部协议，对模型无意义",
-            Parameters = parameters,
-            Handler = handler,
-        };
-
-    private static ParameterSpec ViewParameter() => new()
-    {
-        Name = "view",
-        Description = "取数视图：entries 为扩展坞条目。",
-        Required = false,
-        Default = MercuryUiData.EntriesView,
-        AllowedValues = [MercuryUiData.EntriesView],
-        Position = 0,
-    };
-
-    private static ParameterSpec EntryKeyParameter() => new()
-    {
-        Name = "key",
-        Description = "当前扩展坞里已有的行键，只能是 proj:<项目名> 或 cmd:<已登记的指令文本>，例如 proj:2026-021-HistoryMercury。不在坞里的键和裸指令文本都会拒绝。",
-        Required = true,
-        Position = 0,
-    };
 
     private static ParameterSpec HotkeyIdParameter() => new()
     {
@@ -341,6 +262,13 @@ internal static class MercuryCommandCatalog
         string summary,
         string example,
         Func<CommandContext, string> handler)
+        => ProjectResult(name, summary, example, context => CommandResult.Ok(handler(context)));
+
+    private static CommandDescriptor ProjectResult(
+        string name,
+        string summary,
+        string example,
+        Func<CommandContext, CommandResult> handler)
         => new()
         {
             Name = name,
@@ -349,7 +277,7 @@ internal static class MercuryCommandCatalog
             Example = example,
             Parameters = [NameParameter()],
             Annotations = ProjectCompletionProvider(),
-            Handler = CommandDescriptor.Sync(context => CommandResult.Ok(handler(context))),
+            Handler = CommandDescriptor.Sync(handler),
         };
 
     private static CommandDescriptor Readonly(string name, string commandClass, string summary, Func<CommandContext, object?> handler)
@@ -440,14 +368,6 @@ internal static class MercuryCommandCatalog
         Description = "活动项目的工作树名称或 mercury.proj.list 里的序号；省略则清除全部使用历史。",
         Required = false,
         Position = 0,
-    };
-
-    private static ParameterSpec OptionalIntParameter(string name, string description) => new()
-    {
-        Name = name,
-        Description = description,
-        Type = ParamType.Int,
-        Required = false,
     };
 
     private static ParameterSpec OptionalDoubleParameter(string name, string description) => new()
