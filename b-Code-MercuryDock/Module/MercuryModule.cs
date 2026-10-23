@@ -297,6 +297,8 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             ShowInTaskbar = false;
             ShowActivated = false;
             Topmost = false;
+            // 坞内滚动条与「+」列表同一套 OneHistory 风格（DockStyles）：细圆角滑块，没有箭头和轨道。
+            Resources.MergedDictionaries.Add(DockStyles.Create());
 
             var border = new Border
             {

@@ -22,6 +22,14 @@ public static class DockTheme
     public static SolidColorBrush AccentHover => Frozen(Color.FromRgb(0xE8, 0xB6, 0x5C));
     public static SolidColorBrush TextOnAccent => Frozen(Color.FromRgb(0x17, 0x19, 0x18));
 
+    // 墨色组（OneHistoryID 网站风格 §2.4，取 Aurora 深色令牌的同名值）：选中 = 墨色块反白，聚焦 = 边线变墨色。
+    public static SolidColorBrush Canvas => Frozen(Color.FromRgb(0x1A, 0x1D, 0x1C));
+    public static SolidColorBrush Ink => Frozen(Color.FromRgb(0xE2, 0xDA, 0xC6));
+    public static SolidColorBrush OnInk => Frozen(Color.FromRgb(0x1A, 0x1D, 0x1C));
+    public static SolidColorBrush AccentOnInk => Frozen(Color.FromRgb(0x7F, 0x5E, 0x0F));
+    public static SolidColorBrush MutedOnInk => Frozen(Color.FromRgb(0x6A, 0x64, 0x58));
+    public static SolidColorBrush TextDisabled => Frozen(Color.FromRgb(0x77, 0x74, 0x6A));
+
     /// <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
     public static SolidColorBrush Selection => Frozen(Color.FromRgb(0xEA, 0xDC, 0x9E));
     public static SolidColorBrush SelectionText => TextOnAccent;

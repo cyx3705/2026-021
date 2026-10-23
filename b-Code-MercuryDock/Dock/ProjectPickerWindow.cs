@@ -44,15 +44,12 @@ internal sealed class ProjectPickerWindow : Window
         Topmost = true;
         FontFamily = DockTheme.FontFamily;
         FontSize = DockTheme.BodyFontSize;
+        // 搜索框、滚动条、列表选中都照 OneHistory 风格（见 DockStyles）。
+        Resources.MergedDictionaries.Add(DockStyles.Create());
 
         _query = new TextBox
         {
-            Background = DockTheme.SurfaceAlt,
-            Foreground = DockTheme.Label,
-            CaretBrush = DockTheme.Label,
-            BorderBrush = DockTheme.PanelBorder,
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(8, 5, 8, 5),
+            Style = (Style)Resources[DockStyles.SearchBoxKey],
             FontFamily = DockTheme.FontFamily,
             FontSize = DockTheme.BodyFontSize,
             ToolTip = "按名称或编号搜索；空格分开的几个词都要命中",
@@ -64,7 +61,7 @@ internal sealed class ProjectPickerWindow : Window
         {
             Text = "搜索项目名或编号",
             Foreground = DockTheme.Muted,
-            Margin = new Thickness(10, 0, 0, 0),
+            Margin = new Thickness(11, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
             IsHitTestVisible = false,
         };
@@ -85,13 +82,12 @@ internal sealed class ProjectPickerWindow : Window
         {
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Foreground = DockTheme.Label,
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Foreground = DockTheme.Ink,
+            Padding = new Thickness(0),
+            FocusVisualStyle = null,
+            ItemContainerStyle = (Style)Resources[DockStyles.ItemKey],
         };
         ScrollViewer.SetHorizontalScrollBarVisibility(_list, ScrollBarVisibility.Disabled);
-        _list.Resources[SystemColors.HighlightBrushKey] = DockTheme.Hover;
-        _list.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = DockTheme.Hover;
-        _list.Resources[SystemColors.HighlightTextBrushKey] = DockTheme.Label;
         _list.PreviewKeyDown += OnListKey;
 
         var layout = new DockPanel { LastChildFill = true };
@@ -175,17 +171,16 @@ internal sealed class ProjectPickerWindow : Window
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        // 名字不写死颜色：跟着行的 Foreground 走，选中时由样式换成墨色块上的反白。
         var name = new TextBlock
         {
             Text = project.Name,
-            Foreground = DockTheme.Label,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
         };
         var state = new TextBlock
         {
             Text = project.Excluded ? "已排除" : project.Pinned ? "已固定" : string.Empty,
-            Foreground = project.Pinned && !project.Excluded ? DockTheme.Accent : DockTheme.Muted,
             FontSize = DockTheme.SmallFontSize,
             Margin = new Thickness(8, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Center,
@@ -198,10 +193,17 @@ internal sealed class ProjectPickerWindow : Window
         {
             Content = grid,
             Tag = project.Name,
-            Padding = new Thickness(6, 5, 6, 5),
             ToolTip = project.Path,
             Cursor = Cursors.Hand,
         };
+        // 「已固定」是金字；落在墨色块上要换成 on-ink 的那一档（网站风格 §2.4），否则米底上看不见。
+        var pinned = project.Pinned && !project.Excluded;
+        void Paint() => state.Foreground = item.IsSelected
+            ? pinned ? DockTheme.AccentOnInk : DockTheme.MutedOnInk
+            : pinned ? DockTheme.Accent : DockTheme.Muted;
+        item.Selected += (_, _) => Paint();
+        item.Unselected += (_, _) => Paint();
+        Paint();
         item.PreviewMouseLeftButtonUp += (_, _) => Toggle(project);
         return item;
     }

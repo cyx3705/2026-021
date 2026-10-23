@@ -503,6 +503,39 @@ foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercu
     Equal(1, ProjectPickerWindow.Filter(library, "JANUS").Count, "Search ignores case.");
 }
 
+// 坞与「+」列表的控件样式是运行时解析的 XAML 文本：写错一个字只会在真机上弹窗时炸。这里在 STA 线程上真解析一次，
+// 并钉住 OneHistory 风格的两个关键值：选中 = 墨色块反白，搜索框聚焦 = 边线变墨色。
+{
+    Exception? styleError = null;
+    var styleThread = new Thread(() =>
+    {
+        try
+        {
+            var styles = DockStyles.Create();
+            True(styles.Contains(DockStyles.SearchBoxKey), "Dock styles must define the search box.");
+            True(styles.Contains(DockStyles.ItemKey), "Dock styles must define the list item.");
+            True(styles.Contains(typeof(System.Windows.Controls.Primitives.ScrollBar)), "Dock styles must restyle scroll bars.");
+            var item = (System.Windows.Style)styles[DockStyles.ItemKey];
+            var template = (System.Windows.Controls.ControlTemplate)item.Setters.OfType<System.Windows.Setter>()
+                .Single(setter => setter.Property == System.Windows.Controls.Control.TemplateProperty).Value;
+            var selected = template.Triggers.OfType<System.Windows.Trigger>()
+                .Single(trigger => trigger.Property == System.Windows.Controls.ListBoxItem.IsSelectedProperty);
+            var background = selected.Setters.OfType<System.Windows.Setter>()
+                .Single(setter => setter.Property == System.Windows.Controls.Border.BackgroundProperty).Value;
+            True(background is System.Windows.Media.SolidColorBrush ink && ink.Color == DockTheme.Ink.Color,
+                "A selected row must be an ink block (OneHistoryID §2.4).");
+        }
+        catch (Exception ex)
+        {
+            styleError = ex;
+        }
+    });
+    styleThread.SetApartmentState(ApartmentState.STA);
+    styleThread.Start();
+    styleThread.Join();
+    True(styleError == null, "Dock styles must parse: " + styleError);
+}
+
 // 活动坞磁贴：底色随使用频率由纯白线性趋近柔和强调色，不再用光晕表达频率。
 Equal(0d, DockWeight.TileTint(0, 10), "Unused project keeps a plain white tile.");
 Equal(1d, DockWeight.TileTint(10, 10), "The most-used project reaches the fully tinted end.");
