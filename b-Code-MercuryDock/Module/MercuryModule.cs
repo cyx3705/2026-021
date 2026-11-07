@@ -294,6 +294,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             Background = Brushes.Transparent;
             FontFamily = DockTheme.FontFamily;
             FontSize = DockTheme.BodyFontSize;
+            FontWeight = DockTheme.BodyFontWeight;
             ShowInTaskbar = false;
             ShowActivated = false;
             Topmost = false;
@@ -452,10 +453,12 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             _items.Children.Add(HistoryVulcanButton());
 
             var projects = MercuryState.Projects;
+            var labels = DockProjectLabels.Create(MercuryState.AllProjects.Select(item => item.Name)
+                .Concat(projects.Select(item => item.Name)));
             // 光圈亮度按当前列表最大权重归一化，保证任何时候都有对比度。
             var maximum = projects.Count == 0 ? 0 : projects.Max(item => item.Weight);
             foreach (var project in projects)
-                _items.Children.Add(ProjectButton(project, maximum));
+                _items.Children.Add(ProjectButton(project, maximum, labels[project.Name]));
 
             // 手动加入的指令项常驻项目之后：不参与权重与策略排序，点击即经总线执行。
             foreach (var entry in MercuryState.CommandEntries)
@@ -543,7 +546,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
                     Text = "HC",
                     FontFamily = DockTheme.FontFamily,
                     FontSize = DockTheme.BodyFontSize,
-                    FontWeight = FontWeights.SemiBold,
+                    FontWeight = DockTheme.TitleFontWeight,
                     Foreground = DockTheme.TextOnAccent,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -564,7 +567,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             return button;
         }
 
-        private static Button ProjectButton(DockProject project, double maximum)
+        private static Button ProjectButton(DockProject project, double maximum, string shortLabel)
         {
             // 磁贴当场绘制而不用缓存的 PNG：底色随使用频率变化，按名字缓存的位图表达不了。
             var host = new Border
@@ -585,11 +588,11 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
                 BorderBrush = project.Pinned ? DockTheme.PinnedRing : Brushes.Transparent,
                 Child = new TextBlock
                 {
-                    Text = ProjectIconGenerator.ShortLabel(project.Name),
+                    Text = shortLabel,
                     FontFamily = DockTheme.FontFamily,
                     // 40 = 52 - 描边 2×2 - 文字左右边距 4×2。
-                    FontSize = ProjectIconGenerator.FitFontSize(ProjectIconGenerator.ShortLabel(project.Name), 40, 15),
-                    FontWeight = FontWeights.SemiBold,
+                    FontSize = ProjectIconGenerator.FitFontSize(shortLabel, 40, 15),
+                    FontWeight = DockTheme.TitleFontWeight,
                     Foreground = DockTheme.TileText,
                     TextAlignment = TextAlignment.Center,
                     TextTrimming = TextTrimming.None,
@@ -603,6 +606,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
             var label = new TextBlock
             {
                 Text = project.Number,
+                FontWeight = DockTheme.TitleFontWeight,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
                 Foreground = DockTheme.Label,
@@ -642,7 +646,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
                     Text = "❯",
                     FontFamily = DockTheme.FontFamily,
                     FontSize = 22,
-                    FontWeight = FontWeights.SemiBold,
+                    FontWeight = DockTheme.TitleFontWeight,
                     Foreground = DockTheme.Accent,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
@@ -722,6 +726,7 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
                 BorderBrush = DockTheme.PanelBorder,
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.BodyFontSize,
+                FontWeight = DockTheme.BodyFontWeight,
             };
             menu.Resources[SystemColors.MenuBrushKey] = DockTheme.PanelBackground;
             menu.Resources[SystemColors.MenuTextBrushKey] = DockTheme.Label;
@@ -753,7 +758,14 @@ public sealed class MercuryModule : IModuleContextAware, IDisposable
                 FontFamily = DockTheme.FontFamily,
                 FontSize = DockTheme.SmallFontSize,
                 Template = template,
-                ToolTip = tooltip,
+                FontWeight = DockTheme.BodyFontWeight,
+                ToolTip = new ToolTip
+                {
+                    Content = tooltip,
+                    FontFamily = DockTheme.FontFamily,
+                    FontSize = DockTheme.SmallFontSize,
+                    FontWeight = DockTheme.BodyFontWeight,
+                },
             };
         }
     }

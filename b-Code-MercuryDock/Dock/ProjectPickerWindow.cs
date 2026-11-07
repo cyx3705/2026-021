@@ -44,6 +44,7 @@ internal sealed class ProjectPickerWindow : Window
         Topmost = true;
         FontFamily = DockTheme.FontFamily;
         FontSize = DockTheme.BodyFontSize;
+        FontWeight = DockTheme.BodyFontWeight;
         // 搜索框、滚动条、列表选中都照 OneHistory 风格（见 DockStyles）。
         Resources.MergedDictionaries.Add(DockStyles.Create());
 
@@ -52,7 +53,14 @@ internal sealed class ProjectPickerWindow : Window
             Style = (Style)Resources[DockStyles.SearchBoxKey],
             FontFamily = DockTheme.FontFamily,
             FontSize = DockTheme.BodyFontSize,
-            ToolTip = "按名称或编号搜索；空格分开的几个词都要命中",
+            FontWeight = DockTheme.BodyFontWeight,
+            ToolTip = new ToolTip
+            {
+                Content = "按名称或编号搜索；空格分开的几个词都要命中",
+                FontFamily = DockTheme.FontFamily,
+                FontSize = DockTheme.SmallFontSize,
+                FontWeight = DockTheme.BodyFontWeight,
+            },
         };
         _query.TextChanged += (_, _) => Fill();
         _query.PreviewKeyDown += OnQueryKey;

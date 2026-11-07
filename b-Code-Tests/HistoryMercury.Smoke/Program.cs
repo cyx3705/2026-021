@@ -63,6 +63,32 @@ Equal("Mercury", ProjectIconGenerator.ShortLabel("2026-021-HistoryMercury"),
 True(ProjectIconGenerator.FitFontSize("A very long project suffix", 44) >= 6,
     "Project tile font remains a complete, non-ellipsis rendering path.");
 
+// REQ-DOCK-LABEL-01：单字/短英文、全库不重名，并独立于权重排序；HC 保留给主界面。
+{
+    string[] names = [
+        "2026-001-大AGV小车", "2026-002-大AGV小车", "2026-003-大AGV小车",
+        "2026-004-HistoryMercury", "2026-005-HistoryMessage", "2026-006-HistoryHC",
+        "2026-007-人工开发表格", "2026-008-软件开发", "2026-009-software",
+        "2026-010-Software", "2026-011-123", "2026-012-𠮷项目"
+    ];
+    var labels = DockProjectLabels.Create(names);
+    Equal("大", labels[names[0]], "Chinese projects use one character.");
+    Equal("MER", labels[names[3]], "English names omit History and use a few letters.");
+    Equal("人", labels[names[6]], "Chinese names are not reduced to tiny full-name text.");
+    Equal("𠮷", labels[names[11]], "A supplementary Chinese character must not be split.");
+    Equal(names.Length, labels.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+        "Every project has a distinct visible label, even identical suffixes and case variants.");
+    True(!labels.Values.Contains("HC", StringComparer.OrdinalIgnoreCase), "Host tile label is reserved.");
+    var reordered = DockProjectLabels.Create(names.Reverse().Concat(names));
+    True(names.All(name => labels[name] == reordered[name]), "Weight ordering and duplicates do not reassign labels.");
+    True(labels.Values.All(value => value.EnumerateRunes().Count() == 1
+        || (value.Length <= 4 && value.All(char.IsAsciiLetter))), "Labels are one character or short English.");
+    var crowded = DockProjectLabels.Create(Enumerable.Range(0, 100).Select(index => $"2026-{index:000}-同"));
+    Equal(100, crowded.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count(), "Exhausted candidate letters still avoid collisions.");
+    True(crowded.Values.All(value => value.Length <= 4), "Collision fallbacks stay short for a large library.");
+    var reserved = DockProjectLabels.Create(["2026-001-大", "2026-002-大小", "2026-003-小"]);
+    Equal("小", reserved["2026-003-小"], "Collision resolution must not steal another project's preferred character.");
+}
 var registry = new TestRegistrar();
 MercuryCommandCatalog.Register(registry);
 var commands = registry.All();
@@ -511,6 +537,28 @@ foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercu
     {
         try
         {
+            // REQ-DOCK-FONT-01 / WEB-FONT-001：正文 500，标题与编号 700；实际测量必须与磁贴字体一致。
+            Equal("Noto Serif, Noto Serif SC, Times New Roman, SimSun", DockTheme.FontFamily.Source,
+                "Font priority follows OHsite, including offline system serif fallbacks.");
+            Equal(500, DockTheme.BodyFontWeight.ToOpenTypeWeight(), "OHsite body weight is 500.");
+            Equal(700, DockTheme.TitleFontWeight.ToOpenTypeWeight(), "OHsite title weight is 700.");
+            Equal(DockTheme.FontFamily.Source, DockTheme.TileTypeface.FontFamily.Source,
+                "Tile measuring and rendering use the shared font family.");
+            Equal(DockTheme.TitleFontWeight, DockTheme.TileTypeface.Weight, "Tile measurement uses the actual title weight.");
+            var fontButton = new System.Windows.Controls.Button();
+            DockTheme.StyleButton(fontButton);
+            Equal(DockTheme.FontFamily.Source, fontButton.FontFamily.Source, "Styled controls use the shared serif stack.");
+            Equal(DockTheme.BodyFontWeight, fontButton.FontWeight, "Styled controls use body weight 500.");
+            foreach (var label in new[] { "大", "𠮷", "MER", "HC", "XCV", "WWWW" })
+            {
+                var size = ProjectIconGenerator.FitFontSize(label, 40, 15);
+                var measured = new System.Windows.Media.FormattedText(label,
+                    System.Globalization.CultureInfo.CurrentUICulture, System.Windows.FlowDirection.LeftToRight,
+                    DockTheme.TileTypeface, size, System.Windows.Media.Brushes.Black, 1);
+                True(measured.Width <= 40, "OHsite font must fit the actual tile content: " + label);
+                True(measured.Height <= 48, "OHsite font must fit the tile height: " + label);
+                True(!measured.BuildGeometry(new System.Windows.Point()).IsEmpty(), "Font must render a visible label: " + label);
+            }
             var styles = DockStyles.Create();
             True(styles.Contains(DockStyles.SearchBoxKey), "Dock styles must define the search box.");
             True(styles.Contains(DockStyles.ItemKey), "Dock styles must define the list item.");

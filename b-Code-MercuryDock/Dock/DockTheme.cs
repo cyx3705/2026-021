@@ -6,7 +6,7 @@ namespace Mercury;
 
 /// <summary>
 /// HistoryMercury 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
-/// 恒用深色色板，宿主处于浅色模式时页面也不会变白。字体与间距与深浅无关，继续跟随宿主。
+/// 恒用深色色板，宿主处于浅色模式时页面也不会变白。字体按 OneHistoryID §4 独立提供。
 /// </summary>
 public static class DockTheme
 {
@@ -60,7 +60,7 @@ public static class DockTheme
             (byte)Math.Round(TileBase.B + ((TileTintTarget.B - TileBase.B) * t))));
     }
     /// <summary>
-    /// 字体与间距。取值与前端令牌 <c>Aurora.Font.*</c> / <c>Aurora.Space.ControlPad</c> 一致，
+    /// 字体与间距。REQ-DOCK-FONT-01：字体对齐 OHsite 的 WEB-FONT-001；字号沿用桌面布局，
     /// 但**自己拿着**，不去查前端。
     /// </summary>
     /// <remarks>
@@ -69,7 +69,18 @@ public static class DockTheme
     /// 一直落在下面这些字面量上——写成"跟随宿主"只是错觉。坞是桌面上的常驻面，
     /// 它在前端起来之前就要显示，本来也不该跟着前端的主题走。
     /// </remarks>
-    public static FontFamily FontFamily => new("Microsoft YaHei UI, Segoe UI");
+    // OneHistorySite/z-OneHistoryID/README.md §4：西文/数字先 Noto Serif，中文落到 Noto Serif SC。
+    // 未安装 Noto 时按网站同一规则回落 Times New Roman / 宋体，不依赖 Aurora 或联网加载字体。
+    public static FontFamily FontFamily => new("Noto Serif, Noto Serif SC, Times New Roman, SimSun");
+
+    /// <summary>OHsite 正文与说明文字：500，深浅主题一致。</summary>
+    public static FontWeight BodyFontWeight => FontWeights.Medium;
+
+    /// <summary>OHsite 标题、项目编号与磁贴简称：700。</summary>
+    public static FontWeight TitleFontWeight => FontWeights.Bold;
+
+    /// <summary>绘制和宽度测量共用磁贴字体，避免测量仍走旧的 Segoe UI。</summary>
+    public static Typeface TileTypeface => new(FontFamily, FontStyles.Normal, TitleFontWeight, FontStretches.Normal);
 
     public static double BodyFontSize => 13;
 
@@ -89,6 +100,7 @@ public static class DockTheme
         button.Padding = ControlPadding;
         button.FontFamily = FontFamily;
         button.FontSize = BodyFontSize;
+        button.FontWeight = BodyFontWeight;
         button.Foreground = accent ? TextOnAccent : Label;
         button.Background = accent ? Accent : SurfaceAlt;
         button.BorderBrush = accent ? Accent : PanelBorder;

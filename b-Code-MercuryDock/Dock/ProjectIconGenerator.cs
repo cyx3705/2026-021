@@ -27,7 +27,7 @@ public static class ProjectIconGenerator
     {
         var cache = cacheRoot ?? Path.Combine(MercuryPaths.DataRoot, "icons");
         Directory.CreateDirectory(cache);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("v1:" + projectName)));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("v2-ohsite-serif:" + projectName)));
         var path = Path.Combine(cache, hash + ".png");
         if (!File.Exists(path))
             Render(projectName, path);
@@ -55,7 +55,7 @@ public static class ProjectIconGenerator
                 label,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                DockTheme.TileTypeface,
                 fontSize,
                 Brushes.White,
                 1.0);
@@ -91,7 +91,7 @@ public static class ProjectIconGenerator
                 text,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+                DockTheme.TileTypeface,
                 size,
                 Brushes.White,
                 1.0);
