@@ -71,13 +71,13 @@ public static class DockTheme
     /// </remarks>
     // OneHistorySite/z-OneHistoryID/README.md §4：西文/数字先 Noto Serif，中文落到 Noto Serif SC。
     // 未安装 Noto 时按网站同一规则回落 Times New Roman / 宋体，不依赖 Aurora 或联网加载字体。
-    public static FontFamily FontFamily => new("Noto Serif, Noto Serif SC, Times New Roman, SimSun");
+    public static FontFamily FontFamily => new(TypographySnapshot.FontFamily);
 
-    /// <summary>OHsite 正文与说明文字：500，深浅主题一致。</summary>
-    public static FontWeight BodyFontWeight => FontWeights.Medium;
+    /// <summary>OHsite 正文与说明文字：引用 Z 级消费快照，深浅主题一致。</summary>
+    public static FontWeight BodyFontWeight => FontWeight.FromOpenTypeWeight(TypographySnapshot.BodyWeight);
 
-    /// <summary>OHsite 标题、项目编号与磁贴简称：700。</summary>
-    public static FontWeight TitleFontWeight => FontWeights.Bold;
+    /// <summary>OHsite 标题、项目编号与磁贴简称：引用 Z 级消费快照。</summary>
+    public static FontWeight TitleFontWeight => FontWeight.FromOpenTypeWeight(TypographySnapshot.HeadingWeight);
 
     /// <summary>绘制和宽度测量共用磁贴字体，避免测量仍走旧的 Segoe UI。</summary>
     public static Typeface TileTypeface => new(FontFamily, FontStyles.Normal, TitleFontWeight, FontStretches.Normal);

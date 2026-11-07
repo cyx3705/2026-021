@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text.Json;
 using System.IO;
 using System.Xml.Linq;
@@ -537,18 +537,18 @@ foreach (var name in new[] { "mercury.ui.describe", "mercury.ui.actions", "mercu
     {
         try
         {
-            // REQ-DOCK-FONT-01 / WEB-FONT-001：正文 500，标题与编号 700；实际测量必须与磁贴字体一致。
+            // REQ-DOCK-FONT-01 / WEB-FONT-001：正文 400，标题与编号 600；实际测量必须与磁贴字体一致。
             Equal("Noto Serif, Noto Serif SC, Times New Roman, SimSun", DockTheme.FontFamily.Source,
                 "Font priority follows OHsite, including offline system serif fallbacks.");
-            Equal(500, DockTheme.BodyFontWeight.ToOpenTypeWeight(), "OHsite body weight is 500.");
-            Equal(700, DockTheme.TitleFontWeight.ToOpenTypeWeight(), "OHsite title weight is 700.");
+            Equal(400, DockTheme.BodyFontWeight.ToOpenTypeWeight(), "OHsite body weight is 400.");
+            Equal(600, DockTheme.TitleFontWeight.ToOpenTypeWeight(), "OHsite title weight is 600.");
             Equal(DockTheme.FontFamily.Source, DockTheme.TileTypeface.FontFamily.Source,
                 "Tile measuring and rendering use the shared font family.");
             Equal(DockTheme.TitleFontWeight, DockTheme.TileTypeface.Weight, "Tile measurement uses the actual title weight.");
             var fontButton = new System.Windows.Controls.Button();
             DockTheme.StyleButton(fontButton);
             Equal(DockTheme.FontFamily.Source, fontButton.FontFamily.Source, "Styled controls use the shared serif stack.");
-            Equal(DockTheme.BodyFontWeight, fontButton.FontWeight, "Styled controls use body weight 500.");
+            Equal(DockTheme.BodyFontWeight, fontButton.FontWeight, "Styled controls use the consumed body weight.");
             foreach (var label in new[] { "大", "𠮷", "MER", "HC", "XCV", "WWWW" })
             {
                 var size = ProjectIconGenerator.FitFontSize(label, 40, 15);

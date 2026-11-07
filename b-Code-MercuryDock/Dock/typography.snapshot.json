@@ -1,0 +1,40 @@
+{
+  "source": "2026-031-OneHistorySite/z-OneHistoryID/typography.json",
+  "sha256": "CCB8EA2D74D9C955730AB040F2A44A8E1210C1264B7989713AF6D22BBD396670",
+  "tokens": {
+    "schemaVersion": 1,
+    "id": "onehistory.typography",
+    "families": {
+      "serif": [
+        "Noto Serif",
+        "Noto Serif SC",
+        "Source Han Serif SC",
+        "Times New Roman",
+        "Tinos",
+        "SimSun",
+        "Songti SC",
+        "serif"
+      ],
+      "numerals": [
+        "Noto Serif",
+        "Times New Roman",
+        "serif"
+      ],
+      "mono": [
+        "Consolas",
+        "Courier New",
+        "monospace"
+      ],
+      "desktopSerif": [
+        "Noto Serif",
+        "Noto Serif SC",
+        "Times New Roman",
+        "SimSun"
+      ]
+    },
+    "weights": {
+      "body": 400,
+      "heading": 600
+    }
+  }
+}

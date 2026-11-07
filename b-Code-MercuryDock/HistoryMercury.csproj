@@ -8,7 +8,7 @@
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
     <AssemblyName>HistoryMercury</AssemblyName>
     <RootNamespace>Mercury</RootNamespace>
-    <Version>5.3.0</Version>
+    <Version>5.3.1</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
@@ -16,6 +16,7 @@
     <EmbeddedResource Remove="obj/**;tests/**" />
     <None Remove="obj/**;tests/**" />
     <InternalsVisibleTo Include="HistoryMercury.Smoke" />
+    <EmbeddedResource Include="Dock\typography.snapshot.json" LogicalName="Mercury.TypographySnapshot" />
   </ItemGroup>
   <ItemGroup>
     <!--
