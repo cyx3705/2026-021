@@ -17,6 +17,19 @@ Environment.SetEnvironmentVariable("MERCURY_STATE_DIRECTORY", stateOverride);
 var smokeDataRoot = Path.Combine(stateOverride, "ModuleData", "HistoryMercury");
 MercuryPaths.Configure(smokeDataRoot, null, null);
 
+
+// REQ-DOCK-COLOR-01: actual brushes consume the embedded authority and icon cache uses its revision.
+using (var colorStream = typeof(MercuryCommands).Assembly.GetManifestResourceStream("Mercury.ColorSnapshot")!)
+using (var colorDoc = JsonDocument.Parse(colorStream))
+{
+ var colorRoot = colorDoc.RootElement;
+ var colorTokens = colorRoot.GetProperty("tokens");
+ Equal(colorTokens.GetProperty("themes").GetProperty("dark").GetProperty("canvas").GetString(), DockTheme.Canvas.Color.ToString().Replace("#FF", "#"), "Consumed dark canvas");
+ Equal(colorTokens.GetProperty("common").GetProperty("accent").GetString(), DockTheme.Accent.Color.ToString().Replace("#FF", "#"), "Consumed shared accent");
+ var snapshotType = typeof(MercuryCommands).Assembly.GetType("Mercury.ColorSnapshot")!;
+ Equal(colorRoot.GetProperty("sha256").GetString(), snapshotType.GetProperty("Revision", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null), "Color revision survives initialization");
+}
+
 var assembly = typeof(MercuryCommands).Assembly;
 var moduleInfos = assembly.GetTypes()
     .Where(type => type.IsPublic && !type.IsAbstract && typeof(ModuleInfoBase).IsAssignableFrom(type))

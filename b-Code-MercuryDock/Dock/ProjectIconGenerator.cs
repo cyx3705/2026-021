@@ -15,19 +15,19 @@ public static class ProjectIconGenerator
 {
     private static readonly Color[] Palette =
     [
-        Color.FromRgb(38, 99, 156),
-        Color.FromRgb(33, 122, 91),
-        Color.FromRgb(156, 69, 58),
-        Color.FromRgb(97, 76, 150),
-        Color.FromRgb(157, 108, 30),
-        Color.FromRgb(45, 116, 128),
+        ColorSnapshot.Get("icon-blue", desktop: true),
+        ColorSnapshot.Get("icon-green", desktop: true),
+        ColorSnapshot.Get("icon-red", desktop: true),
+        ColorSnapshot.Get("icon-purple", desktop: true),
+        ColorSnapshot.Get("icon-gold", desktop: true),
+        ColorSnapshot.Get("icon-teal", desktop: true),
     ];
 
     public static BitmapSource Create(string projectName, string? cacheRoot = null)
     {
         var cache = cacheRoot ?? Path.Combine(MercuryPaths.DataRoot, "icons");
         Directory.CreateDirectory(cache);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("v2-ohsite-serif:" + projectName)));
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("v3-ohsite-colors:" + ColorSnapshot.Revision + ":" + projectName)));
         var path = Path.Combine(cache, hash + ".png");
         if (!File.Exists(path))
             Render(projectName, path);
@@ -57,7 +57,7 @@ public static class ProjectIconGenerator
                 FlowDirection.LeftToRight,
                 DockTheme.TileTypeface,
                 fontSize,
-                Brushes.White,
+                new SolidColorBrush(ColorSnapshot.Get("icon-text", desktop: true)),
                 1.0);
             context.DrawText(text, new Point((size - text.Width) / 2, (size - text.Height) / 2));
         }
@@ -93,7 +93,7 @@ public static class ProjectIconGenerator
                 FlowDirection.LeftToRight,
                 DockTheme.TileTypeface,
                 size,
-                Brushes.White,
+                new SolidColorBrush(ColorSnapshot.Get("icon-text", desktop: true)),
                 1.0);
             if (formatted.Width <= maxWidth)
                 break;

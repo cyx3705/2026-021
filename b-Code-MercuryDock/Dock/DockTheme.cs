@@ -6,43 +6,41 @@ namespace Mercury;
 
 /// <summary>
 /// HistoryMercury 的视觉令牌。管理页与桌面坞只有深色模式：颜色不解析宿主主题令牌，
-/// 恒用深色色板，宿主处于浅色模式时页面也不会变白。字体按 OneHistoryID §4 独立提供。
+/// 恒用深色色板，宿主处于浅色模式时页面也不会变白。颜色和字体均取 OneHistoryID 的 Diana Z 级消费快照。
 /// </summary>
 public static class DockTheme
 {
-    public static SolidColorBrush PanelBackground => Frozen(Color.FromRgb(0x1D, 0x20, 0x1F));
-    public static SolidColorBrush PanelBorder => Frozen(Color.FromRgb(0x34, 0x37, 0x36));
-    public static SolidColorBrush Label => Frozen(Color.FromRgb(0xE2, 0xDA, 0xC6));
-    public static SolidColorBrush Muted => Frozen(Color.FromRgb(0xAC, 0xA5, 0x93));
-    public static SolidColorBrush Hover => Frozen(Color.FromRgb(0x2A, 0x2D, 0x2C));
-    public static SolidColorBrush Pressed => Frozen(Color.FromRgb(0x34, 0x37, 0x36));
-    public static SolidColorBrush SurfaceAlt => Frozen(Color.FromRgb(0x24, 0x26, 0x25));
-    public static SolidColorBrush AccentSoft => Frozen(Color.FromRgb(0x5A, 0x48, 0x24));
-    public static SolidColorBrush Accent => Frozen(Color.FromRgb(0xD9, 0xA4, 0x41));
-    public static SolidColorBrush AccentHover => Frozen(Color.FromRgb(0xE8, 0xB6, 0x5C));
-    public static SolidColorBrush TextOnAccent => Frozen(Color.FromRgb(0x17, 0x19, 0x18));
+    public static SolidColorBrush PanelBackground => Frozen(ColorSnapshot.Get("surface"));
+    public static SolidColorBrush PanelBorder => Frozen(ColorSnapshot.Get("hairline-2"));
+    public static SolidColorBrush Label => Frozen(ColorSnapshot.Get("text"));
+    public static SolidColorBrush Muted => Frozen(ColorSnapshot.Get("text-2"));
+    public static SolidColorBrush Hover => Frozen(ColorSnapshot.Get("surface-hover"));
+    public static SolidColorBrush Pressed => Frozen(ColorSnapshot.Get("pressed"));
+    public static SolidColorBrush SurfaceAlt => Frozen(ColorSnapshot.Get("surface-2"));
+    public static SolidColorBrush AccentSoft => Frozen(ColorSnapshot.Get("selection-fill"));
+    public static SolidColorBrush Accent => Frozen(ColorSnapshot.Get("accent"));
+    public static SolidColorBrush AccentHover => Frozen(ColorSnapshot.Get("accent"));
+    public static SolidColorBrush TextOnAccent => Frozen(ColorSnapshot.Get("canvas"));
 
-    // 墨色组（OneHistoryID 网站风格 §2.4，取 Aurora 深色令牌的同名值）：选中 = 墨色块反白，聚焦 = 边线变墨色。
-    public static SolidColorBrush Canvas => Frozen(Color.FromRgb(0x1A, 0x1D, 0x1C));
-    public static SolidColorBrush Ink => Frozen(Color.FromRgb(0xE2, 0xDA, 0xC6));
-    public static SolidColorBrush OnInk => Frozen(Color.FromRgb(0x1A, 0x1D, 0x1C));
-    public static SolidColorBrush AccentOnInk => Frozen(Color.FromRgb(0x7F, 0x5E, 0x0F));
-    public static SolidColorBrush MutedOnInk => Frozen(Color.FromRgb(0x6A, 0x64, 0x58));
-    public static SolidColorBrush TextDisabled => Frozen(Color.FromRgb(0x77, 0x74, 0x6A));
+    // 墨色组（OneHistoryID 网站风格 §2.4，取 OHsite 深色令牌的同名值）：选中 = 墨色块反白，聚焦 = 边线变墨色。
+    public static SolidColorBrush Canvas => Frozen(ColorSnapshot.Get("canvas"));
+    public static SolidColorBrush Ink => Frozen(ColorSnapshot.Get("ink"));
+    public static SolidColorBrush OnInk => Frozen(ColorSnapshot.Get("on-ink"));
+    public static SolidColorBrush AccentOnInk => Frozen(ColorSnapshot.Get("accent"));
+    public static SolidColorBrush MutedOnInk => Frozen(ColorSnapshot.Get("text-2-on-ink"));
+    public static SolidColorBrush TextDisabled => Frozen(ColorSnapshot.Get("text-disabled"));
 
-    /// <summary>列表选中色：淡黄底配深色文字，深底上醒目但不刺眼。</summary>
-    public static SolidColorBrush Selection => Frozen(Color.FromRgb(0xEA, 0xDC, 0x9E));
-    public static SolidColorBrush SelectionText => TextOnAccent;
-    /// <summary>磁贴底色的两端：纯白 → 柔和强调背景。取自宿主 UI 文档的
-    /// <c>Aurora.Brush.Surface</c>(#FFFFFF) 与 <c>Aurora.Brush.AccentSoft</c>(#FAF0D8) 浅色值。</summary>
-    public static Color TileBase => Color.FromRgb(0xFF, 0xFF, 0xFF);
+    /// <summary>列表选中色：权威墨色块配本主题反白文字。</summary>
+    public static SolidColorBrush Selection => Frozen(ColorSnapshot.Get("ink"));
+    public static SolidColorBrush SelectionText => OnInk;
+    /// <summary>磁贴底色两端由 OHsite desktop 令牌定义。</summary>
+    public static Color TileBase => ColorSnapshot.Get("tile-base", desktop: true);
 
     /// <summary>磁贴底色偏黄端。</summary>
-    public static Color TileTintTarget => Color.FromRgb(0xFA, 0xF0, 0xD8);
+    public static Color TileTintTarget => ColorSnapshot.Get("tile-tint-target", desktop: true);
 
-    /// <summary>磁贴文字：深黄，取自 UI 文档浅色 <c>Aurora.Brush.Accent</c>(#A87A12)。
-    /// 白底与 #FAF0D8 底上对比度都足够。</summary>
-    public static SolidColorBrush TileText => Frozen(Color.FromRgb(0xA8, 0x7A, 0x12));
+    /// <summary>磁贴文字取 OHsite desktop.tile-text。</summary>
+    public static SolidColorBrush TileText => Frozen(ColorSnapshot.Get("tile-text", desktop: true));
 
     /// <summary>
     /// 置顶磁贴的一圈亮黄描边。用 <see cref="Accent"/> 而不是更亮的

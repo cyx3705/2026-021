@@ -1,0 +1,69 @@
+{
+  "source": "2026-031-OneHistorySite/z-OneHistoryID/colors.json",
+  "sha256": "00595EEBF13EA57BD5C6B79572370736B01AFBC85E1BE32355D9522F845DAE8A",
+  "tokens": {
+    "schemaVersion": 1,
+    "id": "onehistory.colors",
+    "common": {
+      "accent": "#A97F22",
+      "accent-soft": "rgba(169,127,34,.42)",
+      "accent-wash": "rgba(169,127,34,.10)"
+    },
+    "themes": {
+      "light": {
+        "canvas": "#FBFAF7",
+        "surface": "#F3F1EC",
+        "surface-2": "#EBE9E4",
+        "surface-hover": "#E5E3DE",
+        "text": "#38352F",
+        "text-2": "#38352F",
+        "ink": "#26231E",
+        "on-ink": "#FBFAF7",
+        "hairline": "#E5E3DE",
+        "hairline-2": "#D5D1C8",
+        "code-bg": "#EBE9E4",
+        "text-2-on-ink": "#ACA593",
+        "pressed": "#DDD9D1",
+        "danger": "#C42525",
+        "danger-soft": "#FBE9E9",
+        "text-disabled": "#9E998D",
+        "scroll-thumb": "rgba(158,153,141,.55)",
+        "scroll-thumb-hover": "rgba(158,153,141,.85)",
+        "selection-fill": "#EFE8D7"
+      },
+      "dark": {
+        "canvas": "#121414",
+        "surface": "#1D201F",
+        "surface-2": "#191C1B",
+        "surface-hover": "#2A2D2C",
+        "text": "#DAD7CE",
+        "text-2": "#DAD7CE",
+        "ink": "#E2DAC6",
+        "on-ink": "#121414",
+        "hairline": "#2A2D2C",
+        "hairline-2": "#343736",
+        "code-bg": "#171A19",
+        "text-2-on-ink": "#6A6458",
+        "pressed": "#343736",
+        "danger": "#E06C6C",
+        "danger-soft": "#3A2320",
+        "text-disabled": "#77746A",
+        "scroll-thumb": "rgba(119,116,106,.55)",
+        "scroll-thumb-hover": "rgba(119,116,106,.85)",
+        "selection-fill": "#3C3218"
+      }
+    },
+    "desktop": {
+      "tile-base": "#FFFFFF",
+      "tile-tint-target": "#FAF0D8",
+      "tile-text": "#A87A12",
+      "icon-text": "#FFFFFF",
+      "icon-blue": "#26639C",
+      "icon-green": "#217A5B",
+      "icon-red": "#9C453A",
+      "icon-purple": "#614C96",
+      "icon-gold": "#9D6C1E",
+      "icon-teal": "#2D7480"
+    }
+  }
+}
