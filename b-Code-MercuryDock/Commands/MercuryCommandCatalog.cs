@@ -85,7 +85,7 @@ internal static class MercuryCommandCatalog
         },
         Write("mercury.dock.hide", "dock", "隐藏项目坞。", _ => MercuryCommands.HideDock()),
         Write("mercury.dock.show", "dock", "显示项目坞。", _ => MercuryCommands.ShowDock()),
-        WriteWith("mercury.dock.policy", "dock", $"查看或更新项目坞策略；项目数定死 {DockPolicy.ItemCount} 个，只有半衰期可调。不带参数只查看。",
+        WriteWith("mercury.dock.policy", "dock", "查看或调整项目坞排序半衰期",
             "mercury.dock.policy halflife=7",
             context => MercuryCommands.SetDockPolicy(
                 context.Has("halflife") ? context.GetDouble("halflife") : null),
